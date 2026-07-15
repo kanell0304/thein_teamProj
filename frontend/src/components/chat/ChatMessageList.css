@@ -1,0 +1,25 @@
+/*
+ * 메시지 영역: 좌우 9px을 제외한 357px
+ * 공지 높이가 변경되면 flex: 1에 의해 남은 공간을 자동으로 사용합니다.
+ */
+.chat-message-list {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  margin: 8px 9px 0;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+
+.chat-message-list::-webkit-scrollbar {
+  display: none;
+}
+
+.chat-message-list__content {
+  min-height: 100%;
+  padding: 8px 0 12px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 9px;
+}

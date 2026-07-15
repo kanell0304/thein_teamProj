@@ -1,0 +1,86 @@
+/* ChatMessage 한 개의 공통 배치 */
+.message {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+.message--mine {
+  justify-content: flex-end;
+}
+
+.message--other {
+  justify-content: flex-start;
+  align-items: flex-start;
+}
+
+.message-profile {
+  flex: 0 0 31px;
+  width: 31px;
+  height: 31px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 12px;
+  background: linear-gradient(135deg, #8795a1, #e6edf2);
+}
+
+.message-name {
+  display: block;
+  margin-bottom: 4px;
+  color: rgba(0, 0, 0, 0.55);
+  font-size: 11px;
+}
+
+.message-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.message-bubble {
+  position: relative;
+  max-width: 260px;
+  min-height: 32px;
+  padding: 8px 11px;
+  border-radius: 12px;
+  font-size: 14px;
+  line-height: 18px;
+  word-break: break-word;
+}
+
+.message-bubble::after {
+  position: absolute;
+  top: 8px;
+  width: 8px;
+  height: 8px;
+  content: '';
+  background: inherit;
+  transform: rotate(45deg);
+}
+
+.message-bubble--mine {
+  background: #fae64c;
+}
+
+.message-bubble--mine::after {
+  right: -3px;
+}
+
+.message-bubble--other {
+  background: #fff;
+}
+
+.message-bubble--other::after {
+  left: -3px;
+}
+
+.message-time {
+  color: rgba(0, 0, 0, 0.5);
+  font-size: 9px;
+  white-space: nowrap;
+}
+
+@media (max-width: 374px) {
+  .message-bubble {
+    max-width: 70vw;
+  }
+}

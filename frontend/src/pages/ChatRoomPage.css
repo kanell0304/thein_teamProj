@@ -1,0 +1,73 @@
+/*
+ * 채팅 페이지 전체 배치
+ * 375 x 812px 안에서 Header(80px), Body, Input(71px)을 세로로 배치.
+ */
+.chat-room {
+  --header-height: 80px;
+  --input-height: 71px;
+  position: relative;
+  width: 100%;
+  max-width: 375px;
+  height: min(812px, 100dvh);
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: #afc0cf;
+  color: #282a2b;
+}
+
+.chat-room button {
+  border: 0;
+  background: none;
+}
+
+/* 공지가 펼쳐질 때 메시지 영역이 자동으로 줄어들도록 세로 flex로 배치 */
+.chat-body {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  padding-top: 7px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* 하단 입력 영역: 375 x 71px */
+.chat-input-area {
+  position: relative;
+  flex: 0 0 var(--input-height);
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 5px 10px 0;
+  background: #fff;
+}
+
+/* 추후 모먹지 기능 버튼 컴포넌트로 교체할 수 있는 자리 */
+.plus-button {
+  flex: 0 0 34px;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  color: #90949b;
+  font-size: 22px;
+}
+
+.home-bar {
+  position: absolute;
+  right: 50%;
+  bottom: 7px;
+  width: 134px;
+  height: 5px;
+  border-radius: 3px;
+  background: #000;
+  transform: translateX(50%);
+}
+
+@media (max-width: 374px) {
+  .chat-room {
+    max-width: none;
+  }
+}

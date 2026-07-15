@@ -1,0 +1,76 @@
+/* 접힌 상태는 34px이며, 펼치면 children의 실제 높이만큼 자동으로 늘어남. */
+.chat-notice {
+  z-index: 5;
+  flex: 0 0 auto;
+  margin: 0 5px;
+  overflow: hidden;
+  background: #fff;
+  border-radius: 17px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  font-size: 13px;
+}
+
+.notice-summary {
+  width: 100%;
+  min-height: 34px;
+  padding: 0 11px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #282a2b;
+  text-align: left;
+}
+
+.notice-summary:not(:disabled):hover {
+  background: #f8f9fa !important;
+}
+
+.notice-summary:disabled {
+  cursor: default;
+}
+
+.notice-title {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.notice-arrow {
+  font-size: 21px;
+  transition: transform 0.2s ease;
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+}
+
+.chat-notice--expanded .notice-arrow {
+  transform: rotate(180deg);
+}
+
+/* grid 0fr → 1fr 방식으로 auto 높이 콘텐츠도 부드럽게 펼치기. */
+.notice-details {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.25s ease;
+}
+
+.notice-details > div {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.chat-notice--expanded .notice-details {
+  grid-template-rows: 1fr;
+}
+
+.notice-details__content {
+  max-height: 330px;
+  padding: 0 14px;
+  overflow-y: auto;
+  border-top: 1px solid transparent;
+}
+
+.chat-notice--expanded .notice-details__content {
+  padding-top: 12px;
+  padding-bottom: 14px;
+  border-top-color: #ececec;
+}
