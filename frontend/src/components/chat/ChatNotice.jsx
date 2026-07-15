@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import momeokjiIcon from '../../assets/icons/momeokji-icon.png'
 import './ChatNotice.css'
 
 function ChatNotice({ text, children, defaultExpanded = false }) {
@@ -14,13 +15,11 @@ function ChatNotice({ text, children, defaultExpanded = false }) {
         disabled={!hasDetails}
         onClick={() => hasDetails && setIsExpanded((previous) => !previous)}
       >
-        <span aria-hidden="true">📢</span>
+        <img className="notice-icon" src={momeokjiIcon} alt="" aria-hidden="true" />
         <span className="notice-title">{text}</span>
-        {hasDetails && (
-          <span className="material-symbols-outlined notice-arrow" aria-hidden="true">
-            expand_more
-          </span>
-        )}
+        <span className="material-symbols-outlined notice-arrow" aria-hidden="true">
+          expand_more
+        </span>
       </button>
 
       {/* 추천·투표·예약 등 다른 기능의 결과 컴포넌트를 children 위치에 넣습니다. */}

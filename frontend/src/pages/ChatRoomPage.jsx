@@ -68,10 +68,12 @@ function ChatRoomPage() {
 
       {/* 이후 기능 버튼이나 모먹지 패널을 붙일 기준이 되는 하단 영역. */}
       <footer className="chat-input-area">
-        <button className="plus-button" type="button" aria-label="채팅 기능 열기">
-          ＋
-        </button>
-        <ChatInput onSend={sendMessage} />
+        <div className="chat-input-row">
+          <button className="plus-button" type="button" aria-label="채팅 기능 열기">
+            <span className="plus-icon" aria-hidden="true" />
+          </button>
+          <ChatInput onSend={sendMessage} />
+        </div>
         <div className="home-bar" />
       </footer>
     </div>

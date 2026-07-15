@@ -39,17 +39,18 @@
 .message-bubble {
   position: relative;
   max-width: 260px;
-  min-height: 32px;
-  padding: 8px 11px;
-  border-radius: 12px;
-  font-size: 14px;
+  min-height: 35px;
+  border-radius: 13.5px;
+  color: #282a2b;
+  font-size: 15px;
+  font-weight: 400;
   line-height: 18px;
   word-break: break-word;
 }
 
 .message-bubble::after {
   position: absolute;
-  top: 8px;
+  top: 7px;
   width: 8px;
   height: 8px;
   content: '';
@@ -58,6 +59,7 @@
 }
 
 .message-bubble--mine {
+  padding: 9px 10px 8px 12px;
   background: #fae64c;
 }
 
@@ -66,6 +68,7 @@
 }
 
 .message-bubble--other {
+  padding: 9px 10px 8px;
   background: #fff;
 }
 

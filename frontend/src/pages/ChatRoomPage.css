@@ -1,10 +1,10 @@
 /*
  * 채팅 페이지 전체 배치
- * 375 x 812px 안에서 Header(80px), Body, Input(71px)을 세로로 배치.
+ * 375 x 812px 안에서 Header(88px), Body(643px), Input(81px)을 세로로 배치.
  */
 .chat-room {
-  --header-height: 80px;
-  --input-height: 71px;
+  --header-height: 88px;
+  --input-height: 81px;
   position: relative;
   width: 100%;
   max-width: 375px;
@@ -14,6 +14,7 @@
   flex-direction: column;
   overflow: hidden;
   background: #afc0cf;
+  border-radius: 24px;
   color: #282a2b;
 }
 
@@ -27,43 +28,81 @@
   position: relative;
   flex: 1;
   min-height: 0;
-  padding-top: 7px;
   display: flex;
   flex-direction: column;
   overflow: hidden;
 }
 
-/* 하단 입력 영역: 375 x 71px */
+/* 하단 입력 영역: 375 x 81px */
 .chat-input-area {
-  position: relative;
   flex: 0 0 var(--input-height);
+  padding: 8px 0;
   display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  padding: 5px 10px 0;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
   background: #fff;
 }
 
-/* 추후 모먹지 기능 버튼 컴포넌트로 교체할 수 있는 자리 */
+.chat-input-row {
+  flex: 0 0 36px;
+  width: 100%;
+  height: 36px;
+  padding: 0 14px;
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+/* 추후 미디어 선택 컴포넌트로 교체할 수 있는 자리 */
 .plus-button {
-  flex: 0 0 34px;
-  width: 34px;
-  height: 34px;
+  position: relative;
+  flex: 0 0 22.92px;
+  width: 22.92px;
+  height: 22.85px;
+  padding: 0;
   display: grid;
   place-items: center;
-  color: #90949b;
-  font-size: 22px;
+  border: 1.2px solid #90949b !important;
+  border-radius: 7.5px;
+}
+
+.plus-icon,
+.plus-icon::before,
+.plus-icon::after {
+  position: absolute;
+  display: block;
+  content: '';
+  border-radius: 0.5px;
+  background: #90949b;
+}
+
+.plus-icon {
+  top: 50%;
+  left: 50%;
+  width: 12.77px;
+  height: 1.31px;
+  transform: translate(-50%, -50%);
+}
+
+.plus-icon::before {
+  top: 50%;
+  left: 50%;
+  width: 1.31px;
+  height: 12.77px;
+  transform: translate(-50%, -50%);
+}
+
+.plus-icon::after {
+  display: none;
 }
 
 .home-bar {
-  position: absolute;
-  right: 50%;
-  bottom: 7px;
-  width: 134px;
+  flex: 0 0 5px;
+  width: 148px;
   height: 5px;
   border-radius: 3px;
   background: #000;
-  transform: translateX(50%);
 }
 
 @media (max-width: 374px) {

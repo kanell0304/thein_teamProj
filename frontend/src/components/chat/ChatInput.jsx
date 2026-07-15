@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import momeokjiIcon from '../../assets/icons/momeokji-icon.png'
 import './ChatInput.css'
 
 function ChatInput({ onSend }) {
@@ -22,8 +23,17 @@ function ChatInput({ onSend }) {
         placeholder="메시지를 입력하세요"
         onChange={(event) => setText(event.target.value)}
       />
-      <button type="button" aria-label="이모티콘">☺</button>
-      <button className="send-button" type="submit">전송</button>
+      <button className="momeokji-button" type="button" aria-label="모먹지 기능 열기">
+        <span
+          className="momeokji-glyph"
+          style={{ '--momeokji-icon': `url("${momeokjiIcon}")` }}
+          aria-hidden="true"
+        />
+      </button>
+      <button className="emoji-button" type="button" aria-label="이모티콘">
+        <span className="emoji-face" aria-hidden="true" />
+      </button>
+      <button className="sharp-button" type="submit" aria-label="메시지 전송">#</button>
     </form>
   )
 }
