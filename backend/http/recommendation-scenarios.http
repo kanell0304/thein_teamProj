@@ -1,0 +1,254 @@
+### 안내
+# 이 파일은 /api/ai/recommendations 하나의 엔드포인트를 다양한 입력값으로 테스트하기 위한 것입니다.
+# 각 요청은 실제 OpenAI(gpt-5.5) 호출이라 블록당 1~2분씩 걸립니다. "전체 실행"하지 말고
+# 확인하고 싶은 시나리오의 ### 블록만 골라서 하나씩 실행하세요.
+# 투표/최종공지까지 이어지는 전체 흐름 테스트는 recommendation-flow.http를 참고하세요.
+
+
+### 1. 참여자 1명 (최소 인원 - 개인 선호가 그대로 반영되는지 확인)
+POST http://localhost:8081/api/ai/recommendations
+Content-Type: application/json
+
+{
+  "commonOption": {
+    "destinationName": "강남역",
+    "destinationLatitude": 37.498,
+    "destinationLongitude": 127.027,
+    "meetingTime": "2026-07-20T12:00:00",
+    "purpose": "식사"
+  },
+  "personalOptions": [
+    {
+      "participantId": "u1",
+      "walkMinutes": 5,
+      "preferredCategories": ["한식"],
+      "budgetLimit": 15000,
+      "parkingNeeded": false,
+      "excludedFoods": [],
+      "atmosphere": "룸"
+    }
+  ]
+}
+
+> {%
+    client.test("참여자 수 1명 반영", function () {
+        client.assert(response.body.participantCount === 1, "participantCount는 1이어야 함");
+    });
+    client.test("추천 3+2", function () {
+        client.assert(response.body.primaryRecommendations.length === 3, "primary 3개");
+        client.assert(response.body.extraRecommendations.length === 2, "extra 2개");
+    });
+%}
+
+### 2. 참여자 다수(5명) - 완전히 같은 조건 (합의가 쉬운 경우)
+POST http://localhost:8081/api/ai/recommendations
+Content-Type: application/json
+
+{
+  "commonOption": {
+    "destinationName": "강남역",
+    "destinationLatitude": 37.498,
+    "destinationLongitude": 127.027,
+    "meetingTime": "2026-07-20T12:00:00",
+    "purpose": "식사"
+  },
+  "personalOptions": [
+    {"participantId": "u1", "walkMinutes": 10, "preferredCategories": ["한식"], "budgetLimit": 15000, "parkingNeeded": false, "excludedFoods": [], "atmosphere": "개방형"},
+    {"participantId": "u2", "walkMinutes": 10, "preferredCategories": ["한식"], "budgetLimit": 15000, "parkingNeeded": false, "excludedFoods": [], "atmosphere": "개방형"},
+    {"participantId": "u3", "walkMinutes": 10, "preferredCategories": ["한식"], "budgetLimit": 15000, "parkingNeeded": false, "excludedFoods": [], "atmosphere": "개방형"},
+    {"participantId": "u4", "walkMinutes": 10, "preferredCategories": ["한식"], "budgetLimit": 15000, "parkingNeeded": false, "excludedFoods": [], "atmosphere": "개방형"},
+    {"participantId": "u5", "walkMinutes": 10, "preferredCategories": ["한식"], "budgetLimit": 15000, "parkingNeeded": false, "excludedFoods": [], "atmosphere": "개방형"}
+  ]
+}
+
+> {%
+    client.test("참여자 수 5명 반영", function () {
+        client.assert(response.body.participantCount === 5, "participantCount는 5여야 함");
+    });
+%}
+
+### 3. 선호 카테고리가 완전히 갈리는 경우 (한식/중식/일식 각 1명 - 우선순위 애매)
+POST http://localhost:8081/api/ai/recommendations
+Content-Type: application/json
+
+{
+  "commonOption": {
+    "destinationName": "홍대입구역",
+    "destinationLatitude": 37.5572,
+    "destinationLongitude": 126.9245,
+    "meetingTime": "2026-07-21T19:00:00",
+    "purpose": "식사"
+  },
+  "personalOptions": [
+    {"participantId": "u1", "walkMinutes": 10, "preferredCategories": ["한식"], "budgetLimit": 20000, "parkingNeeded": false, "excludedFoods": [], "atmosphere": null},
+    {"participantId": "u2", "walkMinutes": 10, "preferredCategories": ["중식"], "budgetLimit": 20000, "parkingNeeded": false, "excludedFoods": [], "atmosphere": null},
+    {"participantId": "u3", "walkMinutes": 10, "preferredCategories": ["일식"], "budgetLimit": 20000, "parkingNeeded": false, "excludedFoods": [], "atmosphere": null}
+  ]
+}
+
+### 4. 예산 편차가 큰 경우 (5,000원 vs 50,000원 - 최저 예산 기준 필터링 확인)
+POST http://localhost:8081/api/ai/recommendations
+Content-Type: application/json
+
+{
+  "commonOption": {
+    "destinationName": "강남역",
+    "destinationLatitude": 37.498,
+    "destinationLongitude": 127.027,
+    "meetingTime": "2026-07-20T12:00:00",
+    "purpose": "식사"
+  },
+  "personalOptions": [
+    {"participantId": "u1", "walkMinutes": 10, "preferredCategories": ["한식"], "budgetLimit": 5000, "parkingNeeded": false, "excludedFoods": [], "atmosphere": null},
+    {"participantId": "u2", "walkMinutes": 10, "preferredCategories": ["한식"], "budgetLimit": 50000, "parkingNeeded": false, "excludedFoods": [], "atmosphere": null}
+  ]
+}
+
+### 5. 제외 음식이 여러 명에 걸쳐 겹치는 경우 (합집합이 커서 후보가 좁아짐)
+POST http://localhost:8081/api/ai/recommendations
+Content-Type: application/json
+
+{
+  "commonOption": {
+    "destinationName": "강남역",
+    "destinationLatitude": 37.498,
+    "destinationLongitude": 127.027,
+    "meetingTime": "2026-07-20T12:00:00",
+    "purpose": "식사"
+  },
+  "personalOptions": [
+    {"participantId": "u1", "walkMinutes": 10, "preferredCategories": ["한식", "일식"], "budgetLimit": 20000, "parkingNeeded": false, "excludedFoods": ["고수", "해산물"], "atmosphere": null},
+    {"participantId": "u2", "walkMinutes": 10, "preferredCategories": ["한식", "일식"], "budgetLimit": 20000, "parkingNeeded": false, "excludedFoods": ["돼지고기", "매운맛"], "atmosphere": null},
+    {"participantId": "u3", "walkMinutes": 10, "preferredCategories": ["한식", "일식"], "budgetLimit": 20000, "parkingNeeded": false, "excludedFoods": ["유제품"], "atmosphere": null}
+  ]
+}
+
+> {%
+    client.test("응답 정상 여부 확인 - 제외 목록이 많아도 5곳은 채워져야 함", function () {
+        client.assert(response.body.primaryRecommendations.length === 3, "primary 3개");
+        client.assert(response.body.extraRecommendations.length === 2, "extra 2개");
+    });
+%}
+
+### 6. 예산 미입력(무제한) + 선택 옵션 없음 - null/누락 값 처리 확인
+POST http://localhost:8081/api/ai/recommendations
+Content-Type: application/json
+
+{
+  "commonOption": {
+    "destinationName": "잠실역",
+    "destinationLatitude": 37.5133,
+    "destinationLongitude": 127.1000,
+    "meetingTime": "2026-07-22T18:30:00",
+    "purpose": "회식"
+  },
+  "personalOptions": [
+    {"participantId": "u1", "walkMinutes": 15, "preferredCategories": ["고기"], "parkingNeeded": false, "excludedFoods": []},
+    {"participantId": "u2", "walkMinutes": 15, "preferredCategories": ["고기"], "parkingNeeded": true, "excludedFoods": []}
+  ]
+}
+
+### 7. 전원 주차 필요 + 도보 이동시간이 긴 경우 (도보 30분 - 외곽 지역 상정)
+POST http://localhost:8081/api/ai/recommendations
+Content-Type: application/json
+
+{
+  "commonOption": {
+    "destinationName": "판교역",
+    "destinationLatitude": 37.3947,
+    "destinationLongitude": 127.1112,
+    "meetingTime": "2026-07-23T12:30:00",
+    "purpose": "식사"
+  },
+  "personalOptions": [
+    {"participantId": "u1", "walkMinutes": 30, "preferredCategories": ["양식"], "budgetLimit": 25000, "parkingNeeded": true, "excludedFoods": [], "atmosphere": "룸"},
+    {"participantId": "u2", "walkMinutes": 30, "preferredCategories": ["양식"], "budgetLimit": 25000, "parkingNeeded": true, "excludedFoods": [], "atmosphere": "룸"}
+  ]
+}
+
+### 8. 목적이 술자리인 경우 (미팅 목적에 따라 카테고리 추천이 달라지는지)
+POST http://localhost:8081/api/ai/recommendations
+Content-Type: application/json
+
+{
+  "commonOption": {
+    "destinationName": "강남역",
+    "destinationLatitude": 37.498,
+    "destinationLongitude": 127.027,
+    "meetingTime": "2026-07-24T20:00:00",
+    "purpose": "술자리"
+  },
+  "personalOptions": [
+    {"participantId": "u1", "walkMinutes": 10, "preferredCategories": ["안주", "포차"], "budgetLimit": 30000, "parkingNeeded": false, "excludedFoods": [], "atmosphere": "개방형"},
+    {"participantId": "u2", "walkMinutes": 10, "preferredCategories": ["안주", "포차"], "budgetLimit": 30000, "parkingNeeded": false, "excludedFoods": [], "atmosphere": "개방형"}
+  ]
+}
+
+### ---- 검증 실패(400) 확인용 케이스 ----
+
+### 9. personalOptions가 빈 배열 - 400 기대
+POST http://localhost:8081/api/ai/recommendations
+Content-Type: application/json
+
+{
+  "commonOption": {
+    "destinationName": "강남역",
+    "destinationLatitude": 37.498,
+    "destinationLongitude": 127.027,
+    "meetingTime": "2026-07-20T12:00:00",
+    "purpose": "식사"
+  },
+  "personalOptions": []
+}
+
+> {%
+    client.test("빈 personalOptions는 400", function () {
+        client.assert(response.status === 400, "400이어야 함, 실제: " + response.status);
+    });
+%}
+
+### 10. walkMinutes가 0 이하 - 400 기대 (@Min(1) 위반)
+POST http://localhost:8081/api/ai/recommendations
+Content-Type: application/json
+
+{
+  "commonOption": {
+    "destinationName": "강남역",
+    "destinationLatitude": 37.498,
+    "destinationLongitude": 127.027,
+    "meetingTime": "2026-07-20T12:00:00",
+    "purpose": "식사"
+  },
+  "personalOptions": [
+    {"participantId": "u1", "walkMinutes": 0, "preferredCategories": ["한식"], "budgetLimit": 15000, "parkingNeeded": false, "excludedFoods": [], "atmosphere": "룸"}
+  ]
+}
+
+> {%
+    client.test("walkMinutes 0은 400", function () {
+        client.assert(response.status === 400, "400이어야 함, 실제: " + response.status);
+    });
+%}
+
+### 11. preferredCategories가 빈 배열 - 400 기대 (@NotEmpty 위반)
+POST http://localhost:8081/api/ai/recommendations
+Content-Type: application/json
+
+{
+  "commonOption": {
+    "destinationName": "강남역",
+    "destinationLatitude": 37.498,
+    "destinationLongitude": 127.027,
+    "meetingTime": "2026-07-20T12:00:00",
+    "purpose": "식사"
+  },
+  "personalOptions": [
+    {"participantId": "u1", "walkMinutes": 10, "preferredCategories": [], "budgetLimit": 15000, "parkingNeeded": false, "excludedFoods": [], "atmosphere": "룸"}
+  ]
+}
+
+> {%
+    client.test("빈 preferredCategories는 400", function () {
+        client.assert(response.status === 400, "400이어야 함, 실제: " + response.status);
+    });
+%}
