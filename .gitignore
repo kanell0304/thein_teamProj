@@ -35,3 +35,8 @@ out/
 
 ### VS Code ###
 .vscode/
+
+### lsj001206 ###
+**/_temp
+**/_temp-codex
+**/graphify-out
