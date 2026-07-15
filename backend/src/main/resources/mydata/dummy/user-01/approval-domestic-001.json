@@ -1,0 +1,619 @@
+{
+  "rsp_code": "00000",
+  "rsp_msg": "정상 처리",
+  "approved_cnt": 68,
+  "approved_list": [
+    {
+      "approved_num": "89328927",
+      "approved_dtime": "20260501130000",
+      "status": "01",
+      "pay_type": "01",
+      "merchant_name": "강남모밀　무이",
+      "merchant_regno": "715-18-01182",
+      "approved_amt": 12000
+    },
+    {
+      "approved_num": "79804448",
+      "approved_dtime": "20260502132000",
+      "status": "01",
+      "pay_type": "01",
+      "merchant_name": "네이버파이낸셜",
+      "merchant_regno": "524-86-01528",
+      "approved_amt": 11000
+    },
+    {
+      "approved_num": "78808358",
+      "approved_dtime": "20260504134000",
+      "status": "01",
+      "pay_type": "01",
+      "merchant_name": "네이버파이낸셜",
+      "merchant_regno": "524-86-01528",
+      "approved_amt": 28407
+    },
+    {
+      "approved_num": "27801238",
+      "approved_dtime": "20260505130000",
+      "status": "01",
+      "pay_type": "01",
+      "merchant_name": "컴포즈커피 논현영동시장점",
+      "merchant_regno": "505-38-68172",
+      "approved_amt": 2900
+    },
+    {
+      "approved_num": "80837547",
+      "approved_dtime": "20260506132000",
+      "status": "01",
+      "pay_type": "01",
+      "merchant_name": "입속행복리복점／주식",
+      "merchant_regno": "150-86-00240",
+      "approved_amt": 12000
+    },
+    {
+      "approved_num": "36806728",
+      "approved_dtime": "20260507134000",
+      "status": "01",
+      "pay_type": "01",
+      "merchant_name": "주식회사 카카오",
+      "merchant_regno": "113-81-44055",
+      "approved_amt": 4000
+    },
+    {
+      "approved_num": "02279907",
+      "approved_dtime": "20260508130000",
+      "status": "01",
+      "pay_type": "01",
+      "merchant_name": "컴포즈커피　여의도교",
+      "merchant_regno": "197-03-02036",
+      "approved_amt": 2300
+    },
+    {
+      "approved_num": "64997697",
+      "approved_dtime": "20260509132000",
+      "status": "01",
+      "pay_type": "01",
+      "merchant_name": "써브웨이　대청점",
+      "merchant_regno": "209-31-23147",
+      "approved_amt": 7300
+    },
+    {
+      "approved_num": "15800628",
+      "approved_dtime": "20260511134000",
+      "status": "01",
+      "pay_type": "01",
+      "merchant_name": "매머드익스프레스 위더스논현점",
+      "merchant_regno": "244-31-01715",
+      "approved_amt": 2100
+    },
+    {
+      "approved_num": "13808417",
+      "approved_dtime": "20260512130000",
+      "status": "01",
+      "pay_type": "01",
+      "merchant_name": "영인성",
+      "merchant_regno": "211-75-37672",
+      "approved_amt": 11000
+    },
+    {
+      "approved_num": "84801648",
+      "approved_dtime": "20260513132000",
+      "status": "01",
+      "pay_type": "01",
+      "merchant_name": "매머드익스프레스 위더스논현점",
+      "merchant_regno": "244-31-01715",
+      "approved_amt": 2100
+    },
+    {
+      "approved_num": "50782837",
+      "approved_dtime": "20260514134000",
+      "status": "01",
+      "pay_type": "01",
+      "merchant_name": "딸부자네１１번출구점",
+      "merchant_regno": "401-17-61741",
+      "approved_amt": 11000
+    },
+    {
+      "approved_num": "03807058",
+      "approved_dtime": "20260515130000",
+      "status": "01",
+      "pay_type": "01",
+      "merchant_name": "(주) 비바리퍼블리카",
+      "merchant_regno": "411-86-01799",
+      "approved_amt": 38080
+    },
+    {
+      "approved_num": "72800658",
+      "approved_dtime": "20260516132000",
+      "status": "01",
+      "pay_type": "01",
+      "merchant_name": "매머드익스프레스 위더스논현점",
+      "merchant_regno": "244-31-01715",
+      "approved_amt": 1700
+    },
+    {
+      "approved_num": "71800358",
+      "approved_dtime": "20260518134000",
+      "status": "01",
+      "pay_type": "01",
+      "merchant_name": "크린토피아 일원점",
+      "merchant_regno": "229-01-57440",
+      "approved_amt": 2800
+    },
+    {
+      "approved_num": "60809958",
+      "approved_dtime": "20260519130000",
+      "status": "01",
+      "pay_type": "01",
+      "merchant_name": "매머드익스프레스 영통디지털엠파이어2차점",
+      "merchant_regno": "115-42-01067",
+      "approved_amt": 2100
+    },
+    {
+      "approved_num": "49701338",
+      "approved_dtime": "20260520132000",
+      "status": "01",
+      "pay_type": "01",
+      "merchant_name": "GS25논현미래점",
+      "merchant_regno": "260-17-01351",
+      "approved_amt": 2000
+    },
+    {
+      "approved_num": "88709658",
+      "approved_dtime": "20260521134000",
+      "status": "01",
+      "pay_type": "01",
+      "merchant_name": "매머드익스프레스 위더스논현점",
+      "merchant_regno": "244-31-01715",
+      "approved_amt": 5500
+    },
+    {
+      "approved_num": "07705258",
+      "approved_dtime": "20260522130000",
+      "status": "01",
+      "pay_type": "01",
+      "merchant_name": "매머드익스프레스 위더스논현점",
+      "merchant_regno": "244-31-01715",
+      "approved_amt": 2100
+    },
+    {
+      "approved_num": "26707628",
+      "approved_dtime": "20260523132000",
+      "status": "01",
+      "pay_type": "01",
+      "merchant_name": "매머드익스프레스 위더스논현점",
+      "merchant_regno": "244-31-01715",
+      "approved_amt": 4200
+    },
+    {
+      "approved_num": "15704838",
+      "approved_dtime": "20260525134000",
+      "status": "01",
+      "pay_type": "01",
+      "merchant_name": "KIS정보통신",
+      "merchant_regno": "220-81-15770",
+      "approved_amt": 14900
+    },
+    {
+      "approved_num": "84701158",
+      "approved_dtime": "20260526130000",
+      "status": "01",
+      "pay_type": "01",
+      "merchant_name": "강남 대골뼈국",
+      "merchant_regno": "310-85-23440",
+      "approved_amt": 23800
+    },
+    {
+      "approved_num": "83703228",
+      "approved_dtime": "20260527132000",
+      "status": "01",
+      "pay_type": "01",
+      "merchant_name": "매머드익스프레스 위더스논현점",
+      "merchant_regno": "244-31-01715",
+      "approved_amt": 2100
+    },
+    {
+      "approved_num": "74911197",
+      "approved_dtime": "20260528134000",
+      "status": "01",
+      "pay_type": "01",
+      "merchant_name": "딸부자네１１번출구점",
+      "merchant_regno": "401-17-61741",
+      "approved_amt": 11000
+    },
+    {
+      "approved_num": "92700348",
+      "approved_dtime": "20260529130000",
+      "status": "01",
+      "pay_type": "01",
+      "merchant_name": "(주) 비바리퍼블리카",
+      "merchant_regno": "411-86-01799",
+      "approved_amt": 35176
+    },
+    {
+      "approved_num": "01703728",
+      "approved_dtime": "20260530132000",
+      "status": "01",
+      "pay_type": "01",
+      "merchant_name": "우복금 생갈비 신논현 서울본점",
+      "merchant_regno": "563-13-02834",
+      "approved_amt": 15000
+    },
+    {
+      "approved_num": "50708428",
+      "approved_dtime": "20260601134000",
+      "status": "01",
+      "pay_type": "01",
+      "merchant_name": "매머드익스프레스 위더스논현점",
+      "merchant_regno": "244-31-01715",
+      "approved_amt": 2100
+    },
+    {
+      "approved_num": "89787777",
+      "approved_dtime": "20260602130000",
+      "status": "01",
+      "pay_type": "01",
+      "merchant_name": "정돈（강남점）",
+      "merchant_regno": "492-85-00943",
+      "approved_amt": 16000
+    },
+    {
+      "approved_num": "89609438",
+      "approved_dtime": "20260603132000",
+      "status": "01",
+      "pay_type": "01",
+      "merchant_name": "매머드익스프레스 위더스논현점",
+      "merchant_regno": "244-31-01715",
+      "approved_amt": 4200
+    },
+    {
+      "approved_num": "03454897",
+      "approved_dtime": "20260604134000",
+      "status": "01",
+      "pay_type": "01",
+      "merchant_name": "딸부자네１１번출구점",
+      "merchant_regno": "401-17-61741",
+      "approved_amt": 11000
+    },
+    {
+      "approved_num": "78608238",
+      "approved_dtime": "20260605130000",
+      "status": "01",
+      "pay_type": "01",
+      "merchant_name": "매머드익스프레스 위더스논현점",
+      "merchant_regno": "244-31-01715",
+      "approved_amt": 2100
+    },
+    {
+      "approved_num": "94903077",
+      "approved_dtime": "20260606132000",
+      "status": "01",
+      "pay_type": "01",
+      "merchant_name": "용천옛날통닭",
+      "merchant_regno": "481-06-00628",
+      "approved_amt": 10000
+    },
+    {
+      "approved_num": "99108657",
+      "approved_dtime": "20260608134000",
+      "status": "01",
+      "pay_type": "01",
+      "merchant_name": "빽다방　강남역ＣＧＶ",
+      "merchant_regno": "755-39-00793",
+      "approved_amt": 2600
+    },
+    {
+      "approved_num": "27603548",
+      "approved_dtime": "20260609130000",
+      "status": "01",
+      "pay_type": "01",
+      "merchant_name": "멘츠루",
+      "merchant_regno": "873-50-00780",
+      "approved_amt": 12000
+    },
+    {
+      "approved_num": "06603228",
+      "approved_dtime": "20260610132000",
+      "status": "01",
+      "pay_type": "01",
+      "merchant_name": "아성다이소",
+      "merchant_regno": "213-81-52063",
+      "approved_amt": 5000
+    },
+    {
+      "approved_num": "25607648",
+      "approved_dtime": "20260611134000",
+      "status": "01",
+      "pay_type": "01",
+      "merchant_name": "매머드익스프레스 위더스논현점",
+      "merchant_regno": "244-31-01715",
+      "approved_amt": 2100
+    },
+    {
+      "approved_num": "67096567",
+      "approved_dtime": "20260612130000",
+      "status": "01",
+      "pay_type": "01",
+      "merchant_name": "온센텐동　강남점",
+      "merchant_regno": "214-15-23324",
+      "approved_amt": 10900
+    },
+    {
+      "approved_num": "44603928",
+      "approved_dtime": "20260613132000",
+      "status": "01",
+      "pay_type": "01",
+      "merchant_name": "(주) 비바리퍼블리카",
+      "merchant_regno": "411-86-01799",
+      "approved_amt": 45388
+    },
+    {
+      "approved_num": "63605128",
+      "approved_dtime": "20260615134000",
+      "status": "01",
+      "pay_type": "01",
+      "merchant_name": "매머드익스프레스 위더스논현점",
+      "merchant_regno": "244-31-01715",
+      "approved_amt": 2100
+    },
+    {
+      "approved_num": "82609038",
+      "approved_dtime": "20260616130000",
+      "status": "01",
+      "pay_type": "01",
+      "merchant_name": "제로밥상강남점",
+      "merchant_regno": "668-85-02188",
+      "approved_amt": 10900
+    },
+    {
+      "approved_num": "41609838",
+      "approved_dtime": "20260617132000",
+      "status": "01",
+      "pay_type": "01",
+      "merchant_name": "매머드익스프레스 위더스논현점",
+      "merchant_regno": "244-31-01715",
+      "approved_amt": 2200
+    },
+    {
+      "approved_num": "00609158",
+      "approved_dtime": "20260618134000",
+      "status": "01",
+      "pay_type": "01",
+      "merchant_name": "매머드익스프레스 위더스논현점",
+      "merchant_regno": "244-31-01715",
+      "approved_amt": 4200
+    },
+    {
+      "approved_num": "59508228",
+      "approved_dtime": "20260619130000",
+      "status": "01",
+      "pay_type": "01",
+      "merchant_name": "김밥속으로",
+      "merchant_regno": "302-08-94093",
+      "approved_amt": 11000
+    },
+    {
+      "approved_num": "28503128",
+      "approved_dtime": "20260620132000",
+      "status": "01",
+      "pay_type": "01",
+      "merchant_name": "칠백한우국밥",
+      "merchant_regno": "622-08-15600",
+      "approved_amt": 11000
+    },
+    {
+      "approved_num": "97508038",
+      "approved_dtime": "20260622134000",
+      "status": "01",
+      "pay_type": "01",
+      "merchant_name": "매머드익스프레스 위더스논현점",
+      "merchant_regno": "244-31-01715",
+      "approved_amt": 2100
+    },
+    {
+      "approved_num": "46507728",
+      "approved_dtime": "20260623130000",
+      "status": "01",
+      "pay_type": "01",
+      "merchant_name": "매머드익스프레스 위더스논현점",
+      "merchant_regno": "244-31-01715",
+      "approved_amt": 3400
+    },
+    {
+      "approved_num": "65509648",
+      "approved_dtime": "20260624132000",
+      "status": "01",
+      "pay_type": "01",
+      "merchant_name": "매머드익스프레스 위더스논현점",
+      "merchant_regno": "244-31-01715",
+      "approved_amt": 4200
+    },
+    {
+      "approved_num": "04509848",
+      "approved_dtime": "20260625134000",
+      "status": "01",
+      "pay_type": "01",
+      "merchant_name": "상무초밥 강남점",
+      "merchant_regno": "751-13-00976",
+      "approved_amt": 25800
+    },
+    {
+      "approved_num": "43507838",
+      "approved_dtime": "20260626130000",
+      "status": "01",
+      "pay_type": "01",
+      "merchant_name": "매머드익스프레스 위더스논현점",
+      "merchant_regno": "244-31-01715",
+      "approved_amt": 4200
+    },
+    {
+      "approved_num": "92504248",
+      "approved_dtime": "20260627132000",
+      "status": "01",
+      "pay_type": "01",
+      "merchant_name": "칠백한우국밥",
+      "merchant_regno": "622-08-15600",
+      "approved_amt": 10000
+    },
+    {
+      "approved_num": "11502758",
+      "approved_dtime": "20260629134000",
+      "status": "01",
+      "pay_type": "01",
+      "merchant_name": "세븐일레븐 일원엘림점",
+      "merchant_regno": "407-09-54296",
+      "approved_amt": 2000
+    },
+    {
+      "approved_num": "69086147",
+      "approved_dtime": "20260630130000",
+      "status": "01",
+      "pay_type": "01",
+      "merchant_name": "영인성",
+      "merchant_regno": "211-75-37672",
+      "approved_amt": 11000
+    },
+    {
+      "approved_num": "50504928",
+      "approved_dtime": "20260701132000",
+      "status": "01",
+      "pay_type": "01",
+      "merchant_name": "매머드익스프레스 위더스논현점",
+      "merchant_regno": "244-31-01715",
+      "approved_amt": 2100
+    },
+    {
+      "approved_num": "19402448",
+      "approved_dtime": "20260702134000",
+      "status": "01",
+      "pay_type": "01",
+      "merchant_name": "버거킹 신논현역점",
+      "merchant_regno": "101-86-76277",
+      "approved_amt": 8800
+    },
+    {
+      "approved_num": "98404828",
+      "approved_dtime": "20260703130000",
+      "status": "01",
+      "pay_type": "01",
+      "merchant_name": "세븐일레븐 일원엘림점",
+      "merchant_regno": "407-09-54296",
+      "approved_amt": 2300
+    },
+    {
+      "approved_num": "67407728",
+      "approved_dtime": "20260704132000",
+      "status": "01",
+      "pay_type": "01",
+      "merchant_name": "매머드익스프레스 위더스논현점",
+      "merchant_regno": "244-31-01715",
+      "approved_amt": 2100
+    },
+    {
+      "approved_num": "36408048",
+      "approved_dtime": "20260706134000",
+      "status": "01",
+      "pay_type": "01",
+      "merchant_name": "김밥속으로",
+      "merchant_regno": "302-08-94093",
+      "approved_amt": 24000
+    },
+    {
+      "approved_num": "15402048",
+      "approved_dtime": "20260707130000",
+      "status": "01",
+      "pay_type": "01",
+      "merchant_name": "매머드익스프레스 위더스논현점",
+      "merchant_regno": "244-31-01715",
+      "approved_amt": 4200
+    },
+    {
+      "approved_num": "34400138",
+      "approved_dtime": "20260708132000",
+      "status": "01",
+      "pay_type": "01",
+      "merchant_name": "제로밥상강남점",
+      "merchant_regno": "668-85-02188",
+      "approved_amt": 10400
+    },
+    {
+      "approved_num": "83405128",
+      "approved_dtime": "20260709134000",
+      "status": "01",
+      "pay_type": "01",
+      "merchant_name": "매머드익스프레스 위더스논현점",
+      "merchant_regno": "244-31-01715",
+      "approved_amt": 2100
+    },
+    {
+      "approved_num": "92404048",
+      "approved_dtime": "20260710130000",
+      "status": "01",
+      "pay_type": "01",
+      "merchant_name": "세븐일레븐 일원엘림점",
+      "merchant_regno": "407-09-54296",
+      "approved_amt": 4900
+    },
+    {
+      "approved_num": "81403048",
+      "approved_dtime": "20260711132000",
+      "status": "01",
+      "pay_type": "01",
+      "merchant_name": "매머드익스프레스 위더스논현점",
+      "merchant_regno": "244-31-01715",
+      "approved_amt": 2100
+    },
+    {
+      "approved_num": "20409448",
+      "approved_dtime": "20260713134000",
+      "status": "01",
+      "pay_type": "01",
+      "merchant_name": "매머드익스프레스 위더스논현점",
+      "merchant_regno": "244-31-01715",
+      "approved_amt": 1700
+    },
+    {
+      "approved_num": "19306658",
+      "approved_dtime": "20260714130000",
+      "status": "01",
+      "pay_type": "01",
+      "merchant_name": "세븐일레븐 일원엘림점",
+      "merchant_regno": "407-09-54296",
+      "approved_amt": 2300
+    },
+    {
+      "approved_num": "18302948",
+      "approved_dtime": "20260715132000",
+      "status": "01",
+      "pay_type": "01",
+      "merchant_name": "주식회사 평안도식당",
+      "merchant_regno": "193-88-02841",
+      "approved_amt": 13000
+    },
+    {
+      "approved_num": "87301048",
+      "approved_dtime": "20260716134000",
+      "status": "01",
+      "pay_type": "01",
+      "merchant_name": "GS25S9신논현역점",
+      "merchant_regno": "680-01-02306",
+      "approved_amt": 2700
+    },
+    {
+      "approved_num": "86309048",
+      "approved_dtime": "20260717130000",
+      "status": "01",
+      "pay_type": "01",
+      "merchant_name": "매머드익스프레스 위더스논현점",
+      "merchant_regno": "244-31-01715",
+      "approved_amt": 2100
+    },
+    {
+      "approved_num": "14263337",
+      "approved_dtime": "20260718132000",
+      "status": "01",
+      "pay_type": "01",
+      "merchant_name": "영인성",
+      "merchant_regno": "211-75-37672",
+      "approved_amt": 11000
+    }
+  ]
+}
