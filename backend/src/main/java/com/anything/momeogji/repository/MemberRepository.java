@@ -1,7 +1,11 @@
 package com.anything.momeogji.repository;
 
-import org.springframework.stereotype.Repository;
+import com.anything.momeogji.entity.Member;
+import org.springframework.data.jpa.repository.JpaRepository;
 
-@Repository
-public class MemberRepository {
+import java.util.Optional;
+
+public interface MemberRepository extends JpaRepository<Member, Long> {
+
+    Optional<Member> findByKakaoId(String kakaoId);
 }
