@@ -4,7 +4,6 @@ import java.util.List;
 
 public record RecommendationResult(
         int participantCount,
-        List<RestaurantRecommendation> primaryRecommendations,
-        List<RestaurantRecommendation> extraRecommendations
+        List<RestaurantRecommendation> recommendations
 ) {
 }

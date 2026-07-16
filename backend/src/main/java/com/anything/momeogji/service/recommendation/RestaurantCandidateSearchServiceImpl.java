@@ -24,8 +24,8 @@ public class RestaurantCandidateSearchServiceImpl implements RestaurantCandidate
 
     private static final int TOP_CATEGORY_COUNT = 3;
     private static final int SEARCH_SIZE_PER_KEYWORD = 15;
-    private static final int MIN_POOL_SIZE_BEFORE_EXPANDING = 8;
-    private static final int MIN_ACCEPTABLE_POOL_SIZE = 5;
+    private static final int MIN_POOL_SIZE_BEFORE_EXPANDING = 6;
+    private static final int MIN_ACCEPTABLE_POOL_SIZE = 3;
     private static final int MAX_POOL_SIZE = 20;
     private static final int MIN_RADIUS_METERS = 500;
     private static final int MAX_RADIUS_METERS = 20_000;

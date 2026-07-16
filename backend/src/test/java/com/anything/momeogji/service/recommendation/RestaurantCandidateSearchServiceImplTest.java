@@ -73,7 +73,7 @@ class RestaurantCandidateSearchServiceImplTest {
     }
 
     @Test
-    void 반경을_넓혀도_5곳_미만이면_예외를_던진다() {
+    void 반경을_넓혀도_최소_후보수_미만이면_예외를_던진다() {
         AggregatedCondition condition = condition(5.0, List.of(new CategoryCount("한식", 1)));
         given(kakaoLocalClient.searchNearby(eq("한식"), eq(127.027), eq(37.498), anyInt(), anyInt()))
                 .willReturn(candidates("h", 2, 100));

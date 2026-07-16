@@ -1,6 +1,6 @@
 package com.anything.momeogji.service.recommendation;
 
-import com.anything.momeogji.config.recommendation.KakaoProperties;
+import com.anything.momeogji.config.KakaoProperties;
 import com.anything.momeogji.dto.recommendation.RestaurantCandidate;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -84,13 +84,29 @@ public class KakaoLocalClientImpl implements KakaoLocalClient {
         return new RestaurantCandidate(
                 doc.id(),
                 doc.placeName(),
-                doc.categoryGroupName() != null ? doc.categoryGroupName() : doc.categoryName(),
+                extractCategory(doc),
                 doc.roadAddressName(),
                 doc.addressName(),
                 parseDouble(doc.y()),
                 parseDouble(doc.x()),
                 parseInt(doc.distance())
         );
+    }
+
+    /**
+     * category_group_name은 FD6 결과에서 항상 "음식점"으로만 뭉뚱그려져 있어 쓸모가 없다.
+     * category_name("음식점 > 한식 > 육류,고기")에서 실제 세부 카테고리(두 번째 구간)를 뽑아 쓴다.
+     */
+    private static String extractCategory(KakaoKeywordSearchResponse.Document doc) {
+        String categoryName = doc.categoryName();
+        if (categoryName != null && !categoryName.isBlank()) {
+            String[] segments = categoryName.split(">");
+            if (segments.length >= 2) {
+                return segments[1].trim();
+            }
+            return categoryName.trim();
+        }
+        return doc.categoryGroupName();
     }
 
     private static Double parseDouble(String value) {

@@ -7,7 +7,6 @@ import com.anything.momeogji.dto.recommendation.VoteTallyResult;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
-import java.util.stream.Stream;
 
 // 추천 단계에서 이미 카카오 실검색 후보로만 채워진 데이터이므로, 여기서는 별도 좌표 재검증 없이 그대로 사용한다.
 @Service
@@ -17,9 +16,7 @@ public class FinalNoticeServiceImpl implements FinalNoticeService {
     public FinalNoticeResponse buildFinalNotice(RecommendationResult recommendationResult,
                                                  VoteTallyResult tallyResult,
                                                  LocalDateTime meetingTime) {
-        RestaurantRecommendation winner = Stream.concat(
-                        recommendationResult.primaryRecommendations().stream(),
-                        recommendationResult.extraRecommendations().stream())
+        RestaurantRecommendation winner = recommendationResult.recommendations().stream()
                 .filter(candidate -> candidate.name().equals(tallyResult.winnerRestaurantName()))
                 .findFirst()
                 .orElseThrow(() -> new IllegalArgumentException(
@@ -31,6 +28,7 @@ public class FinalNoticeServiceImpl implements FinalNoticeService {
                 winner.address(),
                 winner.latitude(),
                 winner.longitude(),
+                winner.imageUrl(),
                 recommendationResult.participantCount(),
                 meetingTime
         );

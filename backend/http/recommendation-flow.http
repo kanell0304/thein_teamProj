@@ -1,7 +1,10 @@
+### 안내: 이 파일을 실행하기 전에 dev-login.http의 1번 요청을 먼저 실행해서 {{authToken}}을 발급받으세요.
+
 ### 1. 추천 요청 (공통 옵션 + 개인 옵션 2명)
 # 응답에서 1등/2등 음식점 이름을 잡아 다음 요청에 자동으로 넘긴다.
 POST http://localhost:8081/api/ai/recommendations
 Content-Type: application/json
+Authorization: Bearer {{authToken}}
 
 {
   "commonOption": {
@@ -34,24 +37,24 @@ Content-Type: application/json
 }
 
 > {%
-    if (!response.body.primaryRecommendations || !response.body.extraRecommendations) {
+    if (!response.body.recommendations) {
         client.test("1번 요청 실패 - 아래 응답 본문 확인", function () {
-            client.assert(false, "primaryRecommendations/extraRecommendations가 없습니다. 응답: " + JSON.stringify(response.body));
+            client.assert(false, "recommendations가 없습니다. 응답: " + JSON.stringify(response.body));
         });
     } else {
-        client.test("추천 3+2 확인", function () {
-            client.assert(response.body.primaryRecommendations.length === 3, "primary는 3개여야 함");
-            client.assert(response.body.extraRecommendations.length === 2, "extra는 2개여야 함");
+        client.test("추천 3곳 확인", function () {
+            client.assert(response.body.recommendations.length === 3, "recommendations는 3개여야 함");
         });
         client.global.set("recommendationResult", JSON.stringify(response.body));
-        client.global.set("firstRestaurant", response.body.primaryRecommendations[0].name);
-        client.global.set("secondRestaurant", response.body.primaryRecommendations[1].name);
+        client.global.set("firstRestaurant", response.body.recommendations[0].name);
+        client.global.set("secondRestaurant", response.body.recommendations[1].name);
     }
 %}
 
 ### 2. 투표 집계 (1등에 2표, 2등에 1표 → 공동1등 아님)
 POST http://localhost:8081/api/ai/recommendations/votes/tally
 Content-Type: application/json
+Authorization: Bearer {{authToken}}
 
 [
   {"voterId": "u1", "restaurantName": "{{firstRestaurant}}"},
@@ -66,6 +69,7 @@ Content-Type: application/json
 ### 3. 최종 공지 (1번 추천결과 + 2번 투표결과 + 약속시간 조합)
 POST http://localhost:8081/api/ai/recommendations/votes/finalize
 Content-Type: application/json
+Authorization: Bearer {{authToken}}
 
 {
   "recommendationResult": {{recommendationResult}},
@@ -76,12 +80,14 @@ Content-Type: application/json
 ### 4. (선택) 유효성 검증 실패 케이스 - 400이 나와야 정상
 POST http://localhost:8081/api/ai/recommendations
 Content-Type: application/json
+Authorization: Bearer {{authToken}}
 
 {}
 
 ### 5. (선택) 공동 1등 → 랜덤 확정 확인용 (여러 번 실행해서 승자가 바뀌는지 관찰)
 POST http://localhost:8081/api/ai/recommendations/votes/tally
 Content-Type: application/json
+Authorization: Bearer {{authToken}}
 
 [
   {"voterId": "u1", "restaurantName": "{{firstRestaurant}}"},

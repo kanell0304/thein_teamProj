@@ -5,7 +5,6 @@ import com.anything.momeogji.dto.recommendation.RecommendationRequest;
 import com.anything.momeogji.dto.recommendation.RecommendationResult;
 import com.anything.momeogji.dto.recommendation.RestaurantCandidate;
 import com.anything.momeogji.dto.recommendation.RestaurantRecommendation;
-import com.anything.momeogji.dto.recommendation.Tier;
 import com.anything.momeogji.exception.recommendation.AiRecommendationException;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -16,11 +15,13 @@ import org.springframework.stereotype.Service;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
- // OpenAI 추천을 호출해 "주 후보 3개(PRIMARY) + 예비 후보 2개(EXTRA)" 형태로 가공하는 핵심 서비스.
+ // OpenAI 추천을 호출해 음식점 3곳을 가공하는 핵심 서비스.
  // 카카오에서 검색한 실제 음식점 후보(candidates) 중에서만 AI가 고르게 하고, 이름/주소/좌표는 항상
  // 그 실검색 데이터에서 채워 넣는다(AI가 직접 만든 값은 신뢰하지 않음).
  // DB 테이블이 아직 확정되지 않았으므로 결과는 영속화하지 않고 요청-응답으로만 다룬다.
@@ -29,14 +30,14 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class RestaurantRecommendationServiceImpl implements RestaurantRecommendationService {
 
-    private static final int PRIMARY_COUNT = 3;
-    private static final int EXTRA_COUNT = 2;
-    private static final int TOTAL_COUNT = PRIMARY_COUNT + EXTRA_COUNT;
+    private static final int RECOMMENDATION_COUNT = 3;
 
     private final RecommendationConditionAggregator conditionAggregator;
     private final RestaurantCandidateSearchService candidateSearchService;
     private final RecommendationPromptBuilder promptBuilder;
     private final OpenAiChatClient openAiChatClient;
+    private final GooglePlacesImageClient googlePlacesImageClient;
+    private final KakaoImageSearchClient kakaoImageSearchClient;
     private final ObjectMapper objectMapper;
 
     @Override
@@ -55,12 +56,10 @@ public class RestaurantRecommendationServiceImpl implements RestaurantRecommenda
         List<AiSelection> selections = validateSelections(payload);
         List<RestaurantRecommendation> recommendations = selections.stream()
                 .map(selection -> toRecommendation(selection, candidateById))
+                .sorted(Comparator.comparingInt(RestaurantRecommendation::rank))
                 .toList();
 
-        List<RestaurantRecommendation> primary = filterAndSort(recommendations, Tier.PRIMARY);
-        List<RestaurantRecommendation> extra = filterAndSort(recommendations, Tier.EXTRA);
-
-        return new RecommendationResult(condition.participantCount(), primary, extra);
+        return new RecommendationResult(condition.participantCount(), attachImages(recommendations));
     }
 
     private AiSelectionPayload parsePayload(String rawContent) {
@@ -77,14 +76,12 @@ public class RestaurantRecommendationServiceImpl implements RestaurantRecommenda
         }
 
         List<AiSelection> selections = payload.selections();
-        long primaryCount = selections.stream().filter(s -> s.tier() == Tier.PRIMARY).count();
-        long extraCount = selections.stream().filter(s -> s.tier() == Tier.EXTRA).count();
         long distinctCandidateCount = selections.stream().map(AiSelection::candidateId).distinct().count();
 
-        if (primaryCount != PRIMARY_COUNT || extraCount != EXTRA_COUNT || distinctCandidateCount != TOTAL_COUNT) {
+        if (selections.size() != RECOMMENDATION_COUNT || distinctCandidateCount != RECOMMENDATION_COUNT) {
             throw new AiRecommendationException(
-                    "AI 추천 결과 개수/중복이 올바르지 않습니다. (primary=%d, extra=%d, 중복제외개수=%d, 기대값 primary=%d, extra=%d)"
-                            .formatted(primaryCount, extraCount, distinctCandidateCount, PRIMARY_COUNT, EXTRA_COUNT));
+                    "AI 추천 결과 개수/중복이 올바르지 않습니다. (개수=%d, 중복제외개수=%d, 기대값=%d)"
+                            .formatted(selections.size(), distinctCandidateCount, RECOMMENDATION_COUNT));
         }
 
         return selections;
@@ -98,22 +95,52 @@ public class RestaurantRecommendationServiceImpl implements RestaurantRecommenda
         return new RestaurantRecommendation(
                 candidate.id(),
                 selection.rank(),
-                selection.tier(),
                 candidate.name(),
                 candidate.category(),
                 candidate.roadAddress(),
                 candidate.address(),
                 candidate.latitude(),
                 candidate.longitude(),
-                selection.reason()
+                selection.reason(),
+                null
         );
     }
 
-    private List<RestaurantRecommendation> filterAndSort(List<RestaurantRecommendation> recommendations, Tier tier) {
-        return recommendations.stream()
-                .filter(r -> r.tier() == tier)
-                .sorted(Comparator.comparingInt(RestaurantRecommendation::rank))
+    // AI가 최종적으로 고른 3곳에 대해서만 이미지를 조회한다(후보 전체에 조회하면 쿼터가 금방 소진됨).
+    // 3건을 순차 호출하면 지연이 그대로 합산되니 병렬로 조회한다.
+    private List<RestaurantRecommendation> attachImages(List<RestaurantRecommendation> recommendations) {
+        List<CompletableFuture<RestaurantRecommendation>> futures = recommendations.stream()
+                .map(recommendation -> CompletableFuture.supplyAsync(() -> withImage(recommendation)))
                 .toList();
+        return futures.stream().map(CompletableFuture::join).toList();
+    }
+
+    // 구글이 더 정확하므로 먼저 시도하고(그 가게에 실제 등록된 사진), 키가 없거나 실패하면 카카오 이미지 검색으로 폴백한다.
+    private RestaurantRecommendation withImage(RestaurantRecommendation recommendation) {
+        Optional<String> googleImage = hasCoordinates(recommendation)
+                ? googlePlacesImageClient.searchFirstImageUrl(recommendation.name(), recommendation.latitude(), recommendation.longitude())
+                : Optional.empty();
+
+        String imageUrl = googleImage
+                .or(() -> kakaoImageSearchClient.searchFirstImageUrl(recommendation.name()))
+                .orElse(null);
+
+        return new RestaurantRecommendation(
+                recommendation.id(),
+                recommendation.rank(),
+                recommendation.name(),
+                recommendation.category(),
+                recommendation.roadAddress(),
+                recommendation.address(),
+                recommendation.latitude(),
+                recommendation.longitude(),
+                recommendation.reason(),
+                imageUrl
+        );
+    }
+
+    private boolean hasCoordinates(RestaurantRecommendation recommendation) {
+        return recommendation.latitude() != null && recommendation.longitude() != null;
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
@@ -121,6 +148,6 @@ public class RestaurantRecommendationServiceImpl implements RestaurantRecommenda
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-    record AiSelection(String candidateId, int rank, Tier tier, String reason) {
+    record AiSelection(String candidateId, int rank, String reason) {
     }
 }

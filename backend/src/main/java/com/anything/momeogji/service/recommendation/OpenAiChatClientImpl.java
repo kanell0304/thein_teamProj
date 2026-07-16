@@ -22,7 +22,7 @@ import java.util.Map;
 
 
 // 실제 OpenAI /chat/completions 엔드포인트를 호출하는 구현체.
-// response_format=json_schema(strict)를 사용해 "음식점 3개(PRIMARY)+2개(EXTRA)" 형식을 모델 단에서부터 강제한다.
+// response_format=json_schema(strict)를 사용해 "음식점 3개" 형식을 모델 단에서부터 강제한다.
 
 @Component
 public class OpenAiChatClientImpl implements OpenAiChatClient {
@@ -38,17 +38,16 @@ public class OpenAiChatClientImpl implements OpenAiChatClient {
                 "properties": {
                   "selections": {
                     "type": "array",
-                    "minItems": 5,
-                    "maxItems": 5,
+                    "minItems": 3,
+                    "maxItems": 3,
                     "items": {
                       "type": "object",
                       "properties": {
                         "candidateId": { "type": "string" },
                         "rank": { "type": "integer" },
-                        "tier": { "type": "string", "enum": ["PRIMARY", "EXTRA"] },
                         "reason": { "type": "string" }
                       },
-                      "required": ["candidateId", "rank", "tier", "reason"],
+                      "required": ["candidateId", "rank", "reason"],
                       "additionalProperties": false
                     }
                   }
@@ -76,7 +75,7 @@ public class OpenAiChatClientImpl implements OpenAiChatClient {
     // 기본 RestClient는 타임아웃이 없어서 OpenAI가 응답을 안 주면 요청이 무한정 걸린다.
     // 연결/응답 각각에 상한을 둬서 문제가 있으면 빠르게 AiRecommendationException으로 드러나게 한다.
     // (SimpleClientHttpRequestFactory/HttpURLConnection은 청크 응답 처리가 불안정해 JDK HttpClient 기반을 사용한다)
-    // gpt-5.5는 reasoning 단계를 거치고 나서 답하기 때문에 5곳 구조화 추천 기준 실측 60~90초가 걸릴 수 있어 넉넉히 잡는다.
+    // gpt-5.5는 reasoning 단계를 거치고 나서 답하기 때문에 구조화 추천 기준 실측으로 수십 초가 걸릴 수 있어 넉넉히 잡는다.
     private static ClientHttpRequestFactory timeoutAwareRequestFactory() {
         HttpClient httpClient = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(10))

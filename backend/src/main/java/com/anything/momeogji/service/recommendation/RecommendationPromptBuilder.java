@@ -30,7 +30,7 @@ public class RecommendationPromptBuilder {
             4. excludedFoods 목록에 해당하는 메뉴를 주력으로 하는 음식점은 후보에서 제외하세요.
             5. candidates는 이미 도보 가능 거리 안의 후보로만 좁혀져 있습니다. 추천 이유를 쓸 때 거리·교통 편의성을 주된 근거로 반복하지 말고, categoryPriority(선호 카테고리 우선순위), minBudget(1인당 예산 상한), parkingRequiredCount, atmospherePriority 등 다른 조건을 우선적인 근거로 삼으세요.
             6. preferenceNote가 주어지면 그 내용을 다른 조건보다 최우선으로 반영하세요.
-            7. 반드시 candidates 중 서로 다른 5곳을 골라, rank 1~3은 tier=PRIMARY, rank 4~5는 tier=EXTRA로 지정하세요. 같은 후보를 중복 선택하지 마세요.
+            7. 반드시 candidates 중 서로 다른 3곳을 골라 rank 1~3을 매기세요. 같은 후보를 중복 선택하지 마세요.
             8. 응답은 지정된 JSON 스키마 형식으로만 작성하고, 다른 설명 텍스트는 포함하지 마세요.
             """;
 

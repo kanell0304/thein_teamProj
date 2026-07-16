@@ -9,6 +9,7 @@ public record FinalNoticeResponse(
         String address,
         Double latitude,
         Double longitude,
+        String imageUrl,
         int participantCount,
         LocalDateTime meetingTime
 ) {
