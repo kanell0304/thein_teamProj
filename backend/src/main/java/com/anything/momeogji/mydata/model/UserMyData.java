@@ -17,13 +17,13 @@ import java.util.Objects;
  * @param participantId 모임 참가자를 식별하는 내부 ID
  * @param approvals 참가자의 모든 카드에서 수집한 정제 승인내역. 데이터가 없으면 빈 목록
  */
-public record ParticipantMyData(Long participantId, List<CardApprovalData> approvals) {
+public record UserMyData(Long participantId, List<CardApprovalData> approvals) {
     /**
      * 참가자 ID와 목록의 불변성을 보장한다.
      * {@link List#copyOf(java.util.Collection)}를 사용하여 호출자가 전달한 목록을
      * 나중에 변경하더라도 이 결과가 함께 변경되지 않게 한다.
      */
-    public ParticipantMyData {
+    public UserMyData {
         if (participantId == null || participantId <= 0) {
             throw new IllegalArgumentException("participantId는 1 이상이어야 합니다.");
         }
