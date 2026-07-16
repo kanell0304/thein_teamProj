@@ -1,0 +1,10 @@
+.calendar-picker { padding: 12px; border: 1px solid #ececee; border-radius: 12px; background: #fff; }
+.calendar-picker__header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.calendar-picker__header button { width: 32px; height: 32px; padding: 0; border-radius: 8px; color: #555c62; background: #f7f7f8; font-size: 24px; }
+.calendar-picker__header strong { color: #18191b; font-size: 15px; }
+.calendar-picker__grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); row-gap: 4px; text-align: center; }
+.calendar-picker__grid button, .calendar-picker__grid > span { justify-self: center; width: 32px; height: 32px; padding: 0; display: grid; place-items: center; color: #282a2b; border-radius: 50%; font-size: 13px; line-height: 1; }
+.calendar-picker__grid button.is-selected { color: #fff; background: #ff7519; font-weight: 600; }
+.calendar-picker__weekdays { margin-bottom: 2px; }
+.calendar-picker__weekdays span { width: 32px; height: 24px; color: #90949b; font-size: 11px; }
+.calendar-picker__weekdays span:first-child { color: #f05a5a; }

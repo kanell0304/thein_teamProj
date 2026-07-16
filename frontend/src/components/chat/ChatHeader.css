@@ -5,6 +5,7 @@
 }
 
 .status-bar {
+  position: relative;
   height: 42px;
   padding: 0 21px 0 31px;
   display: flex;
@@ -14,6 +15,17 @@
   font-size: 16px;
   font-weight: 500;
   line-height: 19px;
+}
+
+/* ===== 상태바와 채팅방 제목 영역 사이의 얇은 경계선 ===== */
+.status-bar::after {
+  position: absolute;
+  right: 9px;
+  bottom: 0;
+  left: 9px;
+  height: 1px;
+  content: '';
+  background: rgba(24, 25, 27, 0.14);
 }
 
 .status-icons {
@@ -33,6 +45,17 @@
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+/* ===== 채팅방 헤더와 실제 대화 영역을 분리하는 하단 경계선 ===== */
+.top-bar::after {
+  position: absolute;
+  right: 9px;
+  bottom: 0;
+  left: 9px;
+  height: 1px;
+  content: '';
+  background: rgba(24, 25, 27, 0.3);
 }
 
 .room-info {

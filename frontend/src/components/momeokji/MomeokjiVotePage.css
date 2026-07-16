@@ -1,0 +1,22 @@
+/* ===== 투표 전용 바텀시트 레이어 ===== */
+.momeokji-vote-layer { position: absolute; inset: 0; z-index: 40; display: flex; align-items: flex-end; }
+.momeokji-vote-backdrop { position: absolute; inset: 0; width: 100%; height: 100%; background: rgba(24,25,27,.32) !important; }
+.momeokji-vote-sheet { position: relative; z-index: 1; width: 100%; max-height: min(532px, calc(100dvh - 70px)); display: flex; flex-direction: column; overflow: hidden; border-radius: 20px 20px 0 0; background: #fff; }
+
+/* ===== 투표 화면 헤더 ===== */
+.momeokji-vote-sheet__header { flex: 0 0 56px; padding: 0 16px; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid #f0f0f1; }
+.momeokji-vote-sheet__header button { width: 28px; height: 40px; color: #4f5960; font-size: 28px; }
+.momeokji-vote-sheet__header img { width: 22px; height: 22px; object-fit: contain; }
+.momeokji-vote-sheet__header h2 { margin: 0; color: #18191b; font-size: 18px; line-height: 22px; }
+
+/* ===== 추천 가게 선택 영역 ===== */
+.momeokji-vote-sheet__body { min-height: 0; padding: 18px 16px; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; }
+.momeokji-vote-sheet__eyebrow { margin: 0; color: #ff7519; font-size: 12px; font-weight: 600; }
+.momeokji-vote-sheet__body h3 { margin: 0; color: #18191b; font-size: 20px; line-height: 26px; }
+.momeokji-vote-sheet__description { margin: 0 0 4px; color: #90949b; font-size: 13px; line-height: 18px; }
+.momeokji-vote-sheet__multiple { margin: -4px 0 0; color: #ff7519; font-size: 12px; font-weight: 600; line-height: 17px; }
+.momeokji-vote-sheet__complete { margin: 0; padding: 9px 10px; border-radius: 8px; color: #d95c0b; background: #fff3ea; font-size: 12px; line-height: 17px; }
+
+/* ===== 투표 제출 버튼 ===== */
+.momeokji-vote-sheet__footer { flex: 0 0 80px; padding: 8px 16px 16px; display: flex; align-items: flex-end; background: linear-gradient(180deg, rgba(255,255,255,0), #fff 35%); }
+.momeokji-vote-sheet__footer button { width: 100%; height: 56px; }

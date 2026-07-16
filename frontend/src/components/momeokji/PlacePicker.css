@@ -1,0 +1,19 @@
+.place-picker { display: flex; flex-direction: column; gap: 8px; }
+.place-picker__search { display: flex; gap: 8px; }
+.place-picker__search input { flex: 1; min-width: 0; height: 42px; padding: 0 12px; border: 1px solid #dedede; border-radius: 8px; outline: 0; font-size: 14px; }
+.place-picker__search input:focus { border-color: #ff7519; }
+.place-picker__search button { flex: 0 0 64px; }
+.place-picker__results { max-height: 116px; overflow-y: auto; border: 1px solid #ececee; border-radius: 8px; }
+.place-picker__results button { width: 100%; padding: 9px 12px; display: flex; flex-direction: column; gap: 3px; text-align: left; }
+.place-picker__results button + button { border-top: 1px solid #f2f2f3; }
+.place-picker__results strong { color: #18191b; font-size: 13px; }
+.place-picker__results span { color: #90949b; font-size: 11px; }
+.place-picker__error { margin: 0; color: #d94c4c; font-size: 12px; line-height: 17px; }
+
+/* ===== 카카오 지도 및 키 미설정 안내 영역 ===== */
+.place-picker__map { position: relative; height: 150px; display: grid; place-items: center; align-content: center; gap: 5px; overflow: hidden; border: 1px solid #dce3e8; border-radius: 12px; color: #555c62; background-color: #edf2f4; background-image: linear-gradient(#d9e2e7 1px, transparent 1px), linear-gradient(90deg, #d9e2e7 1px, transparent 1px); background-size: 28px 28px; font-size: 13px; }
+.place-picker__map.is-ready { display: block; background: #edf2f4; }
+.place-picker__placeholder { position: absolute; inset: 0; z-index: 2; display: grid; place-items: center; align-content: center; gap: 5px; background-color: #edf2f4; background-image: linear-gradient(#d9e2e7 1px, transparent 1px), linear-gradient(90deg, #d9e2e7 1px, transparent 1px); background-size: 28px 28px; }
+.place-picker__map small { padding: 3px 7px; border-radius: 999px; color: #777d82; background: rgba(255,255,255,.82); font-size: 10px; }
+.place-picker__pin { width: 28px; height: 36px; display: grid; place-items: center; color: #fff; background: #ff7519; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); box-shadow: 0 3px 8px rgba(24,25,27,.18); }
+.place-picker__pin::first-letter { transform: rotate(45deg); }

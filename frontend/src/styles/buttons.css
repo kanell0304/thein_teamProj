@@ -1,0 +1,69 @@
+/* ===== 피그마 버튼 시안의 공통 상태 토큰 ===== */
+:root {
+  --button-disabled-bg: #f7f7f8;
+  --button-disabled-text: #90949b;
+  --button-default-bg: #ffffff;
+  --button-default-text: #18191b;
+  --button-hover-bg: #d5d7d9;
+  --button-active-bg: #ff7519;
+  --button-active-hover-bg: #e9650d;
+}
+
+/* ===== 기능과 크기를 분리해 어느 화면에서도 붙여 쓸 수 있는 공용 버튼 ===== */
+.app-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  color: var(--button-default-text);
+  background: var(--button-default-bg) !important;
+  font-family: var(--font-kakao-body);
+  font-weight: 600;
+  transition: color 120ms ease, background-color 120ms ease, transform 80ms ease;
+}
+
+.app-button--large {
+  min-height: 56px;
+  padding: 10px 12px;
+  border-radius: 12px !important;
+  font-size: 18px;
+  line-height: 21px;
+}
+
+.app-button--small {
+  min-height: 32px;
+  padding: 7px 12px;
+  border-radius: 8px !important;
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.app-button:hover:not(:disabled) {
+  background: var(--button-hover-bg) !important;
+}
+
+/* 필수값 입력 완료처럼 실행 가능한 주요 행동은 주황색 활성 상태로 표시합니다. */
+.app-button--primary {
+  color: #fff;
+  background: var(--button-active-bg) !important;
+}
+
+.app-button--primary:hover:not(:disabled) {
+  color: #fff;
+  background: var(--button-active-hover-bg) !important;
+}
+
+.app-button:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.app-button:focus-visible {
+  outline: 2px solid rgba(255, 117, 25, 0.32);
+  outline-offset: 2px;
+}
+
+.app-button:disabled {
+  cursor: default;
+  color: var(--button-disabled-text);
+  background: var(--button-disabled-bg) !important;
+}

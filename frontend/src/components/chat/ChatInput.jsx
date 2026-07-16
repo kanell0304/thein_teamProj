@@ -1,8 +1,10 @@
 import { useState } from 'react'
-import momeokjiIcon from '../../assets/icons/momeokji-icon.png'
+import emojiIcon from '../../assets/icons/chat-emoji.png'
+import momeokjiIcon from '../../assets/icons/chat-momeokji.png'
+import sharpIcon from '../../assets/icons/chat-sharp.png'
 import './ChatInput.css'
 
-function ChatInput({ onSend }) {
+function ChatInput({ onSend, onOpenMomeokji }) {
   const [text, setText] = useState('')
 
   const handleSubmit = (event) => {
@@ -23,17 +25,20 @@ function ChatInput({ onSend }) {
         placeholder="메시지를 입력하세요"
         onChange={(event) => setText(event.target.value)}
       />
-      <button className="momeokji-button" type="button" aria-label="모먹지 기능 열기">
-        <span
-          className="momeokji-glyph"
-          style={{ '--momeokji-icon': `url("${momeokjiIcon}")` }}
-          aria-hidden="true"
-        />
+      <button
+        className="momeokji-button"
+        type="button"
+        aria-label="모먹지 기능 열기"
+        onClick={onOpenMomeokji}
+      >
+        <img className="chat-input-icon chat-input-icon--momeokji" src={momeokjiIcon} alt="" />
       </button>
       <button className="emoji-button" type="button" aria-label="이모티콘">
-        <span className="emoji-face" aria-hidden="true" />
+        <img className="chat-input-icon chat-input-icon--emoji" src={emojiIcon} alt="" />
       </button>
-      <button className="sharp-button" type="submit" aria-label="메시지 전송">#</button>
+      <button className="sharp-button" type="submit" aria-label="메시지 전송">
+        <img className="chat-input-icon chat-input-icon--sharp" src={sharpIcon} alt="" />
+      </button>
     </form>
   )
 }

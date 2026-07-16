@@ -40,3 +40,11 @@ out/
 **/_temp
 **/_temp-codex
 **/graphify-out
+
+### Environment variables ###
+# 실제 API 키가 들어가는 모든 .env 파일은 Git에서 제외합니다.
+**/.env
+**/.env.*
+
+# 변수명만 제공하는 공유 템플릿은 Git에 포함합니다.
+!**/.env.example

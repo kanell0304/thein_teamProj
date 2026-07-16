@@ -1,0 +1,86 @@
+/* ===== 시간 선택 영역 ===== */
+.time-picker {
+  position: relative;
+  height: 220px;
+  overflow: hidden;
+  border: 1px solid #ececee;
+  border-radius: 12px;
+  background: #fff;
+}
+
+/* ===== 내부 스크롤 목록 ===== */
+.time-picker__list {
+  position: relative;
+  z-index: 1;
+  height: 220px;
+  padding: 88px 8px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scroll-snap-type: y mandatory;
+  scrollbar-width: none;
+}
+
+.time-picker__list::-webkit-scrollbar {
+  display: none;
+}
+
+/* ===== 개별 시간 옵션 ===== */
+.time-picker__option {
+  width: 100%;
+  height: 44px;
+  padding: 0 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  scroll-snap-align: center;
+  border-radius: 10px;
+  color: #90949b;
+  background: transparent !important;
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 20px;
+}
+
+.time-picker__option.is-selected {
+  color: #ff7519;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+/* ===== 선택된 중앙 행 강조 ===== */
+.time-picker__center-guide {
+  position: absolute;
+  z-index: 0;
+  top: 50%;
+  right: 8px;
+  left: 8px;
+  height: 44px;
+  border: 1px solid #ffe1cd;
+  border-radius: 10px;
+  background: #fff7f1;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+/* ===== 위아래 흐림 처리 ===== */
+.time-picker::before,
+.time-picker::after {
+  position: absolute;
+  right: 0;
+  left: 0;
+  z-index: 2;
+  height: 48px;
+  content: '';
+  pointer-events: none;
+}
+
+.time-picker::before {
+  top: 0;
+  background: linear-gradient(#fff, rgba(255, 255, 255, 0));
+}
+
+.time-picker::after {
+  bottom: 0;
+  background: linear-gradient(rgba(255, 255, 255, 0), #fff);
+}

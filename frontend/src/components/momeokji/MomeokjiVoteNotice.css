@@ -1,0 +1,4 @@
+/* ===== 투표 화면 진입 버튼 ===== */
+.momeokji-vote-notice { padding: 2px 0; }
+.momeokji-vote-notice__button { width: 100%; height: 42px; border-radius: 8px !important; color: #18191b; background: #f2f3f4 !important; font-size: 14px; font-weight: 600; }
+.momeokji-vote-notice__button:hover { background: #e9eaec !important; }

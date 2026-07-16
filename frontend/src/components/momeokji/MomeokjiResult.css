@@ -1,0 +1,4 @@
+.momeokji-result { margin: 0; display: grid; gap: 8px; }
+.momeokji-result > div { display: grid; grid-template-columns: 64px 1fr; gap: 10px; font-size: 13px; line-height: 18px; }
+.momeokji-result dt { color: #90949b; }
+.momeokji-result dd { margin: 0; color: #282a2b; font-weight: 500; overflow-wrap: anywhere; }

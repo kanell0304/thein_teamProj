@@ -1,0 +1,92 @@
+/* ===== 추천 가게 가로 카드 목록 ===== */
+.restaurant-vote-cards {
+  width: 100%;
+  min-height: 128px;
+  flex: 0 0 128px;
+  padding: 2px;
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  scroll-behavior: smooth;
+  scroll-snap-type: x mandatory;
+  overscroll-behavior-x: contain;
+  touch-action: pan-x;
+  cursor: grab;
+  user-select: none;
+  scrollbar-width: none;
+}
+
+.restaurant-vote-cards::-webkit-scrollbar { display: none; }
+.restaurant-vote-cards.is-dragging { cursor: grabbing; scroll-behavior: auto; scroll-snap-type: none; }
+.restaurant-vote-cards.is-dragging .restaurant-vote-card { cursor: grabbing; }
+
+.restaurant-vote-card {
+  position: relative;
+  /* ===== 카드 크기는 유지하고 네 번째 재투표 카드는 가로 슬라이드로 확인 ===== */
+  flex: 0 0 104px;
+  width: 104px;
+  height: 124px;
+  padding: 8px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: flex-start;
+  border: 3px solid transparent !important;
+  border-radius: 16px;
+  color: #fff;
+  background: #39444a !important;
+  text-align: left;
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+  cursor: grab;
+}
+
+.restaurant-vote-card:disabled { cursor: default; opacity: 1; }
+.restaurant-vote-card.is-selected { border-color: #ff7519 !important; }
+.restaurant-vote-card.is-recommend-again { background: #262d31 !important; }
+.restaurant-vote-card.is-recommend-again .restaurant-vote-card__fallback {
+  color: #ff7519;
+  background: linear-gradient(145deg, #3b454a, #181d20);
+  font-size: 44px;
+}
+
+.restaurant-vote-card__image,
+.restaurant-vote-card__fallback,
+.restaurant-vote-card__shade {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.restaurant-vote-card__image { object-fit: cover; }
+
+.restaurant-vote-card__fallback {
+  display: grid;
+  place-items: center;
+  color: #fff;
+  background: linear-gradient(145deg, #53656b, #20272a);
+  font-size: 42px;
+}
+
+.restaurant-vote-card__shade {
+  background: linear-gradient(180deg, rgba(0,0,0,.04) 25%, rgba(0,0,0,.88) 100%);
+}
+
+.restaurant-vote-card__badge,
+.restaurant-vote-card__copy { position: relative; z-index: 1; }
+
+.restaurant-vote-card__badge {
+  padding: 5px 6px;
+  border-radius: 999px;
+  color: #fff;
+  background: #ff7519;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 12px;
+}
+
+.restaurant-vote-card__copy { width: 100%; display: grid; gap: 2px; }
+.restaurant-vote-card__copy strong { overflow: hidden; font-size: 14px; font-weight: 600; line-height: 18px; text-overflow: ellipsis; white-space: nowrap; }
+.restaurant-vote-card__copy small { overflow: hidden; color: #fff; font-size: 12px; line-height: 16px; text-overflow: ellipsis; white-space: nowrap; }

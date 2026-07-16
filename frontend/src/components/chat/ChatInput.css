@@ -30,64 +30,42 @@
   color: #90949b;
 }
 
+/* ===== 피그마에서 내보낸 하단 기능 아이콘 공통 규격 ===== */
 .momeokji-button,
-.momeokji-glyph {
+.emoji-button,
+.sharp-button {
+  width: 24px;
+  height: 24px;
+}
+
+.chat-input-icon {
+  display: block;
+  object-fit: contain;
+  pointer-events: none;
+}
+
+.chat-input-icon--momeokji {
+  width: 21px;
+  height: 21px;
+}
+
+.chat-input-icon--emoji {
   width: 22px;
   height: 22px;
 }
 
-.momeokji-glyph {
-  display: block;
-  background: #90949b;
-  -webkit-mask-image: var(--momeokji-icon);
-  mask-image: var(--momeokji-icon);
-  -webkit-mask-position: center;
-  mask-position: center;
-  -webkit-mask-repeat: no-repeat;
-  mask-repeat: no-repeat;
-  -webkit-mask-size: contain;
-  mask-size: contain;
+.chat-input-icon--sharp {
+  width: 17px;
+  height: 20px;
 }
 
-.emoji-button {
-  position: relative;
-  width: 21.42px;
-  height: 21.42px;
-  border: 1.3px solid #90949b !important;
-  border-radius: 50%;
+/* 키보드 사용자에게만 과하지 않은 포커스 링을 표시합니다. */
+.chat-input-form button:focus {
+  outline: none;
 }
 
-.emoji-face::before,
-.emoji-face::after {
-  position: absolute;
-  display: block;
-  content: '';
-}
-
-.emoji-face::before {
-  top: 5.4px;
-  left: 5px;
-  width: 2px;
-  height: 2.97px;
-  border-radius: 1px;
-  background: #90949b;
-  box-shadow: 8.5px 0 #90949b;
-}
-
-.emoji-face::after {
-  left: 50%;
-  bottom: 3.7px;
-  width: 7.5px;
-  height: 4.8px;
-  border-bottom: 1.2px solid #90949b;
-  border-radius: 0 0 8px 8px;
-  transform: translateX(-50%);
-}
-
-.sharp-button {
-  width: 14px;
-  height: 18px;
-  font-size: 19px;
-  font-weight: 400;
-  line-height: 18px;
+.chat-input-form button:focus-visible {
+  border-radius: 5px;
+  outline: 2px solid rgba(91, 99, 107, 0.38);
+  outline-offset: 2px;
 }

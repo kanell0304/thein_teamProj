@@ -1,0 +1,70 @@
+.participant-picker { position: relative; }
+.participant-picker__trigger { width: 100%; height: 48px; padding: 0 14px; display: flex; align-items: center; justify-content: space-between; border: 1px solid #dedede !important; border-radius: 8px; color: #18191b; background: #fff !important; text-align: left; }
+.participant-picker__trigger:hover { border-color: #aeb3b7 !important; }
+.participant-picker__trigger:focus { outline: none; }
+.participant-picker__trigger:focus-visible { border-color: #ff7519 !important; box-shadow: 0 0 0 2px rgba(255, 117, 25, 0.2); }
+
+/* ===== 문자 기호 대신 CSS 선으로 그린 참가자 드롭다운 화살표 ===== */
+.participant-picker__chevron {
+  width: 8px;
+  height: 8px;
+  margin: -4px 3px 0 10px;
+  flex: 0 0 auto;
+  border-right: 1.5px solid #555c62;
+  border-bottom: 1.5px solid #555c62;
+  transform: rotate(45deg);
+  transition: margin 140ms ease, transform 140ms ease;
+}
+
+.participant-picker__trigger[aria-expanded='true'] .participant-picker__chevron {
+  margin-top: 4px;
+  transform: rotate(225deg);
+}
+
+.participant-picker__menu { position: absolute; z-index: 3; top: 54px; right: 0; left: 0; padding: 6px; border: 1px solid #ececee; border-radius: 10px; background: #fff; box-shadow: 0 8px 24px rgba(24,25,27,.12); }
+.participant-picker__menu label { min-height: 42px; padding: 6px 8px; display: flex; align-items: center; gap: 10px; border-radius: 8px; color: #282a2b; font-size: 14px; }
+.participant-picker__menu label:hover { background: #f7f7f8; }
+
+/* ===== 브라우저 기본 파란 체크박스를 주황색 원형 체크로 통일 ===== */
+.participant-picker__menu input {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  display: grid;
+  flex: 0 0 18px;
+  appearance: none;
+  place-items: center;
+  border: 1.5px solid #18191b;
+  border-radius: 50%;
+  background: #fff;
+  cursor: pointer;
+}
+
+.participant-picker__menu input::after {
+  width: 4px;
+  height: 8px;
+  margin-top: -2px;
+  border-right: 1.8px solid #fff;
+  border-bottom: 1.8px solid #fff;
+  content: '';
+  opacity: 0;
+  transform: rotate(45deg) scale(0.7);
+  transition: opacity 100ms ease, transform 100ms ease;
+}
+
+.participant-picker__menu input:checked {
+  border-color: #ff7519;
+  background: #ff7519;
+}
+
+.participant-picker__menu input:checked::after {
+  opacity: 1;
+  transform: rotate(45deg) scale(1);
+}
+
+.participant-picker__menu input:focus-visible {
+  outline: 2px solid rgba(255, 117, 25, 0.28);
+  outline-offset: 2px;
+}
+
+.participant-picker__avatar { width: 26px; height: 26px; display: grid; place-items: center; border-radius: 50%; color: #555c62; background: #e8edf1; font-size: 12px; }

@@ -9,18 +9,36 @@
   justify-content: flex-end;
 }
 
+/* ===== 같은 발신자의 연속 메시지는 카카오톡처럼 촘촘하게 한 묶음으로 표시 ===== */
+.message--continuation {
+  margin-top: -6px;
+}
+
+/* ===== 기능 카드 메시지는 일반 말풍선 너비와 독립적으로 배치 ===== */
+.message--momeokji {
+  align-items: flex-end;
+}
+
 .message--other {
   justify-content: flex-start;
   align-items: flex-start;
 }
 
-.message-profile {
+.message-profile,
+.message-profile-spacer {
   flex: 0 0 31px;
   width: 31px;
   height: 31px;
+}
+
+.message-profile {
   border: 1px solid rgba(0, 0, 0, 0.12);
   border-radius: 12px;
   background: linear-gradient(135deg, #8795a1, #e6edf2);
+}
+
+.message-content {
+  min-width: 0;
 }
 
 .message-name {
@@ -74,6 +92,11 @@
 
 .message-bubble--other::after {
   left: -3px;
+}
+
+/* 묶음의 두 번째 메시지부터는 프로필 방향 꼬리를 숨겨 한 덩어리로 정돈합니다. */
+.message-bubble--continuation::after {
+  display: none;
 }
 
 .message-time {

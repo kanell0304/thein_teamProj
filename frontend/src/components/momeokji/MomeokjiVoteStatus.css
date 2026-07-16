@@ -1,0 +1,18 @@
+/* ===== 이미지와 가게별 표를 매칭한 투표 현황 ===== */
+.momeokji-vote-status-panel { display: grid; gap: 8px; }
+.momeokji-vote-status-panel__header { display: flex; align-items: center; justify-content: space-between; }
+.momeokji-vote-status-panel__header h4 { margin: 0; color: #18191b; font-size: 13px; line-height: 18px; }
+.momeokji-vote-status-panel__header > strong { color: #ff7519; font-size: 13px; }
+.momeokji-vote-status-panel__rows { display: grid; gap: 4px; }
+
+.momeokji-vote-status-row { min-height: 42px; display: grid; grid-template-columns: 42px 1fr; gap: 6px; }
+.momeokji-vote-status-row__thumbnail { width: 42px; height: 42px; overflow: hidden; display: grid; place-items: center; border-radius: 5px; background: #e7eaec; }
+.momeokji-vote-status-row__thumbnail img { width: 100%; height: 100%; object-fit: cover; }
+.momeokji-vote-status-row__thumbnail > i { font-size: 21px; font-style: normal; }
+.momeokji-vote-status-row__result { position: relative; min-width: 0; overflow: hidden; border-radius: 5px; color: #e86008; background: #fff0e6; }
+.momeokji-vote-status-row__gauge { position: absolute; inset: 0 auto 0 0; min-width: 0; border-radius: inherit; background: #ffbd91; transition: width .28s ease; }
+.momeokji-vote-status-row__content { position: relative; z-index: 1; width: 100%; height: 100%; padding: 0 10px; display: flex; align-items: center; gap: 7px; }
+.momeokji-vote-status-row__content > strong { flex: 0 0 auto; font-size: 13px; }
+.momeokji-vote-status-row__content > span:not(.momeokji-vote-status-row__avatars) { min-width: 0; overflow: hidden; color: #7d6b60; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.momeokji-vote-status-row__avatars { margin-left: auto; display: flex; }
+.momeokji-vote-status-row__avatars i { width: 22px; height: 22px; margin-left: -5px; display: grid; place-items: center; border: 1px solid #fff; border-radius: 50%; color: #555; background: #d9dee1; font-size: 10px; font-style: normal; }

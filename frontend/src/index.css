@@ -1,3 +1,6 @@
+@import './styles/typography.css';
+@import './styles/buttons.css';
+
 * {
   box-sizing: border-box;
 }
@@ -12,7 +15,6 @@ body,
 body {
   margin: 0;
   background: #f0f0f0;
-  font-family: Pretendard, 'Malgun Gothic', sans-serif;
 }
 
 button,

@@ -1,0 +1,86 @@
+/* ===== 카카오 공식 웹폰트: https://www.kakaocorp.com/page/detail/11571 ===== */
+@font-face {
+  font-family: 'Kakao Small Sans';
+  src: url('../assets/fonts/KakaoSmallSans-Light.woff2') format('woff2');
+  font-display: swap;
+  font-style: normal;
+  font-weight: 300;
+}
+
+@font-face {
+  font-family: 'Kakao Small Sans';
+  src: url('../assets/fonts/KakaoSmallSans-Regular.woff2') format('woff2');
+  font-display: swap;
+  font-style: normal;
+  font-weight: 400;
+}
+
+@font-face {
+  font-family: 'Kakao Small Sans';
+  src: url('../assets/fonts/KakaoSmallSans-Regular.woff2') format('woff2');
+  font-display: swap;
+  font-style: normal;
+  font-weight: 500;
+}
+
+@font-face {
+  font-family: 'Kakao Small Sans';
+  src: url('../assets/fonts/KakaoSmallSans-Bold.woff2') format('woff2');
+  font-display: swap;
+  font-style: normal;
+  font-weight: 600;
+}
+
+@font-face {
+  font-family: 'Kakao Small Sans';
+  src: url('../assets/fonts/KakaoSmallSans-Bold.woff2') format('woff2');
+  font-display: swap;
+  font-style: normal;
+  font-weight: 700;
+}
+
+@font-face {
+  font-family: 'Kakao Big Sans';
+  src: url('../assets/fonts/KakaoBigSans-Regular.woff2') format('woff2');
+  font-display: swap;
+  font-style: normal;
+  font-weight: 400 500;
+}
+
+@font-face {
+  font-family: 'Kakao Big Sans';
+  src: url('../assets/fonts/KakaoBigSans-Bold.woff2') format('woff2');
+  font-display: swap;
+  font-style: normal;
+  font-weight: 600 700;
+}
+
+@font-face {
+  font-family: 'Kakao Big Sans';
+  src: url('../assets/fonts/KakaoBigSans-ExtraBold.woff2') format('woff2');
+  font-display: swap;
+  font-style: normal;
+  font-weight: 800 900;
+}
+
+:root {
+  --font-kakao-body: 'Kakao Small Sans', 'Malgun Gothic', sans-serif;
+  --font-kakao-title: 'Kakao Big Sans', 'Malgun Gothic', sans-serif;
+}
+
+/* ===== 본문·버튼·입력·캡션은 작은 화면 가독성이 높은 작은글씨 사용 ===== */
+body,
+button,
+input,
+select,
+textarea {
+  font-family: var(--font-kakao-body);
+}
+
+/* ===== 화면 제목과 단계 제목은 주목도가 높은 큰글씨 사용 ===== */
+h1,
+h2,
+h3,
+.momeokji-vote-bubble__brand strong {
+  font-family: var(--font-kakao-title);
+}
