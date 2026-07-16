@@ -4,37 +4,54 @@ import com.anything.momeogji.dto.recommendation.CommonOptionRequest;
 import com.anything.momeogji.dto.recommendation.PersonalOptionRequest;
 import com.anything.momeogji.dto.recommendation.RecommendationRequest;
 import com.anything.momeogji.dto.recommendation.RecommendationResult;
+import com.anything.momeogji.dto.recommendation.RestaurantCandidate;
 import com.anything.momeogji.exception.recommendation.AiRecommendationException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.verify;
 
-/** 실제 네트워크 호출 없이, OpenAiChatClient가 반환한 JSON을 서비스가 올바르게 가공/검증하는지 확인한다. */
+/** 실제 네트워크 호출 없이, 카카오 후보 검색 + OpenAI 응답을 서비스가 올바르게 조합/검증하는지 확인한다. */
 @ExtendWith(MockitoExtension.class)
 class RestaurantRecommendationServiceImplTest {
 
+    // rank 1~5 순서대로 candidateId c1~c5를 선택한 정상 AI 응답
     private static final String VALID_RESPONSE_JSON = """
             {
-              "restaurants": [
-                {"rank":1,"tier":"PRIMARY","name":"모먹지 김밥천국","category":"한식","roadAddress":"서울 강남구 테헤란로 1","address":"서울 강남구 역삼동 1","latitude":37.499,"longitude":127.028,"reason":"그룹 예산과 접근성에 부합"},
-                {"rank":2,"tier":"PRIMARY","name":"스시모먹지","category":"일식","roadAddress":"서울 강남구 테헤란로 2","address":"서울 강남구 역삼동 2","latitude":37.500,"longitude":127.029,"reason":"선호 카테고리 상위"},
-                {"rank":3,"tier":"PRIMARY","name":"모먹지 삼겹살","category":"한식","roadAddress":"서울 강남구 테헤란로 3","address":"서울 강남구 역삼동 3","latitude":37.501,"longitude":127.030,"reason":"주차 가능"},
-                {"rank":4,"tier":"EXTRA","name":"모먹지 파스타","category":"양식","roadAddress":"서울 강남구 테헤란로 4","address":"서울 강남구 역삼동 4","latitude":37.502,"longitude":127.031,"reason":"예비 후보"},
-                {"rank":5,"tier":"EXTRA","name":"모먹지 훠궈","category":"중식","roadAddress":"서울 강남구 테헤란로 5","address":"서울 강남구 역삼동 5","latitude":37.503,"longitude":127.032,"reason":"예비 후보"}
+              "selections": [
+                {"candidateId":"c1","rank":1,"tier":"PRIMARY","reason":"그룹 예산과 접근성에 부합"},
+                {"candidateId":"c2","rank":2,"tier":"PRIMARY","reason":"선호 카테고리 상위"},
+                {"candidateId":"c3","rank":3,"tier":"PRIMARY","reason":"주차 가능"},
+                {"candidateId":"c4","rank":4,"tier":"EXTRA","reason":"예비 후보"},
+                {"candidateId":"c5","rank":5,"tier":"EXTRA","reason":"예비 후보"}
               ]
             }
             """;
+
+    private static final List<RestaurantCandidate> CANDIDATES = List.of(
+            new RestaurantCandidate("c1", "모먹지 김밥천국", "한식", "서울 강남구 테헤란로 1", "서울 강남구 역삼동 1", 37.499, 127.028, 100),
+            new RestaurantCandidate("c2", "스시모먹지", "일식", "서울 강남구 테헤란로 2", "서울 강남구 역삼동 2", 37.500, 127.029, 150),
+            new RestaurantCandidate("c3", "모먹지 삼겹살", "한식", "서울 강남구 테헤란로 3", "서울 강남구 역삼동 3", 37.501, 127.030, 200),
+            new RestaurantCandidate("c4", "모먹지 파스타", "양식", "서울 강남구 테헤란로 4", "서울 강남구 역삼동 4", 37.502, 127.031, 250),
+            new RestaurantCandidate("c5", "모먹지 훠궈", "중식", "서울 강남구 테헤란로 5", "서울 강남구 역삼동 5", 37.503, 127.032, 300)
+    );
+
+    @Mock
+    private RestaurantCandidateSearchService candidateSearchService;
 
     @Mock
     private OpenAiChatClient openAiChatClient;
@@ -46,34 +63,91 @@ class RestaurantRecommendationServiceImplTest {
         ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
         service = new RestaurantRecommendationServiceImpl(
                 new RecommendationConditionAggregator(),
+                candidateSearchService,
                 new RecommendationPromptBuilder(objectMapper),
                 openAiChatClient,
                 objectMapper
         );
+        given(candidateSearchService.search(any(), any(), any())).willReturn(CANDIDATES);
     }
 
     @Test
-    void 정상_응답이면_주추천_3개와_예비추천_2개로_분리한다() {
+    void 정상_응답이면_주추천_3개와_예비추천_2개를_실제_후보_데이터로_채운다() {
         given(openAiChatClient.requestStructuredJson(any(), any())).willReturn(VALID_RESPONSE_JSON);
 
-        RecommendationResult result = service.recommend(sampleRequest());
+        RecommendationResult result = service.recommend(sampleRequest(List.of(), null));
 
         assertThat(result.participantCount()).isEqualTo(2);
         assertThat(result.primaryRecommendations()).hasSize(3);
         assertThat(result.extraRecommendations()).hasSize(2);
+        // AI는 candidateId만 골랐을 뿐이고, 실제 이름/주소/좌표는 후보 데이터에서 그대로 채워져야 한다.
+        assertThat(result.primaryRecommendations().get(0).id()).isEqualTo("c1");
         assertThat(result.primaryRecommendations().get(0).name()).isEqualTo("모먹지 김밥천국");
+        assertThat(result.primaryRecommendations().get(0).roadAddress()).isEqualTo("서울 강남구 테헤란로 1");
         assertThat(result.extraRecommendations().get(1).name()).isEqualTo("모먹지 훠궈");
+    }
+
+    @Test
+    void 재추천_요청의_excludedRestaurantIds가_후보_검색에_그대로_전달된다() {
+        given(openAiChatClient.requestStructuredJson(any(), any())).willReturn(VALID_RESPONSE_JSON);
+
+        service.recommend(sampleRequest(List.of("old1", "old2"), null));
+
+        verify(candidateSearchService).search(any(), any(), eq(Set.of("old1", "old2")));
+    }
+
+    @Test
+    void preferenceNote가_있으면_AI에게_보내는_user_prompt에_포함된다() {
+        given(openAiChatClient.requestStructuredJson(any(), any())).willReturn(VALID_RESPONSE_JSON);
+
+        service.recommend(sampleRequest(List.of(), "가성비 위주로 골라줘"));
+
+        ArgumentCaptor<String> userPromptCaptor = ArgumentCaptor.forClass(String.class);
+        verify(openAiChatClient).requestStructuredJson(any(), userPromptCaptor.capture());
+        assertThat(userPromptCaptor.getValue()).contains("가성비 위주로 골라줘");
     }
 
     @Test
     void AI_응답_개수가_3plus2가_아니면_예외를_던진다() {
         given(openAiChatClient.requestStructuredJson(any(), any())).willReturn("""
-                { "restaurants": [
-                  {"rank":1,"tier":"PRIMARY","name":"a","category":"한식","roadAddress":null,"address":null,"latitude":null,"longitude":null,"reason":"r"}
+                { "selections": [
+                  {"candidateId":"c1","rank":1,"tier":"PRIMARY","reason":"r"}
                 ] }
                 """);
 
-        assertThatThrownBy(() -> service.recommend(sampleRequest()))
+        assertThatThrownBy(() -> service.recommend(sampleRequest(List.of(), null)))
+                .isInstanceOf(AiRecommendationException.class);
+    }
+
+    @Test
+    void AI가_같은_후보를_중복_선택하면_예외를_던진다() {
+        given(openAiChatClient.requestStructuredJson(any(), any())).willReturn("""
+                { "selections": [
+                  {"candidateId":"c1","rank":1,"tier":"PRIMARY","reason":"r"},
+                  {"candidateId":"c1","rank":2,"tier":"PRIMARY","reason":"r"},
+                  {"candidateId":"c3","rank":3,"tier":"PRIMARY","reason":"r"},
+                  {"candidateId":"c4","rank":4,"tier":"EXTRA","reason":"r"},
+                  {"candidateId":"c5","rank":5,"tier":"EXTRA","reason":"r"}
+                ] }
+                """);
+
+        assertThatThrownBy(() -> service.recommend(sampleRequest(List.of(), null)))
+                .isInstanceOf(AiRecommendationException.class);
+    }
+
+    @Test
+    void AI가_후보_목록에_없는_candidateId를_고르면_예외를_던진다() {
+        given(openAiChatClient.requestStructuredJson(any(), any())).willReturn("""
+                { "selections": [
+                  {"candidateId":"c1","rank":1,"tier":"PRIMARY","reason":"r"},
+                  {"candidateId":"c2","rank":2,"tier":"PRIMARY","reason":"r"},
+                  {"candidateId":"c3","rank":3,"tier":"PRIMARY","reason":"r"},
+                  {"candidateId":"c4","rank":4,"tier":"EXTRA","reason":"r"},
+                  {"candidateId":"존재하지않는id","rank":5,"tier":"EXTRA","reason":"r"}
+                ] }
+                """);
+
+        assertThatThrownBy(() -> service.recommend(sampleRequest(List.of(), null)))
                 .isInstanceOf(AiRecommendationException.class);
     }
 
@@ -81,11 +155,11 @@ class RestaurantRecommendationServiceImplTest {
     void AI_응답이_JSON이_아니면_예외를_던진다() {
         given(openAiChatClient.requestStructuredJson(any(), any())).willReturn("이건 JSON이 아닙니다");
 
-        assertThatThrownBy(() -> service.recommend(sampleRequest()))
+        assertThatThrownBy(() -> service.recommend(sampleRequest(List.of(), null)))
                 .isInstanceOf(AiRecommendationException.class);
     }
 
-    private RecommendationRequest sampleRequest() {
+    private RecommendationRequest sampleRequest(List<String> excludedRestaurantIds, String preferenceNote) {
         CommonOptionRequest common = new CommonOptionRequest(
                 "강남역", 37.498, 127.027, LocalDateTime.of(2026, 7, 20, 12, 0), "식사"
         );
@@ -93,6 +167,6 @@ class RestaurantRecommendationServiceImplTest {
                 new PersonalOptionRequest("u1", 5, List.of("한식"), 15000, false, List.of(), "룸"),
                 new PersonalOptionRequest("u2", 10, List.of("한식"), 20000, true, List.of("고수"), "개방형")
         );
-        return new RecommendationRequest(common, personal);
+        return new RecommendationRequest(common, personal, excludedRestaurantIds, preferenceNote);
     }
 }

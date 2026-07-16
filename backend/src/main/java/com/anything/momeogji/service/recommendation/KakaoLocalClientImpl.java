@@ -1,7 +1,7 @@
 package com.anything.momeogji.service.recommendation;
 
 import com.anything.momeogji.config.recommendation.KakaoProperties;
-import com.anything.momeogji.dto.recommendation.GeocodedAddress;
+import com.anything.momeogji.dto.recommendation.RestaurantCandidate;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import org.slf4j.Logger;
@@ -16,17 +16,17 @@ import org.springframework.web.client.RestClientException;
 import java.net.http.HttpClient;
 import java.time.Duration;
 import java.util.List;
-import java.util.Optional;
 
 /**
- * 실제 카카오 로컬 API(GET /v2/local/search/address.json) 호출 구현체.
- * 이 호출은 최종 공지에 쓸 음식점 1곳의 주소만 보정하는 부가 기능이므로,
- * 실패해도 예외를 던지지 않고 빈 값을 돌려줘서 호출 측이 AI 원본 좌표로 자연스럽게 폴백하게 한다.
+ * 실제 카카오 로컬 API(GET /v2/local/search/keyword.json) 호출 구현체.
+ * 좌표 주변의 실존 음식점을 검색해 AI에게 "고를 수 있는 후보"로 제공하는 용도이며,
+ * 검색이 실패해도 예외를 던지지 않고 빈 리스트를 돌려줘 호출 측(후보 풀 구성 로직)이 다른 키워드/반경으로 계속 시도할 수 있게 한다.
  */
 @Component
 public class KakaoLocalClientImpl implements KakaoLocalClient {
 
     private static final Logger log = LoggerFactory.getLogger(KakaoLocalClientImpl.class);
+    private static final String RESTAURANT_CATEGORY_GROUP_CODE = "FD6";
 
     private final RestClient restClient;
 
@@ -48,41 +48,52 @@ public class KakaoLocalClientImpl implements KakaoLocalClient {
     }
 
     @Override
-    public Optional<GeocodedAddress> searchAddress(String query) {
-        if (query == null || query.isBlank()) {
-            return Optional.empty();
+    public List<RestaurantCandidate> searchNearby(String keyword, double longitude, double latitude, int radiusMeters, int size) {
+        if (keyword == null || keyword.isBlank()) {
+            return List.of();
         }
 
         try {
-            KakaoAddressSearchResponse response = restClient.get()
-                    .uri(uriBuilder -> uriBuilder.path("/v2/local/search/address.json")
-                            .queryParam("query", query)
+            KakaoKeywordSearchResponse response = restClient.get()
+                    .uri(uriBuilder -> uriBuilder.path("/v2/local/search/keyword.json")
+                            .queryParam("query", keyword)
+                            .queryParam("x", longitude)
+                            .queryParam("y", latitude)
+                            .queryParam("radius", radiusMeters)
+                            .queryParam("category_group_code", RESTAURANT_CATEGORY_GROUP_CODE)
+                            .queryParam("sort", "distance")
+                            .queryParam("size", size)
                             .build())
                     .retrieve()
-                    .body(KakaoAddressSearchResponse.class);
+                    .body(KakaoKeywordSearchResponse.class);
 
-            if (response == null || response.documents() == null || response.documents().isEmpty()) {
-                log.info("카카오 주소 검색 결과 없음: {}", query);
-                return Optional.empty();
+            if (response == null || response.documents() == null) {
+                return List.of();
             }
 
-            KakaoAddressSearchResponse.Document doc = response.documents().get(0);
-            String roadAddress = doc.roadAddress() != null ? doc.roadAddress().addressName() : null;
-            String address = doc.address() != null ? doc.address().addressName() : doc.addressName();
-
-            return Optional.of(new GeocodedAddress(
-                    roadAddress,
-                    address,
-                    parseCoordinate(doc.y()),
-                    parseCoordinate(doc.x())
-            ));
+            return response.documents().stream()
+                    .map(KakaoLocalClientImpl::toCandidate)
+                    .toList();
         } catch (RestClientException e) {
-            log.warn("카카오 주소 검색 실패, AI가 준 좌표를 그대로 사용합니다. query={}, cause={}", query, e.getMessage());
-            return Optional.empty();
+            log.warn("카카오 키워드 검색 실패, 이 키워드는 이번 후보 풀에서 제외합니다. keyword={}, cause={}", keyword, e.getMessage());
+            return List.of();
         }
     }
 
-    private static Double parseCoordinate(String value) {
+    private static RestaurantCandidate toCandidate(KakaoKeywordSearchResponse.Document doc) {
+        return new RestaurantCandidate(
+                doc.id(),
+                doc.placeName(),
+                doc.categoryGroupName() != null ? doc.categoryGroupName() : doc.categoryName(),
+                doc.roadAddressName(),
+                doc.addressName(),
+                parseDouble(doc.y()),
+                parseDouble(doc.x()),
+                parseInt(doc.distance())
+        );
+    }
+
+    private static Double parseDouble(String value) {
         if (value == null || value.isBlank()) {
             return null;
         }
@@ -93,25 +104,32 @@ public class KakaoLocalClientImpl implements KakaoLocalClient {
         }
     }
 
+    private static Integer parseInt(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        try {
+            return Integer.valueOf(value);
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
     @JsonIgnoreProperties(ignoreUnknown = true)
-    record KakaoAddressSearchResponse(List<Document> documents) {
+    record KakaoKeywordSearchResponse(List<Document> documents) {
 
         @JsonIgnoreProperties(ignoreUnknown = true)
         record Document(
+                String id,
+                @JsonProperty("place_name") String placeName,
+                @JsonProperty("category_name") String categoryName,
+                @JsonProperty("category_group_name") String categoryGroupName,
+                @JsonProperty("road_address_name") String roadAddressName,
                 @JsonProperty("address_name") String addressName,
                 String x,
                 String y,
-                @JsonProperty("road_address") RoadAddress roadAddress,
-                Address address
+                String distance
         ) {
-        }
-
-        @JsonIgnoreProperties(ignoreUnknown = true)
-        record RoadAddress(@JsonProperty("address_name") String addressName) {
-        }
-
-        @JsonIgnoreProperties(ignoreUnknown = true)
-        record Address(@JsonProperty("address_name") String addressName) {
         }
     }
 }

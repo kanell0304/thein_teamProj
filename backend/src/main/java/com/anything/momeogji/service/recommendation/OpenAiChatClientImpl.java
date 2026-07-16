@@ -28,6 +28,7 @@ import java.util.Map;
 public class OpenAiChatClientImpl implements OpenAiChatClient {
 
     // openAI에게 음식점을 추천받을때 받아야하는 데이터 값을 미리 지정
+    // AI가 이름/주소/좌표를 직접 만들어내지 않도록, candidates 목록의 id만 고르게 하는 구조로 최소화함
     private static final String RECOMMENDATION_JSON_SCHEMA = """
             {
               "name": "restaurant_recommendation",
@@ -35,29 +36,24 @@ public class OpenAiChatClientImpl implements OpenAiChatClient {
               "schema": {
                 "type": "object",
                 "properties": {
-                  "restaurants": {
+                  "selections": {
                     "type": "array",
                     "minItems": 5,
                     "maxItems": 5,
                     "items": {
                       "type": "object",
                       "properties": {
+                        "candidateId": { "type": "string" },
                         "rank": { "type": "integer" },
                         "tier": { "type": "string", "enum": ["PRIMARY", "EXTRA"] },
-                        "name": { "type": "string" },
-                        "category": { "type": "string" },
-                        "roadAddress": { "type": ["string", "null"] },
-                        "address": { "type": ["string", "null"] },
-                        "latitude": { "type": ["number", "null"] },
-                        "longitude": { "type": ["number", "null"] },
                         "reason": { "type": "string" }
                       },
-                      "required": ["rank", "tier", "name", "category", "roadAddress", "address", "latitude", "longitude", "reason"],
+                      "required": ["candidateId", "rank", "tier", "reason"],
                       "additionalProperties": false
                     }
                   }
                 },
-                "required": ["restaurants"],
+                "required": ["selections"],
                 "additionalProperties": false
               }
             }

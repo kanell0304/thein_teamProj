@@ -36,6 +36,11 @@ out/
 ### VS Code ###
 .vscode/
 
+### Secrets ###
+.env
+.env.*
+!.env.example
+
 ### lsj001206 ###
 **/_temp
 **/_temp-codex
