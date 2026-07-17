@@ -19,6 +19,7 @@ function RestaurantVoteCards({
     moved: false,
     startX: 0,
     startScrollLeft: 0,
+    suppressClickUntil: 0,
   })
 
   // ===== 가게 3곳과 재투표를 같은 슬라이드 카드 데이터로 구성 =====
@@ -47,9 +48,8 @@ function RestaurantVoteCards({
       moved: false,
       startX: event.clientX,
       startScrollLeft: carousel.scrollLeft,
+      suppressClickUntil: dragStateRef.current.suppressClickUntil,
     }
-    carousel.setPointerCapture(event.pointerId)
-    carousel.classList.add('is-dragging')
   }
 
   const moveMouseDrag = (event) => {
@@ -58,7 +58,13 @@ function RestaurantVoteCards({
     if (!carousel || !dragState.isDragging) return
 
     const distance = event.clientX - dragState.startX
-    if (Math.abs(distance) > 4) dragState.moved = true
+    if (Math.abs(distance) > 4 && !dragState.moved) {
+      dragState.moved = true
+      carousel.setPointerCapture(event.pointerId)
+      carousel.classList.add('is-dragging')
+    }
+    if (!dragState.moved) return
+
     carousel.scrollLeft = dragState.startScrollLeft - distance
     event.preventDefault()
   }
@@ -67,7 +73,10 @@ function RestaurantVoteCards({
     const carousel = carouselRef.current
     if (!carousel || !dragStateRef.current.isDragging) return
 
-    dragStateRef.current.isDragging = false
+    const dragState = dragStateRef.current
+    dragState.isDragging = false
+    dragState.suppressClickUntil = dragState.moved ? event.timeStamp + 300 : 0
+    dragState.moved = false
     carousel.classList.remove('is-dragging')
     if (carousel.hasPointerCapture(event.pointerId)) {
       carousel.releasePointerCapture(event.pointerId)
@@ -75,11 +84,8 @@ function RestaurantVoteCards({
   }
 
   // 마우스로 카드를 끌었을 때 포인터 해제 뒤 발생하는 클릭은 선택으로 처리하지 않습니다.
-  const selectVoteOption = (optionId) => {
-    if (dragStateRef.current.moved) {
-      dragStateRef.current.moved = false
-      return
-    }
+  const selectVoteOption = (event, optionId) => {
+    if (event.timeStamp <= dragStateRef.current.suppressClickUntil) return
     onToggle?.(optionId)
   }
 
@@ -103,7 +109,7 @@ function RestaurantVoteCards({
             aria-pressed={readOnly ? undefined : isSelected}
             disabled={readOnly}
             key={restaurant.id}
-            onClick={() => selectVoteOption(restaurant.id)}
+            onClick={(event) => selectVoteOption(event, restaurant.id)}
           >
             {restaurant.imageUrl ? (
               <img className="restaurant-vote-card__image" src={restaurant.imageUrl} alt="" />

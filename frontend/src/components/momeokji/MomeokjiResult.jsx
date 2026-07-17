@@ -14,6 +14,15 @@ function MomeokjiResult({ result }) {
       {result.decisionMethod === 'RANDOM_RESTAURANT_TIE' && (
         <div><dt>결정 방식</dt><dd>가게 공동 1등 · 무작위 결정</dd></div>
       )}
+      {result.decisionMethod === 'DEADLINE_MAJORITY' && (
+        <div><dt>결정 방식</dt><dd>투표 시간 만료 · 최다 득표</dd></div>
+      )}
+      {result.decisionMethod === 'DEADLINE_RANDOM_RESTAURANT_TIE' && (
+        <div><dt>결정 방식</dt><dd>투표 시간 만료 · 공동 1등 무작위 결정</dd></div>
+      )}
+      {result.decisionMethod === 'NO_VOTES_TIMEOUT' && (
+        <div><dt>결정 방식</dt><dd>투표 시간 만료 · 참여자 투표 없음</dd></div>
+      )}
       <div><dt>메뉴</dt><dd>{result.selectedRestaurant?.menuName || result.menus.join(', ') || '미정'}</dd></div>
       <div><dt>피할 음식</dt><dd>{result.avoidFoods.join(', ') || '없음'}</dd></div>
       <div><dt>분위기</dt><dd>{result.moods.join(', ') || '상관없음'}</dd></div>

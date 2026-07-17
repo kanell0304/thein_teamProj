@@ -1,0 +1,4 @@
+.countdown-timer { margin-left: auto; display: inline-flex; align-items: center; gap: 5px; color: var(--color-muted); white-space: nowrap; }
+.countdown-timer small { font-size: 10px; font-weight: 500; }
+.countdown-timer strong { color: var(--color-primary); font-size: 13px; font-variant-numeric: tabular-nums; }
+.countdown-timer.is-urgent strong { color: var(--color-danger); }

@@ -9,6 +9,7 @@ import { registerMapProvider } from './mapApi'
 const KAKAO_APP_KEY = import.meta.env.VITE_KAKAO_MAP_APP_KEY?.trim()
 const KAKAO_SDK_ID = 'kakao-map-sdk'
 const ADDRESS_PATTERN = /(?:대로|로|길)\s*\d+(?:-\d+)?(?:\s|$)|(?:읍|면|동|리)\s*\d+(?:-\d+)?(?:\s|$)/
+const DEFAULT_MAP_CENTER = { latitude: 37.566826, longitude: 126.9786567 }
 
 let sdkLoadPromise = null
 const mapInstances = new WeakMap()
@@ -88,6 +89,25 @@ function normalizeKakaoAddress(address) {
   }
 }
 
+// ===== 지도 클릭 좌표의 도로명·지번 주소를 앱 데이터로 변환 =====
+function normalizeKakaoCoordinateAddress(result, latitude, longitude) {
+  const roadAddress = result.road_address
+  const jibunAddress = result.address
+  const displayAddress = roadAddress?.address_name || jibunAddress?.address_name
+
+  return {
+    id: `coordinate-${longitude}-${latitude}`,
+    provider: 'kakao-coordinate',
+    name: roadAddress?.building_name || displayAddress || '지도에서 선택한 위치',
+    address: displayAddress || `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`,
+    latitude,
+    longitude,
+    categoryName: '지도 선택',
+    phone: '',
+    placeUrl: '',
+  }
+}
+
 // ===== 키워드 기반 장소명·상호명 검색 =====
 function searchKeywordPlaces(kakao, query) {
   const placesService = new kakao.maps.services.Places()
@@ -130,9 +150,21 @@ function searchAddressCoordinates(kakao, query) {
   })
 }
 
+// ===== 숫자가 앞에 오는 역순 도로명 주소까지 재검색 후보로 정규화 =====
+function buildSearchQueries(query) {
+  const normalized = query.trim().replace(/\s+/g, ' ')
+  const tokens = normalized.split(' ')
+  const roadNumberNormalized = normalized.replace(
+    /(\d+(?:-\d+)?)\s+([^\s]+(?:대로|로|길))/g,
+    '$2 $1',
+  )
+  const fullyReversed = /^\d/.test(tokens[0]) ? [...tokens].reverse().join(' ') : ''
+
+  return [...new Set([normalized, roadNumberNormalized, fullyReversed].filter(Boolean))]
+}
+
 // ===== 입력 형태에 따라 장소명 검색과 주소 검색 순서 결정 =====
-async function searchPlaces(query) {
-  const kakao = await loadKakaoMapSdk()
+async function searchSingleQuery(kakao, query) {
   const shouldSearchAddressFirst = ADDRESS_PATTERN.test(query)
 
   if (shouldSearchAddressFirst) {
@@ -147,12 +179,46 @@ async function searchPlaces(query) {
   return searchAddressCoordinates(kakao, query)
 }
 
+async function searchPlaces(query) {
+  const kakao = await loadKakaoMapSdk()
+
+  for (const searchQuery of buildSearchQueries(query)) {
+    const results = await searchSingleQuery(kakao, searchQuery)
+    if (results.length > 0) return results
+  }
+
+  return []
+}
+
+// ===== 지도 좌표를 도로명 또는 지번 주소로 역지오코딩 =====
+function reverseGeocodeCoordinate(kakao, latitude, longitude) {
+  const geocoder = new kakao.maps.services.Geocoder()
+
+  return new Promise((resolve, reject) => {
+    geocoder.coord2Address(longitude, latitude, (addresses, status) => {
+      if (status === kakao.maps.services.Status.OK && addresses.length > 0) {
+        resolve(normalizeKakaoCoordinateAddress(addresses[0], latitude, longitude))
+        return
+      }
+
+      if (status === kakao.maps.services.Status.ZERO_RESULT) {
+        resolve(normalizeKakaoCoordinateAddress({}, latitude, longitude))
+        return
+      }
+
+      reject(new Error('선택한 지도 위치의 주소를 찾지 못했습니다.'))
+    })
+  })
+}
+
 // ===== 선택한 장소의 지도와 마커 표시 =====
-async function showPlace(container, place) {
-  if (!container || place.latitude == null || place.longitude == null) return
+async function showPlace(container, place, { onSelect, onError } = {}) {
+  if (!container) return
 
   const kakao = await loadKakaoMapSdk()
-  const position = new kakao.maps.LatLng(place.latitude, place.longitude)
+  const hasPlace = place?.latitude != null && place?.longitude != null
+  const initialCoordinates = hasPlace ? place : DEFAULT_MAP_CENTER
+  const position = new kakao.maps.LatLng(initialCoordinates.latitude, initialCoordinates.longitude)
   let instance = mapInstances.get(container)
 
   if (!instance) {
@@ -160,13 +226,35 @@ async function showPlace(container, place) {
       center: position,
       level: 4,
     })
-    const marker = new kakao.maps.Marker({ position, map })
-    instance = { map, marker }
+    const marker = new kakao.maps.Marker()
+    instance = { map, marker, onSelect, onError }
     mapInstances.set(container, instance)
+
+    // 지도 클릭 위치를 주소로 변환한 뒤 기존 장소 선택 흐름으로 전달합니다.
+    kakao.maps.event.addListener(map, 'click', (mouseEvent) => {
+      const latitude = mouseEvent.latLng.getLat()
+      const longitude = mouseEvent.latLng.getLng()
+
+      reverseGeocodeCoordinate(kakao, latitude, longitude)
+        .then((selectedPlace) => {
+          const selectedPosition = new kakao.maps.LatLng(latitude, longitude)
+          instance.marker.setPosition(selectedPosition)
+          instance.marker.setMap(instance.map)
+          instance.onSelect?.(selectedPlace)
+        })
+        .catch((error) => instance.onError?.(error))
+    })
   } else {
+    instance.onSelect = onSelect
+    instance.onError = onError
+  }
+
+  if (hasPlace) {
     instance.marker.setPosition(position)
     instance.marker.setMap(instance.map)
     instance.map.setCenter(position)
+  } else {
+    instance.marker.setMap(null)
   }
 
   // 바텀시트 크기 변화 뒤에도 지도 타일과 중심점을 다시 맞춥니다.
