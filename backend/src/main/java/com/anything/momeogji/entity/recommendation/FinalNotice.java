@@ -45,4 +45,14 @@ public class FinalNotice {
     /** 채팅방 상단 고정을 해제할 시각(=약속 시각). */
     @Column(name = "pinned_until")
     private LocalDateTime pinnedUntil;
+
+    /** 확정 시점의 추천 후보(RoundCandidate) 이미지를 그대로 복사해둔다. 수정 API가 다시 이미지 API를 호출하지 않도록. */
+    @Column(name = "image_url", length = 500)
+    private String imageUrl;
+
+    /** 호스트가 약속시간을 수정할 때 쓴다. pinnedUntil도 항상 meetingDatetime과 같이 움직이므로 같이 갱신한다. */
+    public void updateMeetingDatetime(LocalDateTime meetingDatetime) {
+        this.meetingDatetime = meetingDatetime;
+        this.pinnedUntil = meetingDatetime;
+    }
 }

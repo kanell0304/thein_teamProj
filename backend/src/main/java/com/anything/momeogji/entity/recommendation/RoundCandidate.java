@@ -46,4 +46,7 @@ public class RoundCandidate {
 
     @Column(columnDefinition = "text")
     private String reason;
+
+    @Column(name = "image_url", length = 500)
+    private String imageUrl;
 }
