@@ -37,6 +37,7 @@ out/
 .vscode/
 
 ### lsj001206 ###
+**.env
 **/_temp
 **/_temp-codex
 **/graphify-out
