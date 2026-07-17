@@ -13,6 +13,8 @@ import org.springframework.security.web.SecurityFilterChain;
 /**
  * 카카오 로그인 + 자체 발급 JWT 기반 인증.
  * /api/auth/**(실로그인), /api/dev/**(개발용 로그인 우회)만 열어두고 나머지 /api/**는 유효한 토큰이 있어야 통과한다.
+ * /ws/**(WebSocket 핸드셰이크)도 HTTP 레벨에서는 열어둔다 — 실제 인증은 STOMP CONNECT 프레임에서
+ * StompAuthChannelInterceptor가 따로 검증한다(브라우저 WebSocket API는 핸드셰이크에 커스텀 헤더를 못 실음).
  */
 @Configuration
 @RequiredArgsConstructor
@@ -31,7 +33,7 @@ public class SecurityConfig {
                         // 컨트롤러에서 예외가 나면 컨테이너가 /error로 forward하는데, 이 디스패치도 인증을 요구하면
                         // 원래 상태코드(400/502 등)가 403으로 덮어써진다. 그걸 막기 위해 ERROR 디스패치는 항상 허용.
                         .dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
-                        .requestMatchers("/api/auth/**", "/api/dev/**").permitAll()
+                        .requestMatchers("/api/auth/**", "/api/dev/**", "/ws/**").permitAll()
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
