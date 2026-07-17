@@ -1,6 +1,5 @@
-package com.anything.mydataapi;
+package com.anything.momeogji.mydata;
 
-import com.anything.momeogji.mydata.MyDataProvider;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Component;
 

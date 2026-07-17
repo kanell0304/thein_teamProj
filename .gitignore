@@ -42,6 +42,7 @@ out/
 !.env.example
 
 ### lsj001206 ###
+**.env
 **/_temp
 **/_temp-codex
 **/graphify-out
