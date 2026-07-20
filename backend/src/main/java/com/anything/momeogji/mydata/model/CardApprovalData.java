@@ -1,5 +1,3 @@
-// 카드 한 장의 국내 승인내역 한 건을 Java 타입으로 정제한 불변 데이터다.
-
 package com.anything.momeogji.mydata.model;
 
 import java.math.BigDecimal;

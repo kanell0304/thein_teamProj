@@ -1,4 +1,3 @@
-// 참가자 한 명의 카드별 정제 결과를 묶어 MyDataService가 반환하는 불변 데이터다.
 package com.anything.momeogji.mydata.model;
 
 import java.util.List;
