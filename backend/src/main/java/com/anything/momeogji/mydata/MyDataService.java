@@ -8,6 +8,9 @@ import com.anything.momeogji.mydata.cardlist.CardListResponse;
 import com.anything.momeogji.mydata.cardlist.CardListValidator;
 import com.anything.momeogji.mydata.model.CardApprovalData;
 import com.anything.momeogji.mydata.model.UserMyData;
+import com.anything.momeogji.mydata.transform.MyDataTransformer;
+import com.anything.momeogji.mydata.transform.model.TimeBand;
+import com.anything.momeogji.mydata.transform.model.TransformedUserMyData;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Service;
@@ -19,7 +22,7 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * 동의한 참가자 한 명의 카드 마이데이터를 수집하는 동기식 핵심 서비스다.
+ * 동의한 참가자 한 명의 카드 마이데이터를 수집하고 최종 가공 흐름을 시작하는 동기식 핵심 서비스다.
  *
  * 카드 목록에서 전송에 동의한 카드 ID를 추출한 뒤 카드별 국내 승인내역을 조회·검증·파싱한다.
  * Dummy와 실제 API 중 어떤 데이터 제공 방식을 사용하는지는 {@link MyDataProvider} 구현체가 결정하며,
@@ -27,7 +30,8 @@ import java.util.Set;
  *
  * 카드 목록과 승인내역의 모든 페이지를 순서대로 처리한다.
  * 처리 중 한 단계라도 실패하면 부분 결과를 반환하지 않고 예외를 전달한다.
- * 참가자 단위 비동기 실행과 실패 상태 기록은 이후 이 서비스를 호출하는 상위 계층이 담당한다.
+ * {@link #collectTransformed(Long, TimeBand)}를 호출하면 수집 결과를 {@link MyDataTransformer}에 전달한다.
+ * 참가자 단위 비동기 실행, 동의 여부 판단과 실패 상태 기록은 이후 이 서비스를 호출하는 상위 계층이 담당한다.
  */
 @Service
 public class MyDataService {
@@ -41,9 +45,10 @@ public class MyDataService {
     private final CardListParser cardListParser;
     private final CardApprovalValidator cardApprovalValidator;
     private final CardApprovalParser cardApprovalParser;
+    private final MyDataTransformer myDataTransformer;
 
     /**
-     * 마이데이터 수집에 필요한 Provider와 단계별 처리 구성요소를 주입받는다.
+     * 마이데이터 수집과 최종 가공에 필요한 Provider와 단계별 처리 구성요소를 주입받는다.
      *
      * @param objectMapper Raw JSON을 응답 DTO로 역직렬화하는 Jackson 매퍼
      * @param myDataProvider Dummy 또는 실제 API에서 Raw JSON을 가져오는 Provider
@@ -51,6 +56,7 @@ public class MyDataService {
      * @param cardListParser 동의 카드 ID 추출기
      * @param cardApprovalValidator 국내 승인내역 응답 검증기
      * @param cardApprovalParser 국내 승인내역 내부 모델 변환기
+     * @param myDataTransformer 수집된 참가자 마이데이터를 최종 가맹점 분류 결과로 가공하는 컴포넌트
      */
     public MyDataService(
             ObjectMapper objectMapper,
@@ -58,7 +64,8 @@ public class MyDataService {
             CardListValidator cardListValidator,
             CardListParser cardListParser,
             CardApprovalValidator cardApprovalValidator,
-            CardApprovalParser cardApprovalParser
+            CardApprovalParser cardApprovalParser,
+            MyDataTransformer myDataTransformer
     ) {
         this.objectMapper = objectMapper;
         this.myDataProvider = myDataProvider;
@@ -66,6 +73,7 @@ public class MyDataService {
         this.cardListParser = cardListParser;
         this.cardApprovalValidator = cardApprovalValidator;
         this.cardApprovalParser = cardApprovalParser;
+        this.myDataTransformer = myDataTransformer;
     }
 
     /**
@@ -101,6 +109,38 @@ public class MyDataService {
 
         // 정상적인 빈 결과를 포함해 참가자 ID와 승인내역을 불변 결과로 반환한다.
         return new UserMyData(participantId, approvals);
+    }
+
+    /**
+     * 지정한 참가자의 마이데이터를 수집한 뒤 선택 시간대의 최종 가맹점 분류 결과까지 가공한다.
+     *
+     * <p>마이데이터 제공에 동의한 참가자에 대해서만 상위 계층이 이 메서드를 호출해야 한다.
+     * 선택 시간대가 잘못된 경우 카드 목록이나 외부 장소 API를 호출하기 전에 즉시 실패한다.</p>
+     *
+     * <p>카드나 승인내역이 없거나 선택 시간대에 해당하는 결제가 없으면 참가자 ID와
+     * 시간대를 포함한 빈 분류 목록을 정상 반환한다. 수집·정제·집계 중 발생한 데이터 오류는
+     * 부분 결과로 바꾸지 않고 호출자에게 전달한다.</p>
+     *
+     * @param participantId 모임 참가자를 식별하는 내부 ID
+     * @param selectedTimeBand 주최자 옵션에서 결정한 마이데이터 가공 대상 시간대
+     * @return 참가자 ID와 선택 시간대, 최종 가맹점 분류 결과를 포함한 불변 데이터
+     * @throws IllegalArgumentException 선택 시간대가 없거나 참가자 ID가 올바르지 않은 경우
+     * @throws IllegalStateException 마이데이터 수집·역직렬화·페이지 처리에 실패한 경우
+     */
+    public TransformedUserMyData collectTransformed(
+            Long participantId,
+            TimeBand selectedTimeBand
+    ) {
+        // 잘못된 요청에서 카드 목록 수집 비용이 발생하지 않도록 선택 시간대를 먼저 검증한다.
+        if (selectedTimeBand == null) {
+            throw new IllegalArgumentException("selectedTimeBand는 필수입니다.");
+        }
+
+        // 기존 수집 흐름을 한 번만 호출해 참가자의 모든 동의 카드 승인내역을 가져온다.
+        UserMyData userMyData = collect(participantId);
+
+        // 수집 결과를 정제·시간대 집계·가맹점 분류 파이프라인에 전달한다.
+        return myDataTransformer.transform(userMyData, selectedTimeBand);
     }
 
     /**
