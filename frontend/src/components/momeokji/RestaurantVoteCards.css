@@ -39,7 +39,7 @@
   text-align: left;
   scroll-snap-align: start;
   scroll-snap-stop: always;
-  cursor: grab;
+  cursor: pointer;
 }
 
 .restaurant-vote-card:disabled { cursor: default; opacity: 1; }

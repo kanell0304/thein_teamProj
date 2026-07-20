@@ -15,6 +15,10 @@ const BUBBLE_COPY = {
     description: '투표 결과를 확인해 주세요.',
     buttonLabel: '결과 확인하기',
   },
+  EXPIRED: {
+    description: '투표 시간이 만료되었습니다.',
+    buttonLabel: '만료 결과 확인하기',
+  },
 }
 
 /** 설정 완료 시 채팅창에 추가되는 카카오톡형 모먹지 투표 연결 버블. */

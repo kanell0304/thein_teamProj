@@ -2,7 +2,7 @@ import './MomeokjiVoteNotice.css'
 
 // ===== 공지사항에는 상세 현황 대신 화면 연결 버튼만 표시 =====
 function MomeokjiVoteNotice({ status, onOpenVote }) {
-  const isClosed = status === 'CLOSED'
+  const isClosed = status === 'CLOSED' || status === 'EXPIRED'
 
   return (
     <div className="momeokji-vote-notice">

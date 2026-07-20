@@ -64,8 +64,8 @@ export async function searchPlacesWithMapApi(query) {
   }]
 }
 
-// ===== 선택 장소 지도·마커 표시 =====
-export async function showSelectedPlaceOnMap(container, place) {
-  if (!container || !place || !mapProvider?.showPlace) return
-  await mapProvider.showPlace(container, place)
+// ===== 선택 장소 지도·마커 표시 및 지도 클릭 선택 연결 =====
+export async function showSelectedPlaceOnMap(container, place, options = {}) {
+  if (!container || !mapProvider?.showPlace) return
+  await mapProvider.showPlace(container, place, options)
 }

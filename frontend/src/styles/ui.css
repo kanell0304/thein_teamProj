@@ -1,0 +1,122 @@
+/* ===== 공통 디자인 토큰: 모든 기능 화면이 같은 색상·반경·간격을 상속 ===== */
+:root {
+  --color-text: #18191b;
+  --color-muted: #777d82;
+  --color-subtle: #90949b;
+  --color-line: #dedede;
+  --color-line-soft: #f0f1f2;
+  --color-surface: #fff;
+  --color-primary: #ff7519;
+  --color-primary-soft: #fff3ea;
+  --color-danger: #e84b4b;
+  --radius-sheet: 24px;
+  --radius-control: 10px;
+  --shadow-sheet: 0 -8px 28px rgba(24, 25, 27, 0.1);
+}
+
+/* ===== 바텀시트 공통 골격: 화면별 CSS는 --ui-* 변수만 재정의 ===== */
+.ui-layer {
+  position: absolute;
+  inset: 0;
+  z-index: var(--ui-layer-z, 20);
+}
+
+.ui-backdrop {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  background: var(--ui-backdrop-bg, rgba(24, 25, 27, 0.12)) !important;
+}
+
+.ui-sheet {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: var(--ui-sheet-size, min(var(--ui-sheet-height, 532px), calc(100dvh - var(--ui-sheet-offset, 44px))));
+  max-height: var(--ui-sheet-height, 532px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--color-surface);
+  border-radius: var(--ui-sheet-radius, var(--radius-sheet)) var(--ui-sheet-radius, var(--radius-sheet)) 0 0;
+  box-shadow: var(--shadow-sheet);
+  animation: ui-sheet-open 180ms ease-out;
+}
+
+@keyframes ui-sheet-open {
+  from { transform: translateY(18px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.ui-sheet__header {
+  flex: 0 0 var(--ui-header-height, 64px);
+  min-height: var(--ui-header-height, 64px);
+  padding: var(--ui-header-padding, 18px 16px 10px);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-bottom: var(--ui-header-border, 0);
+}
+
+.ui-sheet__header img { width: var(--ui-header-icon-size, 24px); height: var(--ui-header-icon-size, 24px); object-fit: contain; }
+.ui-sheet__header h2 { margin: 0; color: var(--color-text); font-size: 18px; font-weight: 700; line-height: 22px; }
+.ui-sheet__back { width: 24px; height: 24px; padding: 0; color: #555c62; font-size: 28px; line-height: 20px; }
+
+.ui-sheet__body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+}
+.ui-sheet__body::-webkit-scrollbar { display: none; }
+
+.ui-sheet__footer {
+  flex: 0 0 auto;
+  padding: var(--ui-footer-padding, 10px 16px 16px);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0), #fff var(--ui-footer-fade, 24%));
+}
+.ui-sheet__footer > button { width: 100%; }
+
+/* ===== 선택 칩 공통 상태 ===== */
+.ui-chip-group { display: flex; flex-wrap: wrap; gap: var(--ui-chip-gap, 7px); }
+.ui-chip {
+  min-height: var(--ui-chip-height, 36px);
+  padding: var(--ui-chip-padding, 9px 12px);
+  border: 1px solid var(--color-text) !important;
+  border-radius: 999px;
+  color: var(--color-text);
+  background: var(--color-surface) !important;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 16px;
+}
+.ui-chip.is-selected {
+  color: #fff;
+  border-color: var(--color-primary) !important;
+  background: var(--color-primary) !important;
+}
+
+/* ===== 입력·오류 공통 상태 ===== */
+.ui-input {
+  width: 100%;
+  height: 48px;
+  padding: 0 12px;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-control);
+  outline: 0;
+  color: var(--color-text);
+  background: var(--color-surface);
+  font-size: 16px;
+}
+.ui-input:focus { border-color: var(--color-primary); box-shadow: 0 0 0 2px rgba(255, 117, 25, 0.12); }
+.ui-alert { margin: 0; padding: 10px 12px; border-radius: 8px; font-size: 12px; line-height: 18px; }
+.ui-alert--error { color: var(--color-danger); background: #fff4f4; }
+
+@media (prefers-reduced-motion: reduce) {
+  .ui-sheet { animation: none; }
+}

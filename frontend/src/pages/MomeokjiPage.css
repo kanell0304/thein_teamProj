@@ -1,65 +1,29 @@
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 
-.momeokji-layer { position: absolute; inset: 0; z-index: 20; }
-.momeokji-backdrop { position: absolute; inset: 0; width: 100%; height: 100%; padding: 0; background: rgba(24, 25, 27, 0.08) !important; }
+/* ===== 공통 바텀시트 변수만 화면 크기에 맞게 재정의 ===== */
+.momeokji-layer { --ui-layer-z: 20; --ui-backdrop-bg: rgba(24, 25, 27, 0.08); }
+.momeokji-sheet { --ui-sheet-height: 532px; --ui-header-height: 68px; --ui-header-padding: 20px 16px 12px; }
+.momeokji-step-count { margin-left: auto; color: var(--color-subtle); font-size: 13px; font-weight: 600; }
 
-.momeokji-sheet {
-  position: absolute; right: 0; bottom: 0; left: 0;
-  width: 100%; height: min(532px, calc(100dvh - 44px)); max-height: 532px;
-  display: flex; flex-direction: column; overflow: hidden;
-  background: #fff; border-radius: 24px 24px 0 0;
-  box-shadow: 0 -8px 28px rgba(24, 25, 27, 0.08);
-  animation: momeokji-open 180ms ease-out;
-}
-
-@keyframes momeokji-open { from { transform: translateY(18px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-
-.momeokji-sheet__header {
-  flex: 0 0 68px; min-height: 68px; padding: 20px 16px 12px;
-  display: flex; align-items: center; gap: 8px;
-}
-.momeokji-sheet__header img { width: 24px; height: 24px; object-fit: contain; }
-.momeokji-sheet__header h2 { margin: 0; color: #18191b; font-size: 18px; font-weight: 700; line-height: 21px; }
-.momeokji-back-button { width: 24px; height: 24px; padding: 0; color: #555c62; font-size: 28px; line-height: 20px; }
-.momeokji-step-count { margin-left: auto; color: #90949b; font-size: 13px; font-weight: 600; }
-
-.momeokji-sheet__body { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none; }
-.momeokji-sheet__body::-webkit-scrollbar { display: none; }
+/* ===== 단계별 내용만 모먹지 화면에서 관리 ===== */
 .momeokji-step { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
-.momeokji-step h3 { margin: 0; color: #18191b; font-size: 18px; font-weight: 600; line-height: 24px; }
-.momeokji-description { margin: -4px 0 2px; color: #777d82; font-size: 13px; line-height: 19px; }
+.momeokji-step h3 { margin: 0; color: var(--color-text); font-size: 18px; font-weight: 600; line-height: 24px; }
+.momeokji-step-title { display: flex; align-items: center; gap: 7px; }
+.momeokji-step-title > span { color: var(--color-primary); font-size: 12px; font-weight: 600; }
+.momeokji-description { margin: -4px 0 2px; color: var(--color-muted); font-size: 13px; line-height: 19px; }
+.momeokji-chips { --ui-chip-gap: 6px; --ui-chip-padding: 10px 12px; }
 
-.momeokji-chips { display: flex; gap: 6px; scrollbar-width: none; }
-.momeokji-chips--wrap { flex-wrap: wrap; }
-.momeokji-chips::-webkit-scrollbar { display: none; }
-.momeokji-chips button {
-  min-height: 36px;
-  padding: 10px 12px;
-  border: 1px solid #18191b !important;
-  border-radius: 999px;
-  color: #18191b;
-  background: #fff;
-  font-size: 13px;
-  font-weight: 500;
-  line-height: 16px;
-}
-
-.momeokji-chips button.is-selected {
-  border-color: #ff7519 !important;
-  color: #fff;
-  background: #ff7519;
-}
-
-.momeokji-custom-input {
-  width: 100%; height: 44px; padding: 0 12px;
-  border: 1px solid #dedede; border-radius: 8px; outline: none;
-  color: #18191b; background: #fff; font-size: 16px;
-}
-.momeokji-custom-input::placeholder { color: #c4c4c4; }
-.momeokji-custom-input:focus { border-color: #ff7519; }
+/* ===== 개인 조건·식당 투표 제한시간 ===== */
+.momeokji-duration-list { display: grid; gap: 14px; }
+.momeokji-duration-field { padding: 14px; display: grid; gap: 8px; border: 1px solid var(--color-line-soft); border-radius: 12px; background: #fafafa; }
+.momeokji-duration-field > span { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.momeokji-duration-field strong { color: var(--color-text); font-size: 14px; }
+.momeokji-duration-field output { color: var(--color-primary); font-size: 16px; font-weight: 700; }
+.momeokji-duration-field small { color: var(--color-muted); font-size: 11px; line-height: 16px; }
+.momeokji-duration-field input { width: 100%; accent-color: var(--color-primary); cursor: pointer; }
+.momeokji-duration-field em { display: flex; justify-content: space-between; color: var(--color-subtle); font-size: 10px; font-style: normal; }
 
 @media (max-height: 620px) {
-  .momeokji-sheet__header { flex-basis: 54px; min-height: 54px; padding-top: 12px; }
+  .momeokji-sheet { --ui-header-height: 54px; --ui-header-padding: 12px 16px 8px; }
   .momeokji-step { padding-top: 10px; padding-bottom: 10px; gap: 10px; }
 }
-@media (prefers-reduced-motion: reduce) { .momeokji-sheet { animation: none; } }

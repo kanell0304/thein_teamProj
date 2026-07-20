@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import momeokjiIcon from '../../assets/icons/momeokji-icon.png'
+import CountdownTimer from './CountdownTimer'
 import RestaurantVoteCards from './RestaurantVoteCards'
 import MomeokjiResult from './MomeokjiResult'
 import MomeokjiVoteStatus from './MomeokjiVoteStatus'
@@ -22,14 +23,17 @@ function MomeokjiVotePage({
     )).map(([optionId]) => optionId)
   ), [currentUserId, session])
   const [selectedIds, setSelectedIds] = useState([])
-  const isClosed = session?.status === 'CLOSED'
+  const [isEditingVote, setIsEditingVote] = useState(false)
+  const isExpired = session?.status === 'EXPIRED'
+  const isClosed = session?.status === 'CLOSED' || isExpired
   const hasVoted = previousVoteIds.length > 0
-  const activeSelectedIds = hasVoted ? previousVoteIds : selectedIds
+  const isSubmittedView = hasVoted && !isEditingVote
+  const activeSelectedIds = isSubmittedView ? previousVoteIds : selectedIds
   const isRevote = (session?.voteRound ?? 1) > 1
 
   // ===== 가게 3곳과 재추천을 각각 켜고 끄는 최대 4개 중복 선택 =====
   const toggleSelection = (optionId) => {
-    if (hasVoted) return
+    if (isSubmittedView) return
     setSelectedIds((previous) => (
       previous.includes(optionId)
         ? previous.filter((id) => id !== optionId)
@@ -37,23 +41,36 @@ function MomeokjiVotePage({
     ))
   }
 
+  // ===== 기존 표를 입력 상태로 불러와 같은 라운드 안에서 다시 선택 =====
+  const startEditingVote = () => {
+    setSelectedIds(previousVoteIds)
+    setIsEditingVote(true)
+  }
+
+  // ===== 최초 투표와 수정 투표를 같은 제출 함수로 전달 =====
+  const submitCurrentVote = async () => {
+    await onSubmit(activeSelectedIds)
+    setIsEditingVote(false)
+  }
+
   if (!open || !session) return null
 
   return (
-    <div className="momeokji-vote-layer" role="presentation">
-      <button className="momeokji-vote-backdrop" type="button" aria-label="투표 닫기" onClick={onClose} />
-      <section className="momeokji-vote-sheet" role="dialog" aria-modal="true" aria-labelledby="momeokji-vote-title">
-        <header className="momeokji-vote-sheet__header">
-          <button type="button" aria-label="투표 닫기" onClick={onClose}>‹</button>
+    <div className="ui-layer momeokji-vote-layer" role="presentation">
+      <button className="ui-backdrop" type="button" aria-label="투표 닫기" onClick={onClose} />
+      <section className="ui-sheet momeokji-vote-sheet" role="dialog" aria-modal="true" aria-labelledby="momeokji-vote-title">
+        <header className="ui-sheet__header momeokji-vote-sheet__header">
+          <button className="ui-sheet__back" type="button" aria-label="투표 닫기" onClick={onClose}>‹</button>
           <img src={momeokjiIcon} alt="" />
-          <h2 id="momeokji-vote-title">{isClosed ? '모먹지 결과' : '모먹지 투표'}</h2>
+          <h2 id="momeokji-vote-title">{isExpired ? '투표 종료' : isClosed ? '모먹지 결과' : '모먹지 투표'}</h2>
+          {!isClosed && <CountdownTimer deadlineAt={session.deadlineAt} label="투표 마감" />}
         </header>
 
-        <div className="momeokji-vote-sheet__body">
+        <div className="ui-sheet__body momeokji-vote-sheet__body">
           {isClosed ? (
             <>
-              <p className="momeokji-vote-sheet__eyebrow">투표 결과</p>
-              <h3>{result?.selectedRestaurant?.name ?? '최종 장소가 결정됐어요'}</h3>
+              <p className="momeokji-vote-sheet__eyebrow">{isExpired ? '시간 만료' : '투표 결과'}</p>
+              <h3>{isExpired ? '투표 시간이 만료됐어요' : result?.selectedRestaurant?.name ?? '최종 장소가 결정됐어요'}</h3>
               <MomeokjiResult result={result} />
             </>
           ) : (
@@ -71,16 +88,16 @@ function MomeokjiVotePage({
               <RestaurantVoteCards
                 restaurants={session.recommendations}
                 selectedIds={activeSelectedIds}
-                onToggle={hasVoted ? undefined : toggleSelection}
-                readOnly={hasVoted}
+                onToggle={isSubmittedView ? undefined : toggleSelection}
+                readOnly={isSubmittedView}
                 showRecommendAgain
               />
 
               <MomeokjiVoteStatus session={session} participants={participants} />
 
-              {hasVoted && (
+              {isSubmittedView && (
                 <p className="momeokji-vote-sheet__complete" role="status">
-                  투표를 완료했어요. 다른 참가자의 투표를 기다리고 있어요.
+                  제출한 선택을 변경하려면 투표 다시하기를 눌러주세요.
                 </p>
               )}
 
@@ -88,20 +105,22 @@ function MomeokjiVotePage({
           )}
         </div>
 
-        <div className="momeokji-vote-sheet__footer">
+        <div className="ui-sheet__footer momeokji-vote-sheet__footer">
           <button
             className="app-button app-button--primary app-button--large"
             type="button"
-            disabled={!isClosed && (activeSelectedIds.length === 0 || hasVoted || isResolvingVote)}
-            onClick={isClosed ? onClose : () => onSubmit(activeSelectedIds)}
+            disabled={!isClosed && (isResolvingVote || (!isSubmittedView && activeSelectedIds.length === 0))}
+            onClick={isClosed ? onClose : isSubmittedView ? startEditingVote : submitCurrentVote}
           >
             {isClosed
               ? '확인'
               : isResolvingVote
                 ? '새 가게를 찾는 중…'
-                : hasVoted
-                  ? '투표 완료'
-                  : '투표하기'}
+                : isSubmittedView
+                  ? '투표 다시하기'
+                  : isEditingVote
+                    ? '투표 변경하기'
+                    : '투표하기'}
           </button>
         </div>
       </section>

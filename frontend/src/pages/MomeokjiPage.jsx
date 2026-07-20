@@ -8,10 +8,13 @@ import TimePicker from '../components/momeokji/TimePicker'
 import AddableMenuInput from '../components/momeokji/AddableMenuInput'
 import {
   AVOID_OPTIONS,
+  MENU_ANY_OPTION,
   MOOD_OPTIONS,
+  PERSONAL_OPTION_DURATION,
   THEMES,
   TIME_OPTIONS,
   TOTAL_STEPS,
+  VOTE_DURATION,
 } from '../constants/momeokjiOptions'
 import { analyzeConversationMenus } from '../services/momeokjiApi'
 import './MomeokjiPage.css'
@@ -47,14 +50,14 @@ function getNearestTimeValue(now = new Date()) {
 
 function ChipGroup({ label, options, selected, onToggle, single = false }) {
   return (
-    <div className="momeokji-chips momeokji-chips--wrap" aria-label={label}>
+    <div className="ui-chip-group momeokji-chips" aria-label={label}>
       {options.map((option) => {
         const optionValue = typeof option === 'string' ? option : option.value
         const optionLabel = typeof option === 'string' ? option : option.label
         const isSelected = single ? selected === optionValue : selected.includes(optionValue)
         return (
           <button
-            className={isSelected ? 'is-selected' : ''}
+            className={`ui-chip${isSelected ? ' is-selected' : ''}`}
             data-option-value={optionValue}
             type="button"
             aria-pressed={isSelected}
@@ -66,6 +69,29 @@ function ChipGroup({ label, options, selected, onToggle, single = false }) {
         )
       })}
     </div>
+  )
+}
+
+// ===== 개인 옵션과 식당 투표 제한시간을 동일한 분 단위 입력으로 관리 =====
+function DurationField({ label, description, value, min, max, onChange }) {
+  return (
+    <label className="momeokji-duration-field">
+      <span>
+        <strong>{label}</strong>
+        <output>{value}분</output>
+      </span>
+      <small>{description}</small>
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step="1"
+        value={value}
+        aria-label={label}
+        onChange={(event) => onChange(Number(event.target.value))}
+      />
+      <em><span>최소 {min}분</span><span>최대 {max}분</span></em>
+    </label>
   )
 }
 
@@ -82,6 +108,10 @@ function MomeokjiPage({
   const [time, setTime] = useState(() => getNearestTimeValue())
   const [place, setPlace] = useState(null)
   const [participantIds, setParticipantIds] = useState(() => defaultParticipantIds)
+  const [personalOptionDurationMinutes, setPersonalOptionDurationMinutes] = useState(
+    PERSONAL_OPTION_DURATION.defaultValue,
+  )
+  const [voteDurationMinutes, setVoteDurationMinutes] = useState(VOTE_DURATION.defaultValue)
   const [themeCode, setThemeCode] = useState('MEAL')
   const [menuOptions, setMenuOptions] = useState([])
   const [customMenuOptions, setCustomMenuOptions] = useState([])
@@ -132,16 +162,22 @@ function MomeokjiPage({
     }
   }, [date, messages, open, place, themeCode, time])
 
+  // ===== 주최자 ID는 UI 상태와 무관하게 최종 참가자 값에 항상 포함 =====
+  const effectiveParticipantIds = useMemo(
+    () => [...new Set([...defaultParticipantIds, ...participantIds])],
+    [defaultParticipantIds, participantIds],
+  )
+
   const selectedParticipantNames = useMemo(
     () => participants
-      .filter((person) => participantIds.includes(person.id))
+      .filter((person) => effectiveParticipantIds.includes(person.id))
       .map((person) => person.name),
-    [participantIds, participants],
+    [effectiveParticipantIds, participants],
   )
 
   // ===== AI 추출 메뉴와 직접 추가 메뉴를 중복 없이 하나의 선택 목록으로 구성 =====
   const selectableMenuOptions = useMemo(
-    () => [...new Set([...menuOptions, ...customMenuOptions])],
+    () => [...new Set([...menuOptions, ...customMenuOptions, MENU_ANY_OPTION])],
     [customMenuOptions, menuOptions],
   )
 
@@ -217,7 +253,11 @@ function MomeokjiPage({
     Boolean(date),
     Boolean(time),
     Boolean(place),
-    participantIds.length > 0,
+    effectiveParticipantIds.length > 0,
+    personalOptionDurationMinutes >= PERSONAL_OPTION_DURATION.min
+      && personalOptionDurationMinutes <= PERSONAL_OPTION_DURATION.max
+      && voteDurationMinutes >= VOTE_DURATION.min
+      && voteDurationMinutes <= VOTE_DURATION.max,
     Boolean(themeCode),
     menus.length > 0,
     true,
@@ -237,8 +277,10 @@ function MomeokjiPage({
       timeZone: 'Asia/Seoul',
       timeLabel: TIME_OPTIONS.find((option) => option.value === time)?.label ?? time,
       place,
-      participantIds,
+      participantIds: effectiveParticipantIds,
       participantNames: selectedParticipantNames,
+      personalOptionDurationMinutes,
+      voteDurationMinutes,
       themeCode,
       themeLabel: THEMES.find((option) => option.value === themeCode)?.label ?? themeCode,
       menus,
@@ -283,7 +325,8 @@ function MomeokjiPage({
             <p className="momeokji-description">선택한 참가자에게만 최종 공지가 보여요.</p>
             <ParticipantPicker
               people={participants}
-              selectedIds={participantIds} 
+              selectedIds={effectiveParticipantIds}
+              requiredIds={defaultParticipantIds}
               onChange={setParticipantIds}
             />
           </div>
@@ -291,19 +334,52 @@ function MomeokjiPage({
       case 4:
         return (
           <div className="momeokji-step">
-            <h3>모임의 주제가 무엇인가요?</h3>
-            <p className="momeokji-description">선택한 테마 코드는 AI 메뉴 추천 조건으로 전달돼요.</p>
-            <ChipGroup label="모임 테마" options={THEMES} selected={themeCode} onToggle={setThemeCode} single />
+            <h3>참여 시간을 정해주세요</h3>
+            <p className="momeokji-description">개인 조건 입력과 식당 투표의 제한 시간을 각각 설정해요.</p>
+            <div className="momeokji-duration-list">
+              <DurationField
+                label="개인 조건 입력 시간"
+                description="참가자가 음식 취향과 개인 조건을 입력할 수 있는 시간이에요."
+                value={personalOptionDurationMinutes}
+                min={PERSONAL_OPTION_DURATION.min}
+                max={PERSONAL_OPTION_DURATION.max}
+                onChange={setPersonalOptionDurationMinutes}
+              />
+              <DurationField
+                label="식당 투표 시간"
+                description="추천 식당이 공개된 후 투표에 참여할 수 있는 시간이에요."
+                value={voteDurationMinutes}
+                min={VOTE_DURATION.min}
+                max={VOTE_DURATION.max}
+                onChange={setVoteDurationMinutes}
+              />
+            </div>
           </div>
         )
       case 5:
         return (
           <div className="momeokji-step">
-            <h3>오늘 대화엔 이런 메뉴가 나왔어요</h3>
+            <h3>모임의 주제가 무엇인가요?</h3>
+            <p className="momeokji-description">선택한 테마 코드는 AI 메뉴 추천 조건으로 전달돼요.</p>
+            <ChipGroup label="모임 테마" options={THEMES} selected={themeCode} onToggle={setThemeCode} single />
+          </div>
+        )
+      case 6:
+        return (
+          <div className="momeokji-step">
+            <div className="momeokji-step-title">
+              <h3>오늘 대화엔 이런 메뉴가 나왔어요</h3>
+              <span>필수</span>
+            </div>
             <p className="momeokji-description">
               {isAnalyzing ? '대화에서 메뉴를 찾고 있어요…' : '대화 내용을 분석한 추천 메뉴예요.'}
             </p>
-            <ChipGroup label="AI 추천 메뉴" options={selectableMenuOptions} selected={menus} onToggle={(value) => toggleArrayValue(setMenus, value)} />
+            <ChipGroup
+              label="AI 추천 메뉴"
+              options={selectableMenuOptions}
+              selected={menus}
+              onToggle={(value) => toggleArrayValue(setMenus, value)}
+            />
             <AddableMenuInput
               value={menuInput}
               onChange={setMenuInput}
@@ -311,7 +387,7 @@ function MomeokjiPage({
             />
           </div>
         )
-      case 6:
+      case 7:
         return (
           <div className="momeokji-step">
             <h3>피하고 싶은 음식이 있나요?</h3>
@@ -346,18 +422,18 @@ function MomeokjiPage({
   if (!open) return null
 
   return (
-    <div className="momeokji-layer" role="presentation">
-      <button className="momeokji-backdrop" type="button" aria-label="모먹지 닫기" onClick={onClose} />
-      <section className="momeokji-sheet" role="dialog" aria-modal="true" aria-labelledby="momeokji-title">
-        <header className="momeokji-sheet__header">
+    <div className="ui-layer momeokji-layer" role="presentation">
+      <button className="ui-backdrop" type="button" aria-label="모먹지 닫기" onClick={onClose} />
+      <section className="ui-sheet momeokji-sheet" role="dialog" aria-modal="true" aria-labelledby="momeokji-title">
+        <header className="ui-sheet__header momeokji-sheet__header">
           {step > 0 && (
-            <button className="momeokji-back-button" type="button" aria-label="이전 단계" onClick={() => setStep((previous) => previous - 1)}>‹</button>
+            <button className="ui-sheet__back" type="button" aria-label="이전 단계" onClick={() => setStep((previous) => previous - 1)}>‹</button>
           )}
           <img src={momeokjiIcon} alt="" />
           <h2 id="momeokji-title">오늘 모 먹지?</h2>
           <span className="momeokji-step-count">{step + 1}/{TOTAL_STEPS}</span>
         </header>
-        <div className="momeokji-sheet__body">{renderStep()}</div>
+        <div className="ui-sheet__body">{renderStep()}</div>
         <NextProgressButton
           currentStep={step + 1}
           totalSteps={TOTAL_STEPS}

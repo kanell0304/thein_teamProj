@@ -1,9 +1,11 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import ChatHeader from '../components/chat/ChatHeader'
 import ChatNotice from '../components/chat/ChatNotice'
 import ChatMessageList from '../components/chat/ChatMessageList'
 import ChatInput from '../components/chat/ChatInput'
 import MomeokjiPage from './MomeokjiPage'
+import ParticipantPreferencePage from './ParticipantPreferencePage'
+import MomeokjiPreferenceNotice from '../components/momeokji/MomeokjiPreferenceNotice'
 import MomeokjiVoteNotice from '../components/momeokji/MomeokjiVoteNotice'
 import MomeokjiVotePage from '../components/momeokji/MomeokjiVotePage'
 import { recommendRestaurants } from '../services/momeokjiApi'
@@ -11,7 +13,6 @@ import {
   createVoteCounts,
   findWinningRestaurant,
   hasEveryoneVoted,
-  hasParticipantVoted,
   hasRecommendAgainWon,
   RECOMMEND_AGAIN_ID,
 } from '../utils/momeokjiVote'
@@ -64,8 +65,15 @@ function createInitialMessages() {
 // ===== 공지사항에 표시할 투표 진행 단계 문구 =====
 function getVoteNoticeText(status) {
   if (status === 'CLOSED') return '투표 결과를 확인해요.'
+  if (status === 'EXPIRED') return '투표 시간이 만료됐어요.'
   if (status === 'IN_PROGRESS') return '투표가 진행 중이에요.'
   return '투표가 만들어졌어요.'
+}
+
+// ===== 공지사항에 표시할 개인 조건 수집 단계 문구 =====
+function getPreferenceNoticeText(status) {
+  if (status === 'GENERATING') return 'AI가 추천 식당을 찾고 있어요.'
+  return '참가자 조건 입력이 시작됐어요.'
 }
 
 function ChatRoomPage({ room = DEMO_ROOM, currentUser = DEMO_CURRENT_USER }) {
@@ -74,15 +82,71 @@ function ChatRoomPage({ room = DEMO_ROOM, currentUser = DEMO_CURRENT_USER }) {
   // API 연결 후에는 createInitialMessages 대신 채팅 조회 응답으로 초기화
   const [messages, setMessages] = useState(createInitialMessages)
   const [isMomeokjiOpen, setIsMomeokjiOpen] = useState(false)
+  const [isParticipantPreferenceOpen, setIsParticipantPreferenceOpen] = useState(false)
   const [isVotePageOpen, setIsVotePageOpen] = useState(false)
   const [isCreatingVote, setIsCreatingVote] = useState(false)
   const [isResolvingVote, setIsResolvingVote] = useState(false)
   const [recommendationError, setRecommendationError] = useState('')
+  const [pendingMeetingSettings, setPendingMeetingSettings] = useState(null)
+  const [preferenceSession, setPreferenceSession] = useState(null)
   const [voteSession, setVoteSession] = useState(null)
   const [momeokjiResult, setMomeokjiResult] = useState(null)
   const voteSubmissionLockRef = useRef(false)
   const canViewVote = voteSession?.settings.participantIds.includes(currentUser.id)
+  const canViewPreference = preferenceSession?.participantIds.includes(currentUser.id)
   const canViewMomeokjiResult = momeokjiResult?.participantIds.includes(currentUser.id)
+
+  // ===== 투표 생성 시각부터 설정된 제한시간이 지나면 현재 득표로 자동 결정 =====
+  useEffect(() => {
+    if (!voteSession?.deadlineAt || ['CLOSED', 'EXPIRED'].includes(voteSession.status)) {
+      return undefined
+    }
+
+    const remainingMilliseconds = Math.max(
+      0,
+      new Date(voteSession.deadlineAt).getTime() - Date.now(),
+    )
+    const timeoutId = window.setTimeout(() => {
+      const votedParticipantIds = new Set(Object.values(voteSession.votes).flat())
+      const voteCounts = createVoteCounts(voteSession.recommendations, voteSession.votes)
+
+      if (votedParticipantIds.size === 0) {
+        setMomeokjiResult({
+          ...voteSession.settings,
+          selectedRestaurant: null,
+          voteCounts,
+          decisionMethod: 'NO_VOTES_TIMEOUT',
+        })
+        setVoteSession((previous) => (
+          previous?.id === voteSession.id ? { ...previous, status: 'EXPIRED' } : previous
+        ))
+        return
+      }
+
+      const restaurantVoteCounts = voteSession.recommendations.map((restaurant) => (
+        voteSession.votes[restaurant.id]?.length ?? 0
+      ))
+      const highestRestaurantVoteCount = Math.max(...restaurantVoteCounts)
+      const restaurantLeaderCount = restaurantVoteCounts.filter((count) => (
+        count === highestRestaurantVoteCount
+      )).length
+      const winner = findWinningRestaurant(voteSession.recommendations, voteSession.votes)
+
+      setMomeokjiResult({
+        ...voteSession.settings,
+        selectedRestaurant: winner,
+        voteCounts,
+        decisionMethod: restaurantLeaderCount > 1
+          ? 'DEADLINE_RANDOM_RESTAURANT_TIE'
+          : 'DEADLINE_MAJORITY',
+      })
+      setVoteSession((previous) => (
+        previous?.id === voteSession.id ? { ...previous, status: 'CLOSED' } : previous
+      ))
+    }, remainingMilliseconds)
+
+    return () => window.clearTimeout(timeoutId)
+  }, [voteSession])
 
   const sendMessage = (text) => {
     setMessages((previous) => [
@@ -96,9 +160,30 @@ function ChatRoomPage({ room = DEMO_ROOM, currentUser = DEMO_CURRENT_USER }) {
     ])
   }
 
+  // ===== 주최자 공통 설정 완료 후 현재 참가자의 개인 조건 입력 단계로 전환 =====
+  const requestParticipantPreference = (settings) => {
+    const isCurrentUserSelected = settings.participantIds.includes(currentUser.id)
+    const participantPreferenceDeadlineAt = new Date(
+      Date.now() + settings.personalOptionDurationMinutes * 60_000,
+    ).toISOString()
+    setPendingMeetingSettings({ ...settings, participantPreferenceDeadlineAt })
+    setPreferenceSession({
+      status: 'IN_PROGRESS',
+      participantIds: settings.participantIds,
+      submittedParticipantIds: [],
+      deadlineAt: participantPreferenceDeadlineAt,
+    })
+    setRecommendationError('')
+    // 선택된 참가자의 클라이언트에서만 개인 조건 입력 시트를 엽니다.
+    setIsParticipantPreferenceOpen(isCurrentUserSelected)
+  }
+
   // ===== 8단계 설정 완료 후 AI 추천 3곳으로 투표 세션 생성 =====
   const createVoteSession = async (settings) => {
     setIsCreatingVote(true)
+    setPreferenceSession((previous) => (
+      previous ? { ...previous, status: 'GENERATING' } : previous
+    ))
     setRecommendationError('')
     setMomeokjiResult(null)
     setVoteSession(null)
@@ -106,11 +191,17 @@ function ChatRoomPage({ room = DEMO_ROOM, currentUser = DEMO_CURRENT_USER }) {
     try {
       const recommendations = await recommendRestaurants(settings)
       const sessionId = crypto.randomUUID()
+      const createdAt = new Date()
+      const deadlineAt = new Date(
+        createdAt.getTime() + settings.voteDurationMinutes * 60_000,
+      )
       setVoteSession({
         id: sessionId,
         status: 'CREATED',
         settings,
         recommendations,
+        createdAt: createdAt.toISOString(),
+        deadlineAt: deadlineAt.toISOString(),
         votes: {},
         excludedRestaurantIds: [],
         generation: 0,
@@ -128,17 +219,54 @@ function ChatRoomPage({ room = DEMO_ROOM, currentUser = DEMO_CURRENT_USER }) {
           time: currentTime(),
         },
       ])
+      setPreferenceSession(null)
     } catch {
+      setPreferenceSession(null)
       setRecommendationError('추천 가게를 불러오지 못했어요. 다시 시도해주세요.')
     } finally {
       setIsCreatingVote(false)
     }
   }
 
+  // ===== 개인 조건 DTO를 공통 설정에 합쳐 기존 추천 API 요청으로 전달 =====
+  const submitParticipantPreference = (preference) => {
+    if (!pendingMeetingSettings) return
+
+    const settings = {
+      ...pendingMeetingSettings,
+      participantPreferences: [preference],
+    }
+    setPreferenceSession((previous) => {
+      if (!previous) return previous
+      const submittedParticipantIds = new Set(previous.submittedParticipantIds)
+      submittedParticipantIds.add(currentUser.id)
+      return {
+        ...previous,
+        status: 'GENERATING',
+        submittedParticipantIds: [...submittedParticipantIds],
+      }
+    })
+    setIsParticipantPreferenceOpen(false)
+    setPendingMeetingSettings(null)
+    createVoteSession(settings)
+  }
+
+  // ===== 목업 단계의 참여 거절 처리: 추천을 시작하지 않고 채팅 공지로 안내 =====
+  const declineParticipantPreference = () => {
+    setIsParticipantPreferenceOpen(false)
+    setPendingMeetingSettings(null)
+    setPreferenceSession(null)
+    setRecommendationError('참여 안 하기를 선택했어요. 모임 설정을 다시 시작해주세요.')
+  }
+
   // ===== 모먹지 기능 버튼은 진행 상태에 맞는 화면을 엽니다. =====
   const openCurrentMomeokjiStage = () => {
     if (voteSession && canViewVote) {
       setIsVotePageOpen(true)
+      return
+    }
+    if (pendingMeetingSettings) {
+      if (canViewPreference) setIsParticipantPreferenceOpen(true)
       return
     }
     setIsMomeokjiOpen(true)
@@ -170,19 +298,20 @@ function ChatRoomPage({ room = DEMO_ROOM, currentUser = DEMO_CURRENT_USER }) {
       || uniqueOptionIds.length > 4
       || uniqueOptionIds.some((optionId) => !validOptionIds.has(optionId))
     ) return
-    // 이미 제출한 참가자는 같은 라운드에서 선택을 바꾸거나 다시 제출할 수 없습니다.
-    if (hasParticipantVoted(voteSession.votes, currentUser.id)) return
     voteSubmissionLockRef.current = true
 
     try {
       const updatedVotes = Object.fromEntries(
         voteSession.recommendations.map((restaurant) => [
           restaurant.id,
-          voteSession.votes[restaurant.id] ?? [],
+          (voteSession.votes[restaurant.id] ?? []).filter((participantId) => (
+            participantId !== currentUser.id
+          )),
         ]),
       )
-      updatedVotes[RECOMMEND_AGAIN_ID] = voteSession.votes[RECOMMEND_AGAIN_ID] ?? []
-      // 선택한 가게와 재추천 각각에 참가자의 표를 한 개씩 기록합니다.
+      updatedVotes[RECOMMEND_AGAIN_ID] = (voteSession.votes[RECOMMEND_AGAIN_ID] ?? [])
+        .filter((participantId) => participantId !== currentUser.id)
+      // 기존 표를 먼저 제거한 뒤 현재 선택을 기록해 수정 투표도 중복 없이 교체합니다.
       uniqueOptionIds.forEach((optionId) => {
         updatedVotes[optionId] = [...updatedVotes[optionId], currentUser.id]
       })
@@ -275,8 +404,26 @@ function ChatRoomPage({ room = DEMO_ROOM, currentUser = DEMO_CURRENT_USER }) {
       <ChatHeader roomName="진원버스 가즈아" memberCount={room.members.length} />
 
       <div className="chat-body">
-        {/* ===== 1단계 설정 완료 후 AI 추천 생성 상태 ===== */}
-        {isCreatingVote && <ChatNotice text="AI가 추천 가게를 찾고 있어요." />}
+        {/* ===== 참가자 전용 공지: 개인 조건 입력 현황과 현재 단계 연결 ===== */}
+        {preferenceSession && canViewPreference && (
+          <ChatNotice
+            text={getPreferenceNoticeText(preferenceSession.status)}
+          >
+            <MomeokjiPreferenceNotice
+              status={preferenceSession.status}
+              participantCount={preferenceSession.participantIds.length}
+              submittedCount={preferenceSession.submittedParticipantIds.length}
+              deadlineAt={preferenceSession.deadlineAt}
+              hasSubmitted={preferenceSession.submittedParticipantIds.includes(currentUser.id)}
+              onOpen={() => setIsParticipantPreferenceOpen(true)}
+            />
+          </ChatNotice>
+        )}
+
+        {/* 개인 조건 단계 없이 추천을 다시 요청하는 예외 흐름의 생성 상태. */}
+        {isCreatingVote && !preferenceSession && (
+          <ChatNotice text="AI가 추천 식당을 찾고 있어요." />
+        )}
         {recommendationError && <ChatNotice text={recommendationError} />}
 
         {/* ===== 참가자 전용 공지: 생성·진행·결과 상태와 연결 버튼만 표시 ===== */}
@@ -312,10 +459,25 @@ function ChatRoomPage({ room = DEMO_ROOM, currentUser = DEMO_CURRENT_USER }) {
       <MomeokjiPage
         open={isMomeokjiOpen}
         onClose={() => setIsMomeokjiOpen(false)}
-        onComplete={createVoteSession}
+        onComplete={requestParticipantPreference}
         messages={messages}
         participants={roomParticipants}
         defaultParticipantIds={[currentUser.id]}
+      />
+
+      <ParticipantPreferencePage
+        key={pendingMeetingSettings
+          ? `${pendingMeetingSettings.date}-${pendingMeetingSettings.time}`
+          : 'no-participant-preference'}
+        open={Boolean(isParticipantPreferenceOpen && canViewPreference)}
+        onClose={() => setIsParticipantPreferenceOpen(false)}
+        onSubmit={submitParticipantPreference}
+        onDecline={declineParticipantPreference}
+        participant={currentUser}
+        meetingSummary={pendingMeetingSettings
+          ? `${pendingMeetingSettings.place.name} · ${pendingMeetingSettings.date} ${pendingMeetingSettings.timeLabel}`
+          : ''}
+        deadlineAt={pendingMeetingSettings?.participantPreferenceDeadlineAt}
       />
 
       <MomeokjiVotePage
