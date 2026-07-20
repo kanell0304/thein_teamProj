@@ -6,26 +6,32 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 /**
- * 선택한 시간대에 발생한 동일 가맹점의 결제들을 하나로 묶은 데이터
+ * 선택한 시간대에 발생한 동일 가맹점의 결제와 카카오 장소 매칭 결과를 묶은 최종 데이터다.
  *
- * 원본 가맹점명은 카카오 로컬 검색에 사용하기 위해 변경하지 않고 보존한다.
- * 승인번호는 정확한 중복 제거가 끝난 1차 정제 이후 폐기
- * 승인시각과 승인금액은 서로의 대응 관계가 어긋나지 않도록 {@link PaymentOccurrence} 목록으로 함께 보존한다.</p>
+ * <p>원본 가맹점명은 카카오 로컬 검색에 사용하기 위해 변경하지 않고 보존한다.
+ * 승인번호는 정확한 중복 제거가 끝난 1차 정제 이후 폐기하고, 승인시각과 승인금액은
+ * 서로의 대응 관계가 어긋나지 않도록 {@link PaymentLog} 목록으로 함께 보존한다.</p>
+ *
+ * <p>가맹점 집계 직후 생성하는 데이터는 {@link KakaoPlaceMatchData#unmatched()}를 사용한다.
+ * 이후 장소 분류 단계는
+ * {@link #withKakaoPlaceMatch(KakaoPlaceMatchData)}로 카카오 결과만 교체한 새 값을 만든다.</p>
  *
  * @param merchantName 최초 결제에서 보존한 원본 가맹점명. 미회신이면 {@code null}
  * @param merchantCode 가맹점을 구분하는 사업자등록번호 기반 코드. 미회신이면 {@code null}
  * @param timeBand 집계에 포함된 모든 결제가 속한 시간대
  * @param payments 원본 등장 순서를 유지한 승인시각·승인금액 쌍의 불변 목록
+ * @param kakaoPlaceMatch 카카오 장소 검색의 매칭 결과. 미매칭 상태도 null 대신 전용 값으로 표현
  */
 public record MerchantUsageData(
         String merchantName,
         String merchantCode,
         TimeBand timeBand,
-        List<PaymentOccurrence> payments
+        List<PaymentLog> payments,
+        KakaoPlaceMatchData kakaoPlaceMatch
 ) {
 
     /**
-     * 가맹점 집계 결과가 후속 로컬 검색과 통계 계산에 사용할 수 있는 상태인지 검증한다.
+     * 가맹점 사용 이력과 카카오 장소 결과가 후속 처리에 사용할 수 있는 상태인지 검증한다.
      * 원본 문자열과 결제 발생 순서는 변경하지 않으며 목록만 방어적으로 복사한다.
      */
     public MerchantUsageData {
@@ -45,7 +51,7 @@ public record MerchantUsageData(
             throw new IllegalArgumentException("timeBand는 필수입니다.");
         }
 
-        // 집계 결과에는 한 건 이상의 결제 발생 정보가 존재하는지 검증한다.
+        // 집계 결과에는 한 건 이상의 결제 로그가 존재하는지 검증한다.
         if (payments == null) {
             throw new IllegalArgumentException("payments는 null일 수 없습니다.");
         }
@@ -53,29 +59,78 @@ public record MerchantUsageData(
             throw new IllegalArgumentException("payments는 한 건 이상이어야 합니다.");
         }
 
-        // 모든 결제 발생 정보가 존재하며 집계 시간대와 일치하는지 검증한다.
+        // 모든 결제 로그가 존재하며 집계 시간대와 일치하는지 검증한다.
         for (int index = 0; index < payments.size(); index++) {
-            PaymentOccurrence occurrence = payments.get(index);
-            if (occurrence == null) {
+            PaymentLog payment = payments.get(index);
+            if (payment == null) {
                 throw new IllegalArgumentException(
                         "payments[" + index + "]은 null일 수 없습니다."
                 );
             }
-            if (TimeBand.from(occurrence.approvedAt()) != timeBand) {
+            if (TimeBand.from(payment.approvedAt()) != timeBand) {
                 throw new IllegalArgumentException(
                         "payments[" + index + "]의 승인시각이 timeBand와 일치하지 않습니다."
                 );
             }
         }
 
-        // 호출자가 전달한 목록을 변경해도 집계 결과가 바뀌지 않도록 불변 목록으로 복사한다.
+        // 호출자가 전달한 목록을 변경해도 가맹점 사용 이력이 바뀌지 않도록 불변 목록으로 복사한다.
         payments = List.copyOf(payments);
+
+        // 분류 전·후 상태를 null로 구분하지 않도록 카카오 장소 결과를 필수로 검증한다.
+        if (kakaoPlaceMatch == null) {
+            throw new IllegalArgumentException("kakaoPlaceMatch는 필수입니다.");
+        }
+    }
+
+    /**
+     * 집계가 끝났지만 카카오 장소 검색은 아직 반영하지 않은 가맹점 사용 이력을 만든다.
+     *
+     * @param merchantName 최초 결제의 원본 가맹점명
+     * @param merchantCode 사업자등록번호 기반 가맹점 코드
+     * @param timeBand 결제가 속한 선택 시간대
+     * @param payments 승인시각·승인금액 결제 로그 목록
+     * @return 미매칭 카카오 결과를 포함한 가맹점 사용 이력
+     */
+    public static MerchantUsageData unclassified(
+            String merchantName,
+            String merchantCode,
+            TimeBand timeBand,
+            List<PaymentLog> payments
+    ) {
+        // 검색 전에는 장소를 찾지 못한 기본 결과를 명시적으로 저장한다.
+        return new MerchantUsageData(
+                merchantName,
+                merchantCode,
+                timeBand,
+                payments,
+                KakaoPlaceMatchData.unmatched()
+        );
+    }
+
+    /**
+     * 기본 가맹점·결제 정보는 유지하고 카카오 장소 매칭 결과만 교체한 새 값을 만든다.
+     *
+     * @param kakaoPlaceMatch 카카오 검색과 이름 비교가 끝난 최종 장소 매칭 결과
+     * @return 기존 사용 이력과 새 카카오 장소 결과를 결합한 불변 데이터
+     */
+    public MerchantUsageData withKakaoPlaceMatch(
+            KakaoPlaceMatchData kakaoPlaceMatch
+    ) {
+        // record를 변경하지 않고 동일한 사용 이력에 새 장소 결과를 적용한 객체를 생성한다.
+        return new MerchantUsageData(
+                merchantName,
+                merchantCode,
+                timeBand,
+                payments,
+                kakaoPlaceMatch
+        );
     }
 
     /**
      * 동일 가맹점·시간대에 포함된 실제 결제 횟수를 반환한다.
      *
-     * @return 결제 발생 목록의 크기
+     * @return 결제 로그 목록의 크기
      */
     public int paymentCount() {
         return payments.size();
@@ -84,7 +139,7 @@ public record MerchantUsageData(
     /**
      * 집계된 결제 중 가장 최근 승인일시를 계산한다.
      *
-     * @return 결제 발생 목록에서 가장 늦은 승인일시
+     * @return 결제 로그에서 가장 늦은 승인일시
      */
     public LocalDateTime latestVisitedAt() {
         LocalDateTime latest = payments.get(0).approvedAt();
@@ -102,14 +157,14 @@ public record MerchantUsageData(
     /**
      * 동일 가맹점·시간대에 포함된 승인금액의 합계를 계산한다.
      *
-     * @return 모든 결제 발생 금액의 합계
+     * @return 모든 결제 로그 금액의 합계
      */
     public BigDecimal totalApprovedAmount() {
         BigDecimal total = BigDecimal.ZERO;
 
-        // 각 결제 발생의 승인금액을 누적하여 총 결제금액을 계산한다.
-        for (PaymentOccurrence occurrence : payments) {
-            total = total.add(occurrence.approvedAmount());
+        // 각 결제 로그의 승인금액을 누적하여 총 결제금액을 계산한다.
+        for (PaymentLog payment : payments) {
+            total = total.add(payment.approvedAmount());
         }
         return total;
     }
@@ -118,7 +173,7 @@ public record MerchantUsageData(
      * 동일 가맹점·시간대의 평균 승인금액을 소수점 둘째 자리까지 계산한다.
      * 나누어떨어지지 않는 값은 일반적인 반올림 방식인 {@link RoundingMode#HALF_UP}을 사용한다.
      *
-     * @return 총 승인금액을 방문 횟수로 나눈 평균 승인금액
+     * @return 총 승인금액을 결제 횟수로 나눈 평균 승인금액
      */
     public BigDecimal averageApprovedAmount() {
         // 한 건 이상임이 생성자에서 보장된 목록의 크기로 총 결제금액을 나눈다.
@@ -143,20 +198,20 @@ public record MerchantUsageData(
     }
 
     /**
-     * 한 번의 결제에서 서로 짝을 이루는 승인시각과 승인금액을 보존하는 불변 값이다.
+     * 한 번의 결제에서 서로 짝을 이루는 승인시각과 승인금액을 보존하는 불변 로그다.
      *
      * @param approvedAt 최초 승인일시
      * @param approvedAmount 최초 승인금액
      */
-    public record PaymentOccurrence(
+    public record PaymentLog(
             LocalDateTime approvedAt,
             BigDecimal approvedAmount
     ) {
 
         /**
-         * 결제 발생 정보가 시간대 분류와 금액 통계에 사용할 수 있는 값인지 검증한다.
+         * 결제 로그가 시간대 분류와 금액 통계에 사용할 수 있는 값인지 검증한다.
          */
-        public PaymentOccurrence {
+        public PaymentLog {
             // 승인시각이 존재하는지 검증한다.
             if (approvedAt == null) {
                 throw new IllegalArgumentException("approvedAt은 필수입니다.");

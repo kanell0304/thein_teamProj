@@ -2,10 +2,11 @@ package com.anything.momeogji.mydata.transform;
 
 import com.anything.momeogji.mydata.transform.MerchantPlaceMatcher.MatchResult;
 import com.anything.momeogji.mydata.transform.local.MerchantPlaceSearchClient.SearchCandidate;
-import com.anything.momeogji.mydata.transform.model.MerchantClassificationData;
+import com.anything.momeogji.mydata.transform.model.KakaoPlaceMatchData;
 import com.anything.momeogji.mydata.transform.model.MerchantUsageData;
 import org.springframework.stereotype.Component;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -13,14 +14,23 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * 가맹점별 결제 사용 이력을 카카오 로컬 API의 키워드로 장소 찾기를 사용해 음식점·카페·미분류 결과로 변환
+ * 가맹점별 결제 사용 이력에 카카오 로컬 장소 매칭 결과를 결합한다.
  *
- * 장소 검색과 이름 신뢰도 계산은 {@link MerchantPlaceMatcher}에 위임하고,
- * 최고 후보들의 카테고리와 좌표를 해석해 최종 분류 데이터를 생성한다.
- * 검색 실패와 미분류 가맹점은 원본 순서대로 {@code UNKNOWN} 결과에 보존한다.
+ * <p>장소 검색과 이름 신뢰도 계산은 {@link MerchantPlaceMatcher}에 위임하고,
+ * 최고 후보들의 카테고리와 좌표를 해석해 기존 {@link MerchantUsageData}의
+ * {@code kakaoPlaceMatch}만 교체한 새 불변 값을 만든다.</p>
+ *
+ * <p>검색 실패와 미매칭 가맹점은 집계 단계에서 만든 미매칭 기본값을 유지한다.
+ * 음식점·카페가 아닌 명시적 카카오 카테고리는 최종 목록에서 제외하며,
+ * 입력 가맹점의 원래 순서를 보존한 불변 목록을 반환한다.</p>
  */
 @Component
 public class MerchantClassificationProcessor {
+
+    private static final BigDecimal MIN_LONGITUDE = BigDecimal.valueOf(-180);
+    private static final BigDecimal MAX_LONGITUDE = BigDecimal.valueOf(180);
+    private static final BigDecimal MIN_LATITUDE = BigDecimal.valueOf(-90);
+    private static final BigDecimal MAX_LATITUDE = BigDecimal.valueOf(90);
 
     private final MerchantPlaceMatcher merchantPlaceMatcher;
 
@@ -34,16 +44,16 @@ public class MerchantClassificationProcessor {
     }
 
     /**
-     * 가맹점 사용 이력을 장소 검색 결과와 비교해 음식점·카페·미분류 목록으로 변환
+     * 가맹점 사용 이력을 장소 검색 결과와 비교해 카카오 장소 정보가 포함된 최종 목록으로 만든다.
      *
-     * 입력 목록이 비어 있으면 빈 불변 목록을 반환한다.
-     * 검색에 실패하거나 장소명을 사용할 수 없는 가맹점은 예외 대신 미분류 결과로 유지하고, 음식점·카페가 아닌 카테고리는 제외
+     * <p>입력 목록이 비어 있으면 빈 불변 목록을 반환한다. 검색에 실패하거나 장소명을 사용할 수
+     * 없는 가맹점은 미매칭 결과로 유지하고, 음식점·카페가 아닌 카테고리는 제외한다.</p>
      *
      * @param merchantUsages 선택 시간대에 맞춰 집계된 가맹점별 결제 사용 이력
-     * @return 입력 순서를 유지한 음식점·카페·미분류 분류 결과의 불변 목록
+     * @return 입력 순서를 유지한 음식점·카페·미분류 가맹점 사용 이력 불변 목록
      * @throws IllegalArgumentException 입력 목록이 null인 경우
      */
-    public List<MerchantClassificationData> process(
+    public List<MerchantUsageData> classify(
             List<MerchantUsageData> merchantUsages
     ) {
         // 분류할 가맹점 사용 이력 목록이 존재하는지 공개 경계에서 검증한다.
@@ -52,27 +62,27 @@ public class MerchantClassificationProcessor {
         }
 
         Map<String, List<SearchCandidate>> searchCache = new HashMap<>();
-        List<MerchantClassificationData> classifications = new ArrayList<>(merchantUsages.size());
+        List<MerchantUsageData> classifiedUsages = new ArrayList<>(merchantUsages.size());
 
         // 입력 가맹점 순서대로 검색과 분류를 수행한다.
         for (MerchantUsageData merchantUsage : merchantUsages) {
             // 음식점·카페·미분류 결과만 최종 목록에 추가한다.
             classifyMerchant(merchantUsage, searchCache)
-                    .ifPresent(classifications::add);
+                    .ifPresent(classifiedUsages::add);
         }
 
         // 호출자가 가맹점 순서와 분류 결과를 변경하지 못하도록 불변 목록을 반환한다.
-        return List.copyOf(classifications);
+        return List.copyOf(classifiedUsages);
     }
 
     /**
-     * 한 가맹점의 원본명과 비교용 이름을 순차 검색해 최종 분류 결과를 만든다.
+     * 한 가맹점의 원본명과 비교용 이름을 순차 검색해 카카오 장소 결과를 결합한다.
      *
      * @param merchantUsage 분류할 한 가맹점의 결제 사용 이력
      * @param searchCache 현재 처리 호출 안에서 검색어별 결과를 재사용하는 캐시
      * @return 음식점·카페·미분류면 결과를 포함하고, 그 외 카테고리면 빈 Optional
      */
-    private Optional<MerchantClassificationData> classifyMerchant(
+    private Optional<MerchantUsageData> classifyMerchant(
             MerchantUsageData merchantUsage,
             Map<String, List<SearchCandidate>> searchCache
     ) {
@@ -82,9 +92,9 @@ public class MerchantClassificationProcessor {
                 searchCache
         );
 
-        // 검색할 이름이 없거나 이름 매칭 후보를 찾지 못하면 미분류 결과로 보존한다.
+        // 검색할 이름이 없거나 이름 매칭 후보를 찾지 못하면 기존 미매칭 결과를 유지한다.
         if (!matchResult.matched()) {
-            return Optional.of(createUnmatchedClassification(merchantUsage));
+            return Optional.of(merchantUsage);
         }
 
         // 최고 점수 후보들만 모아 카테고리 충돌과 좌표의 단일 후보 여부를 판단한다.
@@ -102,16 +112,18 @@ public class MerchantClassificationProcessor {
                 ? parseCoordinates(selectedCandidate)
                 : Coordinates.empty();
 
-        // 선택한 장소의 추적 정보와 분류 결과를 기존 가맹점 사용 이력에 결합한다.
-        return Optional.of(new MerchantClassificationData(
-                merchantUsage,
+        // 선택 장소의 추적 정보와 분류 결과를 하나의 카카오 장소 매칭 값으로 만든다.
+        KakaoPlaceMatchData kakaoPlaceMatch = new KakaoPlaceMatchData(
                 categoryCode,
-                matchResult.matchConfidence(),
                 selectedCandidate.placeId(),
                 selectedCandidate.placeName(),
-                coordinates.x(),
-                coordinates.y()
-        ));
+                matchResult.matchConfidence(),
+                coordinates.longitude(),
+                coordinates.latitude()
+        );
+
+        // 원본 가맹점·결제 정보는 유지하고 카카오 장소 결과만 교체한 새 사용 이력을 반환한다.
+        return Optional.of(merchantUsage.withKakaoPlaceMatch(kakaoPlaceMatch));
     }
 
     /**
@@ -131,7 +143,7 @@ public class MerchantClassificationProcessor {
 
             // 카카오가 카테고리 그룹을 회신하지 않은 후보가 섞이면 미분류로 처리한다.
             if (candidateCategoryCode == null) {
-                return MerchantClassificationData.UNKNOWN_CATEGORY_CODE;
+                return KakaoPlaceMatchData.UNKNOWN_CATEGORY_CODE;
             }
 
             if (resolvedCategoryCode == null) {
@@ -141,12 +153,12 @@ public class MerchantClassificationProcessor {
 
             // 같은 점수 후보들의 카테고리가 다르면 특정 카테고리로 단정하지 않는다.
             if (!resolvedCategoryCode.equals(candidateCategoryCode)) {
-                return MerchantClassificationData.UNKNOWN_CATEGORY_CODE;
+                return KakaoPlaceMatchData.UNKNOWN_CATEGORY_CODE;
             }
         }
 
         return resolvedCategoryCode == null
-                ? MerchantClassificationData.UNKNOWN_CATEGORY_CODE
+                ? KakaoPlaceMatchData.UNKNOWN_CATEGORY_CODE
                 : resolvedCategoryCode;
     }
 
@@ -164,15 +176,15 @@ public class MerchantClassificationProcessor {
     }
 
     /**
-     * 최종 AI 입력에 유지할 음식점·카페·미분류 카테고리인지 확인한다.
+     * 최종 AI 입력 후보에 유지할 음식점·카페·미분류 카테고리인지 확인한다.
      *
      * @param categoryCode 후보 합의로 결정된 카테고리 코드
      * @return FD6, CE7, UNKNOWN 중 하나면 true
      */
     private boolean isRetainedCategory(String categoryCode) {
-        return MerchantClassificationData.RESTAURANT_CATEGORY_CODE.equals(categoryCode)
-                || MerchantClassificationData.CAFE_CATEGORY_CODE.equals(categoryCode)
-                || MerchantClassificationData.UNKNOWN_CATEGORY_CODE.equals(categoryCode);
+        return KakaoPlaceMatchData.RESTAURANT_CATEGORY_CODE.equals(categoryCode)
+                || KakaoPlaceMatchData.CAFE_CATEGORY_CODE.equals(categoryCode)
+                || KakaoPlaceMatchData.UNKNOWN_CATEGORY_CODE.equals(categoryCode);
     }
 
     /**
@@ -182,30 +194,27 @@ public class MerchantClassificationProcessor {
      * @return 두 좌표가 모두 유효하면 좌표 값, 그렇지 않으면 빈 좌표
      */
     private Coordinates parseCoordinates(SearchCandidate candidate) {
-        String rawX = candidate.x();
-        String rawY = candidate.y();
+        String rawLongitude = candidate.x();
+        String rawLatitude = candidate.y();
 
         // 한 좌표라도 미회신이면 불완전한 위치를 저장하지 않는다.
-        if (rawX == null || rawX.isBlank() || rawY == null || rawY.isBlank()) {
+        if (rawLongitude == null || rawLongitude.isBlank()
+                || rawLatitude == null || rawLatitude.isBlank()) {
             return Coordinates.empty();
         }
 
         try {
-            // 카카오가 문자열로 회신한 WGS84 경도와 위도를 숫자로 변환한다.
-            double parsedX = Double.parseDouble(rawX);
-            double parsedY = Double.parseDouble(rawY);
+            // 카카오가 문자열로 회신한 WGS84 경도와 위도를 정밀한 십진수로 변환한다.
+            BigDecimal longitude = new BigDecimal(rawLongitude);
+            BigDecimal latitude = new BigDecimal(rawLatitude);
 
-            // 숫자가 유한하며 경도·위도 허용 범위 안에 있는지 확인한다.
-            if (!Double.isFinite(parsedX)
-                    || parsedX < -180.0
-                    || parsedX > 180.0
-                    || !Double.isFinite(parsedY)
-                    || parsedY < -90.0
-                    || parsedY > 90.0) {
+            // 범위를 벗어난 외부 좌표는 장소 분류를 실패시키지 않고 미보강으로 처리한다.
+            if (!isWithinRange(longitude, MIN_LONGITUDE, MAX_LONGITUDE)
+                    || !isWithinRange(latitude, MIN_LATITUDE, MAX_LATITUDE)) {
                 return Coordinates.empty();
             }
 
-            return new Coordinates(parsedX, parsedY);
+            return new Coordinates(longitude, latitude);
         } catch (NumberFormatException exception) {
             // 좌표는 선택값이므로 잘못된 외부 문자열은 분류 실패 대신 좌표 미보강으로 처리한다.
             return Coordinates.empty();
@@ -213,34 +222,31 @@ public class MerchantClassificationProcessor {
     }
 
     /**
-     * 검색할 이름이 없거나 허용 매칭 후보를 찾지 못한 가맹점을 미분류 결과로 만든다.
+     * 외부 좌표가 지정한 경도 또는 위도 범위 안에 있는지 확인한다.
      *
-     * @param merchantUsage 원본 가맹점 결제 사용 이력
-     * @return 장소 정보와 좌표 없이 신뢰도 0을 가진 미분류 결과
+     * @param coordinate 검사할 좌표
+     * @param minimum 허용 최솟값
+     * @param maximum 허용 최댓값
+     * @return 최솟값 이상 최댓값 이하이면 true
      */
-    private MerchantClassificationData createUnmatchedClassification(
-            MerchantUsageData merchantUsage
+    private boolean isWithinRange(
+            BigDecimal coordinate,
+            BigDecimal minimum,
+            BigDecimal maximum
     ) {
-        return new MerchantClassificationData(
-                merchantUsage,
-                MerchantClassificationData.UNKNOWN_CATEGORY_CODE,
-                0,
-                null,
-                null,
-                null,
-                null
-        );
+        return coordinate.compareTo(minimum) >= 0
+                && coordinate.compareTo(maximum) <= 0;
     }
 
     /**
      * 검증된 경도·위도 쌍 또는 두 값이 모두 없는 상태를 표현하는 내부 값이다.
      *
-     * @param x 경도. 좌표 미보강 상태면 null
-     * @param y 위도. 좌표 미보강 상태면 null
+     * @param longitude 경도. 좌표 미보강 상태면 null
+     * @param latitude 위도. 좌표 미보강 상태면 null
      */
     private record Coordinates(
-            Double x,
-            Double y
+            BigDecimal longitude,
+            BigDecimal latitude
     ) {
 
         /**

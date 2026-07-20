@@ -118,19 +118,19 @@ public class MerchantUsageProcessor {
         }
 
         CleanApprovalData firstApproval = approvals.get(0);
-        List<MerchantUsageData.PaymentOccurrence> payments =
+        List<MerchantUsageData.PaymentLog> payments =
                 new ArrayList<>(approvals.size());
 
-        // 승인번호는 폐기하고 서로 짝을 이루는 승인시각과 승인금액만 원본 순서대로 보존한다.
+        // 승인번호는 폐기하고 서로 짝을 이루는 승인시각과 승인금액만 결제 로그로 보존한다.
         for (CleanApprovalData approval : approvals) {
-            payments.add(new MerchantUsageData.PaymentOccurrence(
+            payments.add(new MerchantUsageData.PaymentLog(
                     approval.approvedAt(),
                     approval.approvedAmount()
             ));
         }
 
-        // 첫 결제의 원본 가맹점 표기를 대표값으로 사용하고 전체 결제 발생 목록을 함께 저장한다.
-        return new MerchantUsageData(
+        // 첫 결제의 원본 가맹점 정보와 미매칭 기본값을 사용해 분류 전 사용 이력을 만든다.
+        return MerchantUsageData.unclassified(
                 firstApproval.merchantName(),
                 firstApproval.merchantRegistrationNumber(),
                 timeBand,
