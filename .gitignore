@@ -45,6 +45,7 @@ out/
 **/_temp
 **/_temp-codex
 **/graphify-out
+**.graphifyignore
 
 ### Environment variables ###
 # 실제 API 키가 들어가는 모든 .env 파일은 Git에서 제외합니다.
