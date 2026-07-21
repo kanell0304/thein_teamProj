@@ -1,7 +1,6 @@
 package com.anything.momeogji.mydata.transform.model;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -124,63 +123,6 @@ public record MerchantUsageData(
                 timeBand,
                 payments,
                 kakaoPlaceMatch
-        );
-    }
-
-    /**
-     * 동일 가맹점·시간대에 포함된 실제 결제 횟수를 반환한다.
-     *
-     * @return 결제 로그 목록의 크기
-     */
-    public int paymentCount() {
-        return payments.size();
-    }
-
-    /**
-     * 집계된 결제 중 가장 최근 승인일시를 계산한다.
-     *
-     * @return 결제 로그에서 가장 늦은 승인일시
-     */
-    public LocalDateTime latestVisitedAt() {
-        LocalDateTime latest = payments.get(0).approvedAt();
-
-        // 원본 순서와 관계없이 가장 늦은 승인일시를 최근 방문일로 선택한다.
-        for (int index = 1; index < payments.size(); index++) {
-            LocalDateTime candidate = payments.get(index).approvedAt();
-            if (candidate.isAfter(latest)) {
-                latest = candidate;
-            }
-        }
-        return latest;
-    }
-
-    /**
-     * 동일 가맹점·시간대에 포함된 승인금액의 합계를 계산한다.
-     *
-     * @return 모든 결제 로그 금액의 합계
-     */
-    public BigDecimal totalApprovedAmount() {
-        BigDecimal total = BigDecimal.ZERO;
-
-        // 각 결제 로그의 승인금액을 누적하여 총 결제금액을 계산한다.
-        for (PaymentLog payment : payments) {
-            total = total.add(payment.approvedAmount());
-        }
-        return total;
-    }
-
-    /**
-     * 동일 가맹점·시간대의 평균 승인금액을 소수점 둘째 자리까지 계산한다.
-     * 나누어떨어지지 않는 값은 일반적인 반올림 방식인 {@link RoundingMode#HALF_UP}을 사용한다.
-     *
-     * @return 총 승인금액을 결제 횟수로 나눈 평균 승인금액
-     */
-    public BigDecimal averageApprovedAmount() {
-        // 한 건 이상임이 생성자에서 보장된 목록의 크기로 총 결제금액을 나눈다.
-        return totalApprovedAmount().divide(
-                BigDecimal.valueOf(paymentCount()),
-                2,
-                RoundingMode.HALF_UP
         );
     }
 
