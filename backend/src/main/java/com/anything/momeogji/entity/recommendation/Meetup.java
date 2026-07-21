@@ -64,4 +64,12 @@ public class Meetup {
 
     @Column(name = "vote_deadline_at")
     private LocalDateTime voteDeadlineAt;
+
+    public void markVoting() {
+        this.status = MeetupStatus.VOTING;
+    }
+
+    public void markFinalized() {
+        this.status = MeetupStatus.FINALIZED;
+    }
 }

@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>모먹지 채팅 테스트</title>
+<style>
+  body { font-family: -apple-system, sans-serif; max-width: 640px; margin: 40px auto; padding: 0 20px; }
+  h2 { margin-bottom: 4px; }
+  .hint { color: #888; font-size: 0.85em; margin-bottom: 16px; }
+  #setup { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
+  #setup input { padding: 6px; }
+  #token { flex: 1; min-width: 240px; }
+  #status { font-size: 0.9em; color: #666; margin-bottom: 12px; }
+  #messages { border: 1px solid #ccc; border-radius: 6px; height: 320px; overflow-y: auto; padding: 10px; margin-bottom: 8px; background: #fafafa; }
+  .msg { margin-bottom: 6px; }
+  .msg .nick { font-weight: 600; }
+  .msg .time { color: #aaa; font-size: 0.75em; margin-left: 6px; }
+  .sendRow { display: flex; gap: 8px; }
+  #messageInput { flex: 1; padding: 8px; }
+  button { padding: 8px 14px; cursor: pointer; }
+</style>
+</head>
+<body>
+<h2>모먹지 채팅 테스트</h2>
+<div class="hint">
+  dev-login으로 받은 토큰과 채팅방 ID를 넣고 연결하세요. 브라우저 탭(또는 시크릿 창) 2개를 열어
+  서로 다른 토큰으로 같은 방에 접속하면 실시간으로 메시지가 오가는 걸 혼자서도 확인할 수 있습니다.
+</div>
+
+<div id="setup">
+  <input id="token" placeholder="JWT 토큰 (dev-login 응답의 accessToken)">
+  <input id="roomId" size="6" value="1" placeholder="방 ID">
+  <button id="connectBtn">연결</button>
+</div>
+<div id="status">연결 안 됨</div>
+
+<div id="chat" style="display:none">
+  <div id="messages"></div>
+  <div class="sendRow">
+    <input id="messageInput" placeholder="메시지 입력 후 Enter">
+    <button id="sendBtn">보내기</button>
+  </div>
+</div>
+
+<div id="progress" style="display:none">
+  <h3 style="margin-bottom:4px">추천/투표/최종공지 진행 상황</h3>
+  <div class="hint">
+    /api/ai/recommendations, /votes/tally, /votes/finalize를 이 방의 chatRoomId로 호출하면
+    (예: recommendation-flow.http, recommendation-scenarios.http) 여기에 실시간으로 표시됩니다.
+  </div>
+  <div id="events" style="border:1px solid #ccc;border-radius:6px;height:220px;overflow-y:auto;padding:10px;background:#fafafa;"></div>
+</div>
+
+<script>
+let ws;
+
+function stompFrame(command, headers, body) {
+  const headerLines = Object.entries(headers).map(([k, v]) => `${k}:${v}`).join('\n');
+  return `${command}\n${headerLines}\n\n${body || ''}\0`;
+}
+
+function appendMessage(nickname, content, createdAt) {
+  const div = document.createElement('div');
+  div.className = 'msg';
+  const time = createdAt ? new Date(createdAt).toLocaleTimeString() : '';
+  div.innerHTML = `<span class="nick">${escapeHtml(nickname)}</span>: ${escapeHtml(content)} <span class="time">${time}</span>`;
+  const box = document.getElementById('messages');
+  box.appendChild(div);
+  box.scrollTop = box.scrollHeight;
+}
+
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+function appendEvent(label, headline, rawJson) {
+  const div = document.createElement('div');
+  div.className = 'msg';
+  const time = new Date().toLocaleTimeString();
+  div.innerHTML = `<span class="nick">[${escapeHtml(label)}]</span> ${escapeHtml(String(headline))} <span class="time">${time}</span>`;
+  div.title = rawJson;
+  const box = document.getElementById('events');
+  box.appendChild(div);
+  box.scrollTop = box.scrollHeight;
+}
+
+document.getElementById('connectBtn').addEventListener('click', () => {
+  const token = document.getElementById('token').value.trim();
+  const roomId = document.getElementById('roomId').value.trim();
+  if (!token || !roomId) { alert('토큰과 방 ID를 입력하세요'); return; }
+
+  ws = new WebSocket('ws://localhost:8081/ws');
+
+  ws.onopen = () => {
+    document.getElementById('status').textContent = '핸드셰이크 완료, 인증 중...';
+    ws.send(stompFrame('CONNECT', {
+      'accept-version': '1.2',
+      'heart-beat': '0,0',
+      'Authorization': `Bearer ${token}`,
+    }));
+  };
+
+  ws.onmessage = (event) => {
+    const frame = event.data;
+    const command = frame.split('\n')[0];
+
+    if (command === 'CONNECTED') {
+      document.getElementById('status').textContent = '✅ 연결됨 (방 ' + roomId + ')';
+      document.getElementById('chat').style.display = 'block';
+      document.getElementById('progress').style.display = 'block';
+      ws.send(stompFrame('SUBSCRIBE', { id: 'sub-0', destination: `/topic/chatrooms/${roomId}` }));
+      ws.send(stompFrame('SUBSCRIBE', { id: 'sub-1', destination: `/topic/chatrooms/${roomId}/recommendation-progress` }));
+      ws.send(stompFrame('SUBSCRIBE', { id: 'sub-2', destination: `/topic/chatrooms/${roomId}/vote-updates` }));
+      ws.send(stompFrame('SUBSCRIBE', { id: 'sub-3', destination: `/topic/chatrooms/${roomId}/final-notice` }));
+    } else if (command === 'MESSAGE') {
+      const destLine = frame.split('\n').find(l => l.startsWith('destination:')) || '';
+      const dest = destLine.replace('destination:', '');
+      const body = frame.substring(frame.indexOf('\n\n') + 2).replace(/\0$/, '');
+      const data = JSON.parse(body);
+
+      if (dest.endsWith('/recommendation-progress')) {
+        appendEvent('추천 진행상황', data.status, JSON.stringify(data));
+      } else if (dest.endsWith('/vote-updates')) {
+        appendEvent('투표 집계', data.winnerRestaurantName, JSON.stringify(data));
+      } else if (dest.endsWith('/final-notice')) {
+        appendEvent('최종 공지', data.restaurantName, JSON.stringify(data));
+      } else {
+        appendMessage(data.nickname, data.content, data.createdAt);
+      }
+    } else if (command === 'ERROR') {
+      document.getElementById('status').textContent = '❌ ' + frame.split('\n').find(l => l.startsWith('message:'));
+    }
+  };
+
+  ws.onerror = () => { document.getElementById('status').textContent = '❌ 연결 실패 (서버가 켜져 있는지 확인하세요)'; };
+  ws.onclose = () => { document.getElementById('status').textContent = '연결 종료됨'; };
+});
+
+function sendMessage() {
+  const input = document.getElementById('messageInput');
+  const content = input.value.trim();
+  const roomId = document.getElementById('roomId').value.trim();
+  if (!content || !ws || ws.readyState !== WebSocket.OPEN) return;
+  ws.send(stompFrame('SEND', {
+    destination: `/app/chatrooms/${roomId}/messages`,
+    'content-type': 'application/json',
+  }, JSON.stringify({ content })));
+  input.value = '';
+}
+
+document.getElementById('sendBtn').addEventListener('click', sendMessage);
+document.getElementById('messageInput').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') sendMessage();
+});
+</script>
+</body>
+</html>

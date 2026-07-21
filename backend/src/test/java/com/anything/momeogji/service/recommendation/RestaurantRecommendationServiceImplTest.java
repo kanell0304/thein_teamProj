@@ -195,8 +195,8 @@ class RestaurantRecommendationServiceImplTest {
                 "강남역", 37.498, 127.027, LocalDateTime.of(2026, 7, 20, 12, 0), "식사"
         );
         List<PersonalOptionRequest> personal = List.of(
-                new PersonalOptionRequest("u1", 5, List.of("한식"), 15000, false, List.of(), "룸"),
-                new PersonalOptionRequest("u2", 10, List.of("한식"), 20000, true, List.of("고수"), "개방형")
+                new PersonalOptionRequest(1L, 5, List.of("한식"), 15000, false, List.of(), "룸"),
+                new PersonalOptionRequest(2L, 10, List.of("한식"), 20000, true, List.of("고수"), "개방형")
         );
         return new RecommendationRequest(common, personal, excludedRestaurantIds, preferenceNote);
     }

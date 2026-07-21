@@ -1,0 +1,28 @@
+### 안내: 이 파일을 실행하기 전에 dev-login.http의 1번 요청을 먼저 실행해서 {{authToken}}을 발급받으세요.
+# 실시간 메시지 송수신(WebSocket/STOMP)은 이 파일로 테스트할 수 없습니다 — IntelliJ HTTP Client가 STOMP를 지원하지 않습니다.
+# 실시간 부분은 backend/websocket-test/chat-test.html을 브라우저로 열어서 확인하세요.
+# 전체 실행 순서/선행조건은 TESTING.md 참고.
+
+### 1. 채팅방 생성 (만든 사람이 자동으로 참여자가 됨)
+POST http://localhost:8081/api/chatrooms
+Content-Type: application/json
+Authorization: Bearer {{authToken}}
+
+{
+  "name": "웹소켓 테스트방"
+}
+
+> {%
+    client.test("채팅방 생성 확인", function () {
+        client.assert(response.body.id, "id가 있어야 함");
+    });
+    client.global.set("chatRoomId", response.body.id);
+%}
+
+### 2. 채팅방 참여 (다른 사용자로 로그인한 토큰으로 실행하면 실제 참여 테스트가 됨)
+POST http://localhost:8081/api/chatrooms/{{chatRoomId}}/join
+Authorization: Bearer {{authToken}}
+
+### 3. 최근 메시지 이력 조회 (WebSocket으로 보낸 메시지가 여기 남아있어야 함)
+GET http://localhost:8081/api/chatrooms/{{chatRoomId}}/messages
+Authorization: Bearer {{authToken}}
