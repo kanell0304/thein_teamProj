@@ -9,13 +9,13 @@ import com.anything.momeogji.mydata.cardlist.CardListValidator;
 import com.anything.momeogji.mydata.model.CardApprovalData;
 import com.anything.momeogji.mydata.model.UserMyData;
 import com.anything.momeogji.mydata.transform.MyDataTransformer;
-import com.anything.momeogji.mydata.transform.model.TimeBand;
 import com.anything.momeogji.mydata.transform.model.TransformedUserMyData;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -30,7 +30,8 @@ import java.util.Set;
  *
  * 카드 목록과 승인내역의 모든 페이지를 순서대로 처리한다.
  * 처리 중 한 단계라도 실패하면 부분 결과를 반환하지 않고 예외를 전달한다.
- * {@link #process(Long, TimeBand)}를 호출하면 수집 결과를 {@link MyDataTransformer}에 전달한다.
+ * {@link #process(Long, LocalTime)}를 호출하면 수집 결과와 옵션 계층에서 받은 선택 시각을
+ * {@link MyDataTransformer}에 전달한다.
  * 참가자 단위 비동기 실행, 동의 여부 판단과 실패 상태 기록은 이후 이 서비스를 호출하는 상위 계층이 담당한다.
  */
 @Service
@@ -77,20 +78,20 @@ public class MyDataService {
     }
 
     /**
-     * 지정한 참가자의 동의 카드와 국내 승인내역을 수집해 하나의 결과로 반환한다.
+     * 지정한 사용자의 동의 카드와 국내 승인내역을 수집해 하나의 결과로 반환한다.
      *
-     * 정상적으로 조회했지만 동의 카드 또는 승인내역이 없으면 참가자 ID와 빈 승인내역 목록을 가진 {@link UserMyData}를 반환
+     * 정상적으로 조회했지만 동의 카드 또는 승인내역이 없으면 사용자 ID와 빈 승인내역 목록을 가진 {@link UserMyData}를 반환
      * Provider 호출, JSON 역직렬화, 응답 검증 또는 파싱이 실패하면 부분 결과를 반환하지 않는다.
      *
-     * @param participantId 모임 참가자를 식별하는 내부 ID
-     * @return 참가자 ID와 모든 동의 카드의 정제된 승인내역을 포함하는 불변 결과
-     * @throws IllegalArgumentException 참가자 ID가 없거나 0 이하인 경우
+     * @param userId 마이데이터를 제공한 사용자를 식별하는 내부 ID
+     * @return 사용자 ID와 모든 동의 카드의 정제된 승인내역을 포함하는 불변 결과
+     * @throws IllegalArgumentException 사용자 ID가 없거나 0 이하인 경우
      * @throws IllegalStateException JSON 역직렬화 또는 페이지 반복 상태가 올바르지 않은 경우
      */
-    public UserMyData collect(Long participantId) {
-        // 수집 시작 전에 참가자 ID가 Dummy 경로와 내부 결과에 사용할 수 있는 양수인지 검사한다.
-        if (participantId == null || participantId <= 0) {
-            throw new IllegalArgumentException("participantId는 1 이상이어야 합니다.");
+    public UserMyData collect(Long userId) {
+        // 수집 시작 전에 사용자 ID가 Dummy 경로와 내부 결과에 사용할 수 있는 양수인지 검사한다.
+        if (userId == null || userId <= 0) {
+            throw new IllegalArgumentException("userId는 1 이상이어야 합니다.");
         }
 
         // 한 번의 수집에 포함된 모든 카드와 페이지가 동일한 조회 종료일을 사용하도록 당일을 한 번만 계산한다.
@@ -99,48 +100,48 @@ public class MyDataService {
         LocalDate fromDate = toDate.minusYears(1);
 
         // 카드 목록의 모든 페이지를 처리해 전송에 동의한 카드 ID만 원본 순서대로 수집한다.
-        List<String> consentedCardIds = collectConsentedCardIds(participantId);
+        List<String> consentedCardIds = collectConsentedCardIds(userId);
 
-        // 동의 카드 순서대로 국내 승인내역을 수집해 하나의 참가자 결과 목록으로 합친다.
+        // 동의 카드 순서대로 국내 승인내역을 수집해 하나의 사용자 결과 목록으로 합친다.
         List<CardApprovalData> approvals = new ArrayList<>();
         for (String cardId : consentedCardIds) {
-            approvals.addAll(collectCardApprovals(participantId, cardId, fromDate, toDate));
+            approvals.addAll(collectCardApprovals(userId, cardId, fromDate, toDate));
         }
 
-        // 정상적인 빈 결과를 포함해 참가자 ID와 승인내역을 불변 결과로 반환한다.
-        return new UserMyData(participantId, approvals);
+        // 정상적인 빈 결과를 포함해 사용자 ID와 승인내역을 불변 결과로 반환한다.
+        return new UserMyData(userId, approvals);
     }
 
     /**
-     * 지정한 참가자의 마이데이터를 수집한 뒤 선택 시간대의 최종 가맹점 분류 결과까지 가공한다.
+     * 지정한 사용자의 마이데이터를 수집한 뒤 선택 시각이 속한 시간대의 최종 가맹점 분류 결과까지 가공한다.
      *
      * <p>마이데이터 제공에 동의한 참가자에 대해서만 상위 계층이 이 메서드를 호출해야 한다.
-     * 선택 시간대가 잘못된 경우 카드 목록이나 외부 장소 API를 호출하기 전에 즉시 실패한다.</p>
+     * 선택 시각이 잘못된 경우 카드 목록이나 외부 장소 API를 호출하기 전에 즉시 실패한다.</p>
      *
-     * <p>카드나 승인내역이 없거나 선택 시간대에 해당하는 결제가 없으면 참가자 ID와
-     * 시간대를 포함한 빈 분류 목록을 정상 반환한다. 수집·정제·집계 중 발생한 데이터 오류는
+     * <p>카드나 승인내역이 없거나 선택 시각이 속한 시간대에 해당하는 결제가 없으면 사용자 ID와
+     * 빈 분류 목록을 정상 반환한다. 수집·정제·집계 중 발생한 데이터 오류는
      * 부분 결과로 바꾸지 않고 호출자에게 전달한다.</p>
      *
-     * @param participantId 모임 참가자를 식별하는 내부 ID
-     * @param selectedTimeBand 주최자 옵션에서 결정한 마이데이터 가공 대상 시간대
-     * @return 참가자 ID와 선택 시간대, 최종 가맹점 분류 결과를 포함한 불변 데이터
-     * @throws IllegalArgumentException 선택 시간대가 없거나 참가자 ID가 올바르지 않은 경우
+     * @param userId 마이데이터를 제공한 사용자를 식별하는 내부 ID
+     * @param meetingTime 옵션 계층에서 검증한 마이데이터 필터 기준 시각
+     * @return 사용자 ID와 최종 가맹점 분류 결과를 포함한 불변 데이터
+     * @throws IllegalArgumentException 선택 시각이 없거나 사용자 ID가 올바르지 않은 경우
      * @throws IllegalStateException 마이데이터 수집·역직렬화·페이지 처리에 실패한 경우
      */
     public TransformedUserMyData process(
-            Long participantId,
-            TimeBand selectedTimeBand
+            Long userId,
+            LocalTime meetingTime
     ) {
-        // 잘못된 요청에서 카드 목록 수집 비용이 발생하지 않도록 선택 시간대를 먼저 검증한다.
-        if (selectedTimeBand == null) {
-            throw new IllegalArgumentException("selectedTimeBand는 필수입니다.");
+        // 잘못된 요청에서 카드 목록 수집 비용이 발생하지 않도록 선택 시각을 먼저 검증한다.
+        if (meetingTime == null) {
+            throw new IllegalArgumentException("meetingTime은 필수입니다.");
         }
 
-        // 기존 수집 흐름을 한 번만 호출해 참가자의 모든 동의 카드 승인내역을 가져온다.
-        UserMyData userMyData = collect(participantId);
+        // 기존 수집 흐름을 한 번만 호출해 사용자의 모든 동의 카드 승인내역을 가져온다.
+        UserMyData userMyData = collect(userId);
 
-        // 수집 결과를 정제·시간대 집계·가맹점 분류 파이프라인에 전달한다.
-        return myDataTransformer.transform(userMyData, selectedTimeBand);
+        // 수집 결과와 일회성 필터 시각을 정제·집계·가맹점 분류 파이프라인에 전달한다.
+        return myDataTransformer.transform(userMyData, meetingTime);
     }
 
     /**
@@ -149,10 +150,10 @@ public class MyDataService {
      * 최초 페이지는 조회 타임스탬프 {@code 0}으로 요청하고, 이후 페이지는 직전 응답의 {@code next_page}만 사용
      * 페이지 간 카드 ID 중복과 페이지 토큰 반복은 정상 응답으로 보지 않는다.
      *
-     * @param participantId 카드 목록을 조회할 참가자 내부 ID
+     * @param userId 카드 목록을 조회할 사용자 내부 ID
      * @return 응답에 처음 등장한 순서를 유지한 동의 카드 ID 불변 목록
      */
-    private List<String> collectConsentedCardIds(Long participantId) {
+    private List<String> collectConsentedCardIds(Long userId) {
         List<String> consentedCardIds = new ArrayList<>();
         Set<String> visitedCardIds = new HashSet<>();
         Set<String> visitedNextPages = new HashSet<>();
@@ -164,7 +165,7 @@ public class MyDataService {
 
             // 현재 페이지 조건으로 카드 목록 Raw JSON을 Provider에 요청한다.
             String rawJson = myDataProvider.fetchCardList(
-                    participantId,
+                    userId,
                     searchTimestamp,
                     nextPage,
                     PAGE_LIMIT
@@ -172,7 +173,7 @@ public class MyDataService {
 
             // 카드 목록 Raw JSON을 응답 DTO로 역직렬화한다.
             CardListResponse response = deserialize(rawJson, CardListResponse.class,
-                    "카드 목록 응답(participantId=" + participantId  + ", nextPage=" +
+                    "카드 목록 응답(userId=" + userId  + ", nextPage=" +
                             (nextPage == null ? "FIRST" : nextPage) + ")");
 
             // 동의 카드 추출 전에 현재 페이지의 응답 상태와 필드 규칙을 검증한다.
@@ -217,13 +218,13 @@ public class MyDataService {
     /**
      * 카드 한 장의 국내 승인내역을 마지막 페이지까지 조회해 정제 데이터로 변환
      *
-     * @param participantId 승인내역을 조회할 참가자 내부 ID
+     * @param userId 승인내역을 조회할 사용자 내부 ID
      * @param cardId 카드 목록 응답에서 얻은 동의 카드 고유 식별자
      * @param fromDate 모든 페이지에 동일하게 전달할 조회 시작일
      * @param toDate 모든 페이지에 동일하게 전달할 조회 종료일
      * @return 페이지와 응답 내부 순서를 유지한 카드 승인내역 목록
      */
-    private List<CardApprovalData> collectCardApprovals(Long participantId, String cardId, LocalDate fromDate,
+    private List<CardApprovalData> collectCardApprovals(Long userId, String cardId, LocalDate fromDate,
                                                         LocalDate toDate) {
         List<CardApprovalData> approvals = new ArrayList<>();
         Set<String> visitedNextPages = new HashSet<>();
@@ -231,12 +232,12 @@ public class MyDataService {
 
         while (true) {
             // 수집 시작 시 계산한 동일 기간과 현재 페이지 토큰으로 카드 승인내역을 요청한다.
-            String rawJson = myDataProvider.fetchDomesticApprovals(participantId, cardId, fromDate, toDate,
+            String rawJson = myDataProvider.fetchDomesticApprovals(userId, cardId, fromDate, toDate,
                     nextPage, PAGE_LIMIT);
 
             // 국내 승인내역 Raw JSON을 응답 DTO로 역직렬화한다.
             CardApprovalResponse response = deserialize(rawJson, CardApprovalResponse.class,
-                    "국내 승인내역 응답(participantId=" + participantId + ", cardId=" + cardId + ", nextPage=" +
+                    "국내 승인내역 응답(userId=" + userId + ", cardId=" + cardId + ", nextPage=" +
                             (nextPage == null ? "FIRST" : nextPage) + ")");
 
             // 내부 승인 데이터로 변환하기 전에 현재 페이지의 상태와 필드 규칙을 검증한다.

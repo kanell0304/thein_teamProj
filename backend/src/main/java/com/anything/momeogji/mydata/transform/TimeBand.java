@@ -1,17 +1,16 @@
-package com.anything.momeogji.mydata.transform.model;
+package com.anything.momeogji.mydata.transform;
 
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 
 /**
- * 승인내역을 아침·점심·저녁 사용 이력으로 분류하는 시간대다.
+ * 옵션에서 전달된 선택 시각과 카드 승인 시각을 비교하기 위한 MyData 내부 시간대다.
  *
  * <p>{@link #MORNING}은 02:00 이상 10:00 미만, {@link #LUNCH}는
  * 10:00 이상 16:00 미만, {@link #DINNER}는 16:00 이상 다음 날 02:00 미만을
- * 의미한다. 화면의 '지금 선택'은 별도 enum 값으로 만들지 않고 현재 시각을
- * {@link #fromTime(LocalTime)}에 전달하여 세 값 중 하나로 변환한다.</p>
+ * 의미한다. 이 값은 결제 필터링에만 사용하며 최종 가공 모델에는 보존하지 않는다.</p>
  */
-public enum TimeBand {
+enum TimeBand {
     MORNING,
     LUNCH,
     DINNER;
@@ -21,13 +20,13 @@ public enum TimeBand {
     private static final int DINNER_START_HOUR = 16;
 
     /**
-     * 승인일시의 시각을 기준으로 해당 결제의 식사 시간대를 계산한다.
+     * 승인일시의 시각을 기준으로 해당 결제의 내부 시간대를 계산한다.
      *
      * @param approvedAt 분류할 카드 승인일시
      * @return 승인일시가 속한 아침·점심·저녁 시간대
      * @throws IllegalArgumentException 승인일시가 {@code null}인 경우
      */
-    public static TimeBand from(LocalDateTime approvedAt) {
+    static TimeBand from(LocalDateTime approvedAt) {
         // 시간대를 계산할 승인일시가 존재하는지 검증한다.
         if (approvedAt == null) {
             throw new IllegalArgumentException("approvedAt은 null일 수 없습니다.");
@@ -38,13 +37,13 @@ public enum TimeBand {
     }
 
     /**
-     * 하루의 특정 시각을 아침·점심·저녁 시간대 중 하나로 분류한다.
+     * 옵션에서 받은 하루의 특정 시각을 내부 시간대 중 하나로 분류한다.
      *
      * @param time 분류할 시각
      * @return 시각이 속한 아침·점심·저녁 시간대
      * @throws IllegalArgumentException 시각이 {@code null}인 경우
      */
-    public static TimeBand fromTime(LocalTime time) {
+    static TimeBand fromTime(LocalTime time) {
         // 시간대를 계산할 시각이 존재하는지 검증한다.
         if (time == null) {
             throw new IllegalArgumentException("time은 null일 수 없습니다.");

@@ -37,24 +37,24 @@ public class DummyMyDataProvider implements MyDataProvider {
      * 참조한다.
      */
     @Override
-    public String fetchDomesticApprovals(Long participantId, String cardId, LocalDate fromDate,
+    public String fetchDomesticApprovals(Long userId, String cardId, LocalDate fromDate,
                                          LocalDate toDate, String nextPage, int limit) {
-        validUserId(participantId);
+        validUserId(userId);
         validCardId(cardId);
 
-        String resourcePath = getDirectory(participantId)
+        String resourcePath = getDirectory(userId)
                 + "/approval-domestic-" + cardId + ".json";
         return getDummyFile(resourcePath);
     }
 
     /**
-     * 참가자 ID를 classpath의 {@code user-숫자} 형식 Dummy 디렉터리 경로로 변환한다.
+     * 사용자 ID를 classpath의 {@code user-숫자} 형식 Dummy 디렉터리 경로로 변환한다.
      *
-     * @param participantId 검증이 끝난 참가자 내부 ID
+     * @param userId 검증이 끝난 사용자 내부 ID
      * @return {@code mydata/dummy/user-01} 형식의 classpath 상대 경로
      */
-    private String getDirectory(Long participantId) {
-        return DUMMY_BASE_PATH + "/user-%02d".formatted(participantId);
+    private String getDirectory(Long userId) {
+        return DUMMY_BASE_PATH + "/user-%02d".formatted(userId);
     }
 
     /**
@@ -85,14 +85,14 @@ public class DummyMyDataProvider implements MyDataProvider {
     }
 
     /**
-     * 참가자 ID가 Dummy 디렉터리 이름으로 사용할 수 있는 양수인지 확인한다.
+     * 사용자 ID가 Dummy 디렉터리 이름으로 사용할 수 있는 양수인지 확인한다.
      *
-     * @param participantId 검사할 참가자 내부 ID
+     * @param userId 검사할 사용자 내부 ID
      * @throws IllegalArgumentException ID가 없거나 1보다 작은 경우
      */
-    private void validUserId(Long participantId) {
-        if (participantId == null || participantId <= 0) {
-            throw new IllegalArgumentException("participantId는 1 이상이어야 합니다.");
+    private void validUserId(Long userId) {
+        if (userId == null || userId <= 0) {
+            throw new IllegalArgumentException("userId는 1 이상이어야 합니다.");
         }
     }
 

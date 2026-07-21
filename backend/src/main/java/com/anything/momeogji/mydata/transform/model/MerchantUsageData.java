@@ -5,7 +5,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 /**
- * 선택한 시간대에 발생한 동일 가맹점의 결제와 카카오 장소 매칭 결과를 묶은 최종 데이터다.
+ * 옵션 계층에서 선택한 시각에 따라 필터링된 동일 가맹점의 결제와 카카오 장소 매칭 결과를 묶은 최종 데이터다.
  *
  * <p>원본 가맹점명은 카카오 로컬 검색에 사용하기 위해 변경하지 않고 보존한다.
  * 승인번호는 정확한 중복 제거가 끝난 1차 정제 이후 폐기하고, 승인시각과 승인금액은
@@ -17,14 +17,12 @@ import java.util.List;
  *
  * @param merchantName 최초 결제에서 보존한 원본 가맹점명. 미회신이면 {@code null}
  * @param merchantCode 가맹점을 구분하는 사업자등록번호 기반 코드. 미회신이면 {@code null}
- * @param timeBand 집계에 포함된 모든 결제가 속한 시간대
  * @param payments 원본 등장 순서를 유지한 승인시각·승인금액 쌍의 불변 목록
  * @param kakaoPlaceMatch 카카오 장소 검색의 매칭 결과. 미매칭 상태도 null 대신 전용 값으로 표현
  */
 public record MerchantUsageData(
         String merchantName,
         String merchantCode,
-        TimeBand timeBand,
         List<PaymentLog> payments,
         KakaoPlaceMatchData kakaoPlaceMatch
 ) {
@@ -45,11 +43,6 @@ public record MerchantUsageData(
             );
         }
 
-        // 집계 기준 시간대가 존재하는지 검증한다.
-        if (timeBand == null) {
-            throw new IllegalArgumentException("timeBand는 필수입니다.");
-        }
-
         // 집계 결과에는 한 건 이상의 결제 로그가 존재하는지 검증한다.
         if (payments == null) {
             throw new IllegalArgumentException("payments는 null일 수 없습니다.");
@@ -58,17 +51,12 @@ public record MerchantUsageData(
             throw new IllegalArgumentException("payments는 한 건 이상이어야 합니다.");
         }
 
-        // 모든 결제 로그가 존재하며 집계 시간대와 일치하는지 검증한다.
+        // 모든 결제 로그가 존재하는지 검증한다.
         for (int index = 0; index < payments.size(); index++) {
             PaymentLog payment = payments.get(index);
             if (payment == null) {
                 throw new IllegalArgumentException(
                         "payments[" + index + "]은 null일 수 없습니다."
-                );
-            }
-            if (TimeBand.from(payment.approvedAt()) != timeBand) {
-                throw new IllegalArgumentException(
-                        "payments[" + index + "]의 승인시각이 timeBand와 일치하지 않습니다."
                 );
             }
         }
@@ -87,21 +75,18 @@ public record MerchantUsageData(
      *
      * @param merchantName 최초 결제의 원본 가맹점명
      * @param merchantCode 사업자등록번호 기반 가맹점 코드
-     * @param timeBand 결제가 속한 선택 시간대
      * @param payments 승인시각·승인금액 결제 로그 목록
      * @return 미매칭 카카오 결과를 포함한 가맹점 사용 이력
      */
     public static MerchantUsageData unclassified(
             String merchantName,
             String merchantCode,
-            TimeBand timeBand,
             List<PaymentLog> payments
     ) {
         // 검색 전에는 장소를 찾지 못한 기본 결과를 명시적으로 저장한다.
         return new MerchantUsageData(
                 merchantName,
                 merchantCode,
-                timeBand,
                 payments,
                 KakaoPlaceMatchData.unmatched()
         );
@@ -120,7 +105,6 @@ public record MerchantUsageData(
         return new MerchantUsageData(
                 merchantName,
                 merchantCode,
-                timeBand,
                 payments,
                 kakaoPlaceMatch
         );

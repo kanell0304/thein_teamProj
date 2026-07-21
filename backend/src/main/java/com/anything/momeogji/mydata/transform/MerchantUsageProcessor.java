@@ -2,9 +2,9 @@ package com.anything.momeogji.mydata.transform;
 
 import com.anything.momeogji.mydata.transform.model.CleanApprovalData;
 import com.anything.momeogji.mydata.transform.model.MerchantUsageData;
-import com.anything.momeogji.mydata.transform.model.TimeBand;
 import org.springframework.stereotype.Component;
 
+import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -35,19 +35,21 @@ public class MerchantUsageProcessor {
      * 입력 목록이 비어 있거나 선택 시간대에 해당하는 결제가 없으면 예외 없이 빈 불변 목록을 반환
      *
      * @param approvals 1차 정제와 정확한 결제 중복 제거가 끝난 승인내역 목록
-     * @param selectedTimeBand 주최자 옵션에 대응하는 집계 대상 시간대
+     * @param meetingTime 옵션 계층에서 검증한 마이데이터 필터 기준 시각
      * @return 최초 가맹점 순서와 결제 순서를 유지한 가맹점별 사용 이력 불변 목록
      * @throws IllegalArgumentException 입력 목록 또는 시간대가 null인 경우
      */
-    public List<MerchantUsageData> process(List<CleanApprovalData> approvals, TimeBand selectedTimeBand) {
-        // 집계할 1차 정제 목록과 선택 시간대가 존재하는지 검증
+    public List<MerchantUsageData> process(List<CleanApprovalData> approvals, LocalTime meetingTime) {
+        // 집계할 1차 정제 목록과 선택 시각이 존재하는지 검증
         if (approvals == null) {
             throw new IllegalArgumentException("approvals는 null일 수 없습니다.");
         }
-        if (selectedTimeBand == null) {
-            throw new IllegalArgumentException("selectedTimeBand는 null일 수 없습니다.");
+        if (meetingTime == null) {
+            throw new IllegalArgumentException("meetingTime은 null일 수 없습니다.");
         }
 
+        // 옵션 계층에서 받은 시각을 결제 필터링에만 사용할 내부 시간대로 변환한다.
+        TimeBand meetingTimeBand = TimeBand.fromTime(meetingTime);
         Map<MerchantAggregationKey, List<CleanApprovalData>> groupedApprovals = new LinkedHashMap<>();
 
         for (CleanApprovalData approval : approvals) {
@@ -55,7 +57,7 @@ public class MerchantUsageProcessor {
             TimeBand approvalTimeBand = TimeBand.from(approval.approvedAt());
 
             // 주최자가 선택한 시간대와 다른 결제는 가맹점 집계 전에 제외한다.
-            if (approvalTimeBand != selectedTimeBand) {
+            if (approvalTimeBand != meetingTimeBand) {
                 continue;
             }
 
@@ -72,7 +74,7 @@ public class MerchantUsageProcessor {
 
         // 각 가맹점 그룹의 승인시각·금액 쌍을 하나의 사용 이력 모델로 변환
         for (List<CleanApprovalData> merchantApprovals : groupedApprovals.values()) {
-            merchantUsages.add(toMerchantUsageData(merchantApprovals, selectedTimeBand));
+            merchantUsages.add(toMerchantUsageData(merchantApprovals));
         }
 
         // 호출자가 가맹점 순서나 집계 내용을 변경하지 못하도록 불변 목록 반환
@@ -105,13 +107,9 @@ public class MerchantUsageProcessor {
      * 같은 집계 키로 모인 결제를 승인시각·승인금액 쌍의 가맹점 사용 이력으로 변환
      *
      * @param approvals 같은 가맹점 키에 속하며 원본 순서를 유지한 결제 목록
-     * @param timeBand 모든 결제가 속한 선택 시간대
      * @return 최초 결제의 원본 가맹점 정보를 유지한 가맹점별 사용 이력
      */
-    private MerchantUsageData toMerchantUsageData(
-            List<CleanApprovalData> approvals,
-            TimeBand timeBand
-    ) {
+    private MerchantUsageData toMerchantUsageData(List<CleanApprovalData> approvals) {
         CleanApprovalData firstApproval = approvals.get(0);
         List<MerchantUsageData.PaymentLog> payments =
                 new ArrayList<>(approvals.size());
@@ -128,7 +126,6 @@ public class MerchantUsageProcessor {
         return MerchantUsageData.unclassified(
                 firstApproval.merchantName(),
                 firstApproval.merchantRegistrationNumber(),
-                timeBand,
                 payments
         );
     }

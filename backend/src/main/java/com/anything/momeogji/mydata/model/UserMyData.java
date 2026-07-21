@@ -13,18 +13,18 @@ import java.util.Objects;
  * {@code null} 대신 빈 목록을 사용한다. Provider 또는 파싱이 실패한 경우에는
  * 이 객체를 빈 결과로 만들지 않고 MyDataService에서 처리 예외를 발생시켜야 한다.</p>
  *
- * @param participantId 모임 참가자를 식별하는 내부 ID
- * @param approvals 참가자의 모든 카드에서 수집한 정제 승인내역. 데이터가 없으면 빈 목록
+ * @param userId 마이데이터를 제공한 사용자를 식별하는 내부 ID
+ * @param approvals 사용자의 모든 카드에서 수집한 정제 승인내역. 데이터가 없으면 빈 목록
  */
-public record UserMyData(Long participantId, List<CardApprovalData> approvals) {
+public record UserMyData(Long userId, List<CardApprovalData> approvals) {
     /**
-     * 참가자 ID와 목록의 불변성을 보장한다.
+     * 사용자 ID와 목록의 불변성을 보장한다.
      * {@link List#copyOf(java.util.Collection)}를 사용하여 호출자가 전달한 목록을
      * 나중에 변경하더라도 이 결과가 함께 변경되지 않게 한다.
      */
     public UserMyData {
-        if (participantId == null || participantId <= 0) {
-            throw new IllegalArgumentException("participantId는 1 이상이어야 합니다.");
+        if (userId == null || userId <= 0) {
+            throw new IllegalArgumentException("userId는 1 이상이어야 합니다.");
         }
 
         Objects.requireNonNull(approvals, "approvals는 null일 수 없습니다.");
