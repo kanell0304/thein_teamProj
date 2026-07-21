@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
 import ChatHeader from '../components/chat/ChatHeader'
 import ChatNotice from '../components/chat/ChatNotice'
 import ChatMessageList from '../components/chat/ChatMessageList'
@@ -8,7 +9,8 @@ import ParticipantPreferencePage from './ParticipantPreferencePage'
 import MomeokjiPreferenceNotice from '../components/momeokji/MomeokjiPreferenceNotice'
 import MomeokjiVoteNotice from '../components/momeokji/MomeokjiVoteNotice'
 import MomeokjiVotePage from '../components/momeokji/MomeokjiVotePage'
-import { recommendRestaurants } from '../services/momeokjiApi'
+import { createMeetup } from '../services/meetupService'
+import { recommendRestaurants } from '../services/momeokjiService'
 import {
   createVoteCounts,
   findWinningRestaurant,
@@ -20,7 +22,8 @@ import './ChatRoomPage.css'
 
 const DEMO_CURRENT_USER = { id: 'member-me', name: '나' }
 const DEMO_ROOM = {
-  id: 'room-demo',
+  // 실제 API의 chatRoomId가 Long 타입이므로 목업에서도 숫자 ID를 사용합니다.
+  id: 1,
   members: [
     DEMO_CURRENT_USER,
     { id: 'member-seojun', name: '서준' },
@@ -76,7 +79,20 @@ function getPreferenceNoticeText(status) {
   return '참가자 조건 입력이 시작됐어요.'
 }
 
-function ChatRoomPage({ room = DEMO_ROOM, currentUser = DEMO_CURRENT_USER }) {
+function ChatRoomPage({ room: providedRoom, currentUser = DEMO_CURRENT_USER }) {
+  // ===== URL의 채팅방 ID를 실제 API 요청용 숫자 ID로 연결 =====
+  const { roomId } = useParams()
+  const navigate = useNavigate()
+  const numericRoomId = Number(roomId)
+  const room = providedRoom ?? {
+    ...DEMO_ROOM,
+    id: Number.isFinite(numericRoomId) && numericRoomId > 0 ? numericRoomId : DEMO_ROOM.id,
+    members: [
+      currentUser,
+      ...DEMO_ROOM.members.filter((member) => member.id !== DEMO_CURRENT_USER.id),
+    ],
+  }
+
   // API 연결 후 room.members에 채팅방 참가자 DTO(id, name)를 그대로 전달합니다.
   const roomParticipants = room.members
   // API 연결 후에는 createInitialMessages 대신 채팅 조회 응답으로 초기화
@@ -84,8 +100,10 @@ function ChatRoomPage({ room = DEMO_ROOM, currentUser = DEMO_CURRENT_USER }) {
   const [isMomeokjiOpen, setIsMomeokjiOpen] = useState(false)
   const [isParticipantPreferenceOpen, setIsParticipantPreferenceOpen] = useState(false)
   const [isVotePageOpen, setIsVotePageOpen] = useState(false)
+  const [isCreatingMeetup, setIsCreatingMeetup] = useState(false)
   const [isCreatingVote, setIsCreatingVote] = useState(false)
   const [isResolvingVote, setIsResolvingVote] = useState(false)
+  const [meetupCreationError, setMeetupCreationError] = useState('')
   const [recommendationError, setRecommendationError] = useState('')
   const [pendingMeetingSettings, setPendingMeetingSettings] = useState(null)
   const [preferenceSession, setPreferenceSession] = useState(null)
@@ -160,22 +178,50 @@ function ChatRoomPage({ room = DEMO_ROOM, currentUser = DEMO_CURRENT_USER }) {
     ])
   }
 
-  // ===== 주최자 공통 설정 완료 후 현재 참가자의 개인 조건 입력 단계로 전환 =====
-  const requestParticipantPreference = (settings) => {
-    const isCurrentUserSelected = settings.participantIds.includes(currentUser.id)
-    const participantPreferenceDeadlineAt = new Date(
-      Date.now() + settings.personalOptionDurationMinutes * 60_000,
-    ).toISOString()
-    setPendingMeetingSettings({ ...settings, participantPreferenceDeadlineAt })
-    setPreferenceSession({
-      status: 'IN_PROGRESS',
-      participantIds: settings.participantIds,
-      submittedParticipantIds: [],
-      deadlineAt: participantPreferenceDeadlineAt,
-    })
+  // ===== 주최자 공통 설정을 서버에 저장한 뒤 개인 조건 입력 단계로 전환 =====
+  const requestParticipantPreference = async (settings) => {
+    if (isCreatingMeetup) return
+
+    setIsCreatingMeetup(true)
+    setMeetupCreationError('')
     setRecommendationError('')
-    // 선택된 참가자의 클라이언트에서만 개인 조건 입력 시트를 엽니다.
-    setIsParticipantPreferenceOpen(isCurrentUserSelected)
+
+    try {
+      // 투표 마감은 추천 회차가 열린 시점부터 계산해야 하므로 최초 모임 생성에는 보내지 않습니다.
+      const meetup = await createMeetup({
+        chatRoomId: room.id,
+        settings,
+      })
+      const meetupId = meetup.id ?? meetup.meetupId
+      if (meetupId == null) throw new Error('서버가 모임 ID를 반환하지 않았습니다.')
+
+      const isCurrentUserSelected = settings.participantIds.includes(currentUser.id)
+      const participantPreferenceDeadlineAt = new Date(
+        Date.now() + settings.personalOptionDurationMinutes * 60_000,
+      ).toISOString()
+      const savedSettings = {
+        ...settings,
+        meetupId,
+        participantPreferenceDeadlineAt,
+      }
+
+      setPendingMeetingSettings(savedSettings)
+      setPreferenceSession({
+        meetupId,
+        status: 'IN_PROGRESS',
+        participantIds: settings.participantIds,
+        submittedParticipantIds: [],
+        deadlineAt: participantPreferenceDeadlineAt,
+      })
+      // 선택된 참가자의 클라이언트에서만 개인 조건 입력 시트를 엽니다.
+      setIsParticipantPreferenceOpen(isCurrentUserSelected)
+    } catch (error) {
+      setMeetupCreationError(
+        error instanceof Error ? error.message : '모임을 만들지 못했습니다. 다시 시도해주세요.',
+      )
+    } finally {
+      setIsCreatingMeetup(false)
+    }
   }
 
   // ===== 8단계 설정 완료 후 AI 추천 3곳으로 투표 세션 생성 =====
@@ -261,6 +307,7 @@ function ChatRoomPage({ room = DEMO_ROOM, currentUser = DEMO_CURRENT_USER }) {
 
   // ===== 모먹지 기능 버튼은 진행 상태에 맞는 화면을 엽니다. =====
   const openCurrentMomeokjiStage = () => {
+    if (isCreatingMeetup) return
     if (voteSession && canViewVote) {
       setIsVotePageOpen(true)
       return
@@ -401,9 +448,17 @@ function ChatRoomPage({ room = DEMO_ROOM, currentUser = DEMO_CURRENT_USER }) {
     <div className="chat-room">
       {/* 필요 없는 영역은 이 조립부에서 컴포넌트 한 줄만 제거. */}
       {/* ===== 채팅방 참가자 수: 이후 room.members API 데이터와 자동 연동 ===== */}
-      <ChatHeader roomName="진원버스 가즈아" memberCount={room.members.length} />
+      <ChatHeader
+        roomName="진원버스 가즈아"
+        memberCount={room.members.length}
+        onBack={() => navigate('/chats')}
+      />
 
       <div className="chat-body">
+        {/* ===== 모임 생성 REST 요청 상태를 채팅 공지로 표시 ===== */}
+        {isCreatingMeetup && <ChatNotice text="모임을 만들고 있어요." />}
+        {meetupCreationError && <ChatNotice text={meetupCreationError} />}
+
         {/* ===== 참가자 전용 공지: 개인 조건 입력 현황과 현재 단계 연결 ===== */}
         {preferenceSession && canViewPreference && (
           <ChatNotice

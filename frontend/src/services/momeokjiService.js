@@ -1,4 +1,8 @@
-import { attachRestaurantImages } from './placeImageApi'
+import {
+  postConversationMenuAnalysis,
+  postRestaurantRecommendation,
+} from '../api/momeokjiApi'
+import { attachRestaurantImages } from './placeImageService'
 
 const FALLBACK_MENUS = ['돈까스', '파스타', '초밥', '치킨', '햄버거', '떡볶이']
 
@@ -16,19 +20,17 @@ const FALLBACK_RECOMMENDATION_GROUPS = [
   ],
 ]
 
-// ===== 대화·모임 조건을 AI 추천 API로 전달 =====
+// ===== 대화·모임 조건을 AI 메뉴 분석 요청 형태로 가공 =====
 export async function analyzeConversationMenus(
   messages,
   { themeCode, meetingDate, meetingTime, timeZone, place } = {},
 ) {
-  // 기능 버블을 제외하고 실제 텍스트 대화만 AI 분석 데이터로 전달합니다.
   const textMessages = messages.filter((message) => typeof message.text === 'string')
   const endpoint = import.meta.env.VITE_MOMEOKJI_AI_URL
+
   if (endpoint) {
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+    try {
+      const data = await postConversationMenuAnalysis(endpoint, {
         themeCode,
         meetingDate,
         meetingTime,
@@ -42,11 +44,11 @@ export async function analyzeConversationMenus(
           longitude: place.longitude,
         } : null,
         messages: textMessages.map(({ name, text }) => ({ name, text })),
-      }),
-    })
-    if (!response.ok) throw new Error('메뉴 분석에 실패했습니다.')
-    const data = await response.json()
-    return data.menus
+      })
+      return data.menus
+    } catch (error) {
+      throw new Error(error.userMessage || '메뉴 분석에 실패했습니다.', { cause: error })
+    }
   }
 
   const conversation = textMessages.map((message) => message.text).join(' ')
@@ -54,7 +56,19 @@ export async function analyzeConversationMenus(
   return found.length ? found : FALLBACK_MENUS
 }
 
-// ===== 모든 모먹지 조건을 AI 가게 추천 API로 전달 =====
+// ===== API 추천 결과에서 제외·중복 식당을 제거하고 3곳만 반환 =====
+function filterUniqueRecommendations(recommendations, excludeRestaurantIds) {
+  const uniqueRestaurantIds = new Set()
+
+  return recommendations.filter((restaurant) => {
+    const isExcluded = excludeRestaurantIds.includes(restaurant.id)
+    const isDuplicated = uniqueRestaurantIds.has(restaurant.id)
+    uniqueRestaurantIds.add(restaurant.id)
+    return !isExcluded && !isDuplicated
+  }).slice(0, 3)
+}
+
+// ===== 모든 모먹지 조건을 AI 가게 추천 요청 형태로 가공 =====
 export async function recommendRestaurants(
   criteria,
   { excludeRestaurantIds = [], generation = 0 } = {},
@@ -63,28 +77,20 @@ export async function recommendRestaurants(
   let recommendations
 
   if (endpoint) {
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+    try {
+      const data = await postRestaurantRecommendation(endpoint, {
         ...criteria,
         excludeRestaurantIds,
         recommendationCount: 3,
         generation,
-      }),
-    })
-
-    if (!response.ok) throw new Error('추천 가게를 불러오지 못했습니다.')
-    const data = await response.json()
-    const uniqueRestaurantIds = new Set()
-
-    // ===== 백엔드 응답도 누적 제외 목록과 대조하여 중복 가게 노출 방지 =====
-    recommendations = data.recommendations.filter((restaurant) => {
-      const isExcluded = excludeRestaurantIds.includes(restaurant.id)
-      const isDuplicated = uniqueRestaurantIds.has(restaurant.id)
-      uniqueRestaurantIds.add(restaurant.id)
-      return !isExcluded && !isDuplicated
-    }).slice(0, 3)
+      })
+      recommendations = filterUniqueRecommendations(
+        data.recommendations,
+        excludeRestaurantIds,
+      )
+    } catch (error) {
+      throw new Error(error.userMessage || '추천 가게를 불러오지 못했습니다.', { cause: error })
+    }
 
     if (recommendations.length !== 3) {
       throw new Error('중복되지 않는 추천 가게 3곳이 필요합니다.')
@@ -103,6 +109,5 @@ export async function recommendRestaurants(
     }))
   }
 
-  // AI 추천 결과를 위치정보 API에 넘겨 동일한 가게의 이미지를 합칩니다.
   return attachRestaurantImages(recommendations, criteria.place)
 }

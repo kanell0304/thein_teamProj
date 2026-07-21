@@ -16,7 +16,7 @@ import {
   TOTAL_STEPS,
   VOTE_DURATION,
 } from '../constants/momeokjiOptions'
-import { analyzeConversationMenus } from '../services/momeokjiApi'
+import { analyzeConversationMenus } from '../services/momeokjiService'
 import './MomeokjiPage.css'
 
 function formatLocalDate(date) {
