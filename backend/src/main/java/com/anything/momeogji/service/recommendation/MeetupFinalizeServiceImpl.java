@@ -83,7 +83,13 @@ public class MeetupFinalizeServiceImpl implements MeetupFinalizeService {
     public FinalNoticeResponse finalize(Long meetupId, Long callerId) {
         Meetup meetup = findMeetup(meetupId);
         requireHost(meetup, callerId);
+        return finalizeInternal(meetup);
+    }
 
+    @Override
+    @Transactional
+    public FinalNoticeResponse finalizeInternal(Meetup meetup) {
+        Long meetupId = meetup.getId();
         RecommendationRound round = recommendationRoundRepository.findFirstByMeetupIdOrderByRoundNoDesc(meetupId)
                 .orElseThrow(() -> new IllegalArgumentException("아직 추천 회차가 없어 확정할 수 없습니다: " + meetupId));
 

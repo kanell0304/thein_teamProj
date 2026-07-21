@@ -1,6 +1,8 @@
 package com.anything.momeogji.service.recommendation;
 
 import com.anything.momeogji.dto.recommendation.FinalNoticeResponse;
+import com.anything.momeogji.dto.recommendation.MeetupInvitationEvent;
+import com.anything.momeogji.dto.recommendation.MeetupProgressEvent;
 import com.anything.momeogji.dto.recommendation.RecommendationProgressEvent;
 import com.anything.momeogji.dto.recommendation.RecommendationProgressStatus;
 import com.anything.momeogji.dto.recommendation.RoundResponse;
@@ -33,6 +35,14 @@ public class RecommendationEventPublisher {
 
     public void finalNoticePublished(Long chatRoomId, FinalNoticeResponse response) {
         messagingTemplate.convertAndSend("/topic/chatrooms/" + chatRoomId + "/final-notice", response);
+    }
+
+    public void meetupInvitationSent(Long chatRoomId, MeetupInvitationEvent event) {
+        messagingTemplate.convertAndSend("/topic/chatrooms/" + chatRoomId + "/meetup-invitations", event);
+    }
+
+    public void preferenceProgress(Long chatRoomId, MeetupProgressEvent event) {
+        messagingTemplate.convertAndSend("/topic/chatrooms/" + chatRoomId + "/meetup-progress", event);
     }
 
     private void publishProgress(Long chatRoomId, RecommendationProgressEvent event) {

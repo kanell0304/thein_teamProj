@@ -5,10 +5,12 @@ import jakarta.servlet.DispatcherType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.web.cors.CorsConfigurationSource;
 
 /**
  * 카카오 로그인 + 자체 발급 JWT 기반 인증.
@@ -21,6 +23,7 @@ import org.springframework.security.web.SecurityFilterChain;
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final CorsConfigurationSource corsConfigurationSource;
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
@@ -28,11 +31,14 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable())
                 .httpBasic(basic -> basic.disable())
                 .formLogin(form -> form.disable())
+                .cors(cors -> cors.configurationSource(corsConfigurationSource))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         // 컨트롤러에서 예외가 나면 컨테이너가 /error로 forward하는데, 이 디스패치도 인증을 요구하면
                         // 원래 상태코드(400/502 등)가 403으로 덮어써진다. 그걸 막기 위해 ERROR 디스패치는 항상 허용.
                         .dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
+                        // 프론트가 JSON body로 요청하면 브라우저가 먼저 OPTIONS 프리플라이트를 보낸다 — 인증 없이 항상 통과시켜야 한다.
+                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/api/auth/**", "/api/dev/**", "/ws/**").permitAll()
                         .anyRequest().authenticated()
                 )

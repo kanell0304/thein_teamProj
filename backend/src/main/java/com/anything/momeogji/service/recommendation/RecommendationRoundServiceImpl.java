@@ -9,7 +9,6 @@ import com.anything.momeogji.dto.recommendation.RoundResponse;
 import com.anything.momeogji.entity.Member;
 import com.anything.momeogji.entity.recommendation.Meetup;
 import com.anything.momeogji.entity.recommendation.MeetupParticipant;
-import com.anything.momeogji.entity.recommendation.ParticipantPreference;
 import com.anything.momeogji.entity.recommendation.RecommendationRound;
 import com.anything.momeogji.entity.recommendation.RecommendationRoundStatus;
 import com.anything.momeogji.entity.recommendation.Restaurant;
@@ -19,7 +18,6 @@ import com.anything.momeogji.repository.ChatRoomMemberRepository;
 import com.anything.momeogji.repository.MeetupParticipantRepository;
 import com.anything.momeogji.repository.MeetupRepository;
 import com.anything.momeogji.repository.MemberRepository;
-import com.anything.momeogji.repository.ParticipantPreferenceRepository;
 import com.anything.momeogji.repository.RecommendationRoundRepository;
 import com.anything.momeogji.repository.RestaurantRepository;
 import com.anything.momeogji.repository.RoundCandidateRepository;
@@ -38,7 +36,7 @@ public class RecommendationRoundServiceImpl implements RecommendationRoundServic
     private final ChatRoomMemberRepository chatRoomMemberRepository;
     private final MeetupParticipantRepository meetupParticipantRepository;
     private final MemberRepository memberRepository;
-    private final ParticipantPreferenceRepository participantPreferenceRepository;
+    private final ParticipantPreferenceUpserter participantPreferenceUpserter;
     private final RecommendationRoundRepository recommendationRoundRepository;
     private final RoundCandidateRepository roundCandidateRepository;
     private final RestaurantRepository restaurantRepository;
@@ -52,14 +50,23 @@ public class RecommendationRoundServiceImpl implements RecommendationRoundServic
         Meetup meetup = findMeetup(meetupId);
         requireMembership(meetup, callerId);
         persistPreferences(meetup, request.personalOptions());
+        return executeRecommendation(meetup, request.personalOptions(), request.preferenceNote());
+    }
 
+    @Override
+    @Transactional
+    public RoundResponse triggerAutoRecommendation(Meetup meetup, List<PersonalOptionRequest> personalOptions) {
+        return executeRecommendation(meetup, personalOptions, null);
+    }
+
+    private RoundResponse executeRecommendation(Meetup meetup, List<PersonalOptionRequest> personalOptions, String preferenceNote) {
         Long chatRoomId = meetup.getChatRoom().getId();
-        List<String> excludedRestaurantIds = derivePreviouslyRecommendedRestaurantIds(meetupId);
+        List<String> excludedRestaurantIds = derivePreviouslyRecommendedRestaurantIds(meetup.getId());
         RecommendationRequest recommendationRequest = new RecommendationRequest(
                 MeetupCommonOptionMapper.toCommonOption(meetup),
-                request.personalOptions(),
+                personalOptions,
                 excludedRestaurantIds,
-                request.preferenceNote()
+                preferenceNote
         );
 
         eventPublisher.recommendationStarted(chatRoomId);
@@ -71,7 +78,7 @@ public class RecommendationRoundServiceImpl implements RecommendationRoundServic
             throw e;
         }
 
-        RecommendationRound round = persistRound(meetup, request.preferenceNote(), result);
+        RecommendationRound round = persistRound(meetup, preferenceNote, result);
         meetup.markVoting();
 
         RoundResponse response = roundResponseAssembler.assemble(round);
@@ -127,25 +134,7 @@ public class RecommendationRoundServiceImpl implements RecommendationRoundServic
     private void persistPreferences(Meetup meetup, List<PersonalOptionRequest> personalOptions) {
         for (PersonalOptionRequest option : personalOptions) {
             MeetupParticipant participant = findOrCreateParticipant(meetup, option.participantId());
-
-            ParticipantPreference existing = participantPreferenceRepository
-                    .findByMeetupParticipantId(participant.getId())
-                    .orElse(null);
-
-            if (existing == null) {
-                participantPreferenceRepository.save(ParticipantPreference.builder()
-                        .meetupParticipant(participant)
-                        .walkMinutes(option.walkMinutes())
-                        .preferredCategories(option.preferredCategories())
-                        .budgetLimit(option.budgetLimit())
-                        .parkingNeeded(option.parkingNeeded())
-                        .excludedFoods(option.excludedFoods())
-                        .atmosphere(option.atmosphere())
-                        .build());
-            } else {
-                existing.update(option.walkMinutes(), option.preferredCategories(), option.budgetLimit(),
-                        option.parkingNeeded(), option.excludedFoods(), option.atmosphere());
-            }
+            participantPreferenceUpserter.upsert(participant, option);
         }
     }
 

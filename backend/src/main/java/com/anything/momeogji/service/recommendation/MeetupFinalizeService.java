@@ -2,6 +2,7 @@ package com.anything.momeogji.service.recommendation;
 
 import com.anything.momeogji.dto.recommendation.FinalNoticeResponse;
 import com.anything.momeogji.dto.recommendation.FinalNoticeUpdateRequest;
+import com.anything.momeogji.entity.recommendation.Meetup;
 
 public interface MeetupFinalizeService {
 
@@ -10,4 +11,7 @@ public interface MeetupFinalizeService {
 
     /** 호스트만 호출할 수 있다. 확정된 약속시간을 수정하고 변경 이력을 남긴다. 값이 그대로면 아무 것도 하지 않는다. */
     FinalNoticeResponse updateFinalNotice(Long meetupId, FinalNoticeUpdateRequest request, Long callerId);
+
+    /** 권한 검사 없이 확정을 수행한다. 전원 투표 완료 시 시스템이 자동으로 트리거할 때 사용한다. */
+    FinalNoticeResponse finalizeInternal(Meetup meetup);
 }

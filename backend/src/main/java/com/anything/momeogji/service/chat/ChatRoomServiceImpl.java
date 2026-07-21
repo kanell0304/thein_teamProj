@@ -1,5 +1,6 @@
 package com.anything.momeogji.service.chat;
 
+import com.anything.momeogji.dto.MemberDTO;
 import com.anything.momeogji.dto.chat.ChatRoomResponse;
 import com.anything.momeogji.entity.ChatRoom;
 import com.anything.momeogji.entity.ChatRoomMember;
@@ -10,6 +11,8 @@ import com.anything.momeogji.repository.MemberRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -50,6 +53,17 @@ public class ChatRoomServiceImpl implements ChatRoomService {
                 .chatRoom(chatRoom)
                 .user(member)
                 .build());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<MemberDTO> listMembers(Long chatRoomId) {
+        return chatRoomMemberRepository.findByChatRoomId(chatRoomId).stream()
+                .map(chatRoomMember -> {
+                    Member member = chatRoomMember.getUser();
+                    return new MemberDTO(member.getId(), member.getNickname(), member.getProfileImageUrl());
+                })
+                .toList();
     }
 
     private ChatRoom findChatRoom(Long chatRoomId) {

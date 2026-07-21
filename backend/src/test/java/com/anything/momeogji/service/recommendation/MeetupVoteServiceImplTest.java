@@ -9,6 +9,7 @@ import com.anything.momeogji.entity.recommendation.MeetupStatus;
 import com.anything.momeogji.entity.recommendation.RecommendationRound;
 import com.anything.momeogji.entity.recommendation.Restaurant;
 import com.anything.momeogji.entity.recommendation.RoundCandidate;
+import com.anything.momeogji.entity.recommendation.SubmissionStatus;
 import com.anything.momeogji.repository.ChatRoomMemberRepository;
 import com.anything.momeogji.repository.MeetupParticipantRepository;
 import com.anything.momeogji.repository.MeetupRepository;
@@ -29,8 +30,11 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
 /** 투표 마감시간(voteDeadlineAt) 적용 전/후 동작을 검증한다. */
@@ -55,6 +59,8 @@ class MeetupVoteServiceImplTest {
     private RecommendationEventPublisher eventPublisher;
     @Mock
     private RoundResponseAssembler roundResponseAssembler;
+    @Mock
+    private MeetupFinalizeService meetupFinalizeService;
 
     @InjectMocks
     private MeetupVoteServiceImpl service;
@@ -126,6 +132,32 @@ class MeetupVoteServiceImplTest {
         RoundResponse response = service.castVote(100L, 2L, 11L, 1L);
 
         assertThat(response).isNotNull();
+    }
+
+    @Test
+    void 제출한_전원이_투표하면_자동으로_확정한다() {
+        given(voteRepository.findByRoundCandidateIdAndMeetupParticipantId(11L, 50L)).willReturn(Optional.empty());
+        given(meetupParticipantRepository.findByMeetupIdAndUserId(100L, 1L))
+                .willReturn(Optional.of(MeetupParticipant.builder().id(50L).meetup(meetup).build()));
+        given(meetupParticipantRepository.countByMeetupIdAndSubmissionStatus(100L, SubmissionStatus.SUBMITTED)).willReturn(1L);
+        given(voteRepository.countDistinctVotersByRoundId(2L)).willReturn(1L);
+
+        service.castVote(100L, 2L, 11L, 1L);
+
+        verify(meetupFinalizeService).finalizeInternal(meetup);
+    }
+
+    @Test
+    void 일부만_투표하면_자동으로_확정하지_않는다() {
+        given(voteRepository.findByRoundCandidateIdAndMeetupParticipantId(11L, 50L)).willReturn(Optional.empty());
+        given(meetupParticipantRepository.findByMeetupIdAndUserId(100L, 1L))
+                .willReturn(Optional.of(MeetupParticipant.builder().id(50L).meetup(meetup).build()));
+        given(meetupParticipantRepository.countByMeetupIdAndSubmissionStatus(100L, SubmissionStatus.SUBMITTED)).willReturn(2L);
+        given(voteRepository.countDistinctVotersByRoundId(2L)).willReturn(1L);
+
+        service.castVote(100L, 2L, 11L, 1L);
+
+        verify(meetupFinalizeService, never()).finalizeInternal(any());
     }
 
     private Meetup withDeadline(LocalDateTime deadline) {

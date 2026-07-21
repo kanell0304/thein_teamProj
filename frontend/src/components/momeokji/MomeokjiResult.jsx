@@ -1,22 +1,22 @@
 import './MomeokjiResult.css'
 
-function MomeokjiResult({ result }) {
-  if (!result) return null
+/** finalNotice는 백엔드 FinalNoticeResponse, meetup은 MeetupDetailResponse(모임 목적 등 보강용, 선택)를 그대로 받는다. */
+function MomeokjiResult({ finalNotice, meetup }) {
+  if (!finalNotice) return null
+
+  const meetingTime = new Date(finalNotice.meetingTime)
+  const dateLabel = meetingTime.toLocaleDateString('ko-KR', { month: 'long', day: 'numeric', weekday: 'long' })
+  const timeLabel = meetingTime.toLocaleTimeString('ko-KR', { hour: 'numeric', minute: '2-digit' })
+
   return (
     <dl className="momeokji-result">
-      <div><dt>일시</dt><dd>{result.date} · {result.timeLabel}</dd></div>
-      <div><dt>지역</dt><dd>{result.place.name}</dd></div>
-      <div><dt>참가자</dt><dd>{result.participantNames.join(', ')}</dd></div>
-      <div><dt>테마</dt><dd>{result.themeLabel}</dd></div>
-      {result.selectedRestaurant && (
-        <div><dt>최종 가게</dt><dd>{result.selectedRestaurant.name}</dd></div>
+      <div><dt>일시</dt><dd>{dateLabel} · {timeLabel}</dd></div>
+      <div><dt>확정 장소</dt><dd>{finalNotice.restaurantName}</dd></div>
+      <div><dt>주소</dt><dd>{finalNotice.roadAddress || finalNotice.address || '주소 정보 없음'}</dd></div>
+      <div><dt>참여 인원</dt><dd>{finalNotice.participantCount}명</dd></div>
+      {meetup?.commonOption?.purpose && (
+        <div><dt>모임 목적</dt><dd>{meetup.commonOption.purpose}</dd></div>
       )}
-      {result.decisionMethod === 'RANDOM_RESTAURANT_TIE' && (
-        <div><dt>결정 방식</dt><dd>가게 공동 1등 · 무작위 결정</dd></div>
-      )}
-      <div><dt>메뉴</dt><dd>{result.selectedRestaurant?.menuName || result.menus.join(', ') || '미정'}</dd></div>
-      <div><dt>피할 음식</dt><dd>{result.avoidFoods.join(', ') || '없음'}</dd></div>
-      <div><dt>분위기</dt><dd>{result.moods.join(', ') || '상관없음'}</dd></div>
     </dl>
   )
 }

@@ -1,296 +1,332 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import ChatHeader from '../components/chat/ChatHeader'
 import ChatNotice from '../components/chat/ChatNotice'
 import ChatMessageList from '../components/chat/ChatMessageList'
 import ChatInput from '../components/chat/ChatInput'
 import MomeokjiPage from './MomeokjiPage'
+import PersonalPreferencePage from './PersonalPreferencePage'
 import MomeokjiVoteNotice from '../components/momeokji/MomeokjiVoteNotice'
 import MomeokjiVotePage from '../components/momeokji/MomeokjiVotePage'
-import { recommendRestaurants } from '../services/momeokjiApi'
+import MomeokjiResult from '../components/momeokji/MomeokjiResult'
+import { ensureDevSession } from '../services/authApi'
+import { ensureTestChatRoom, getChatRoomMembers, getRecentMessages } from '../services/chatApi'
 import {
-  createVoteCounts,
-  findWinningRestaurant,
-  hasEveryoneVoted,
-  hasParticipantVoted,
-  hasRecommendAgainWon,
-  RECOMMEND_AGAIN_ID,
-} from '../utils/momeokjiVote'
+  castVote,
+  createMeetup,
+  forceStartRecommendation,
+  getActiveMeetup,
+  getMeetupParticipants,
+  submitMyPreference,
+} from '../services/meetupApi'
+import { connectChatSocket, disconnectChatSocket, sendChatMessage } from '../services/chatSocket'
 import './ChatRoomPage.css'
 
-const DEMO_CURRENT_USER = { id: 'member-me', name: '나' }
-const DEMO_ROOM = {
-  id: 'room-demo',
-  members: [
-    DEMO_CURRENT_USER,
-    { id: 'member-seojun', name: '서준' },
-    { id: 'member-gyeongjun', name: '경준' },
-  ],
+// ===== 채팅 서버 응답(ChatMessageResponse)을 화면이 쓰는 메시지 형태로 변환 =====
+function toUiMessage(serverMessage, myMemberId) {
+  return {
+    id: serverMessage.id,
+    sender: serverMessage.memberId === myMemberId ? 'me' : 'other',
+    name: serverMessage.nickname,
+    text: serverMessage.content,
+    time: new Date(serverMessage.createdAt).toLocaleTimeString('ko-KR', {
+      hour: 'numeric',
+      minute: '2-digit',
+    }),
+  }
 }
 
-function currentTime() {
-  return new Date().toLocaleTimeString('ko-KR', {
-    hour: 'numeric',
-    minute: '2-digit',
-  })
-}
-
-// 채팅방을 처음 열었을 때의 시각으로 기본 대화를 생성.
-function createInitialMessages() {
-  const startedAt = currentTime()
-
-  return [
-    { id: 1, sender: 'me', text: '오늘 모먹지??', time: startedAt },
-    {
-      id: 2,
-      sender: 'other',
-      name: '서준',
-      text: '저는 상관없어요 아무거나?',
-      time: startedAt,
-    },
-    {
-      id: 3,
-      sender: 'me',
-      text: '또 아무거나야? 좀골라봐바',
-      time: startedAt,
-    },
-    { id: 4, 
-    sender: 'other',
-     name: '경준', 
-     text: '모 먹지 써볼까요그럼?', 
-     time: startedAt },
-  ]
-}
-
-// ===== 공지사항에 표시할 투표 진행 단계 문구 =====
-function getVoteNoticeText(status) {
-  if (status === 'CLOSED') return '투표 결과를 확인해요.'
-  if (status === 'IN_PROGRESS') return '투표가 진행 중이에요.'
-  return '투표가 만들어졌어요.'
-}
-
-function ChatRoomPage({ room = DEMO_ROOM, currentUser = DEMO_CURRENT_USER }) {
-  // API 연결 후 room.members에 채팅방 참가자 DTO(id, name)를 그대로 전달합니다.
-  const roomParticipants = room.members
-  // API 연결 후에는 createInitialMessages 대신 채팅 조회 응답으로 초기화
-  const [messages, setMessages] = useState(createInitialMessages)
+function ChatRoomPage() {
+  const [messages, setMessages] = useState([])
   const [isMomeokjiOpen, setIsMomeokjiOpen] = useState(false)
   const [isVotePageOpen, setIsVotePageOpen] = useState(false)
-  const [isCreatingVote, setIsCreatingVote] = useState(false)
-  const [isResolvingVote, setIsResolvingVote] = useState(false)
-  const [recommendationError, setRecommendationError] = useState('')
-  const [voteSession, setVoteSession] = useState(null)
-  const [momeokjiResult, setMomeokjiResult] = useState(null)
-  const voteSubmissionLockRef = useRef(false)
-  const canViewVote = voteSession?.settings.participantIds.includes(currentUser.id)
-  const canViewMomeokjiResult = momeokjiResult?.participantIds.includes(currentUser.id)
+
+  // ===== 실 채팅 연동: dev 세션으로 방 이력을 불러오고 실시간 소켓을 구독 =====
+  const [chatRoomId, setChatRoomId] = useState(null)
+  const [chatMembers, setChatMembers] = useState([])
+  const [currentUser, setCurrentUser] = useState(null)
+  const [isChatConnecting, setIsChatConnecting] = useState(true)
+  const [chatError, setChatError] = useState('')
+  const chatSocketRef = useRef(null)
+  const chatMemberIdRef = useRef(null)
+  // ParticipantPicker의 기존 {id, name} 계약을 그대로 재사용합니다.
+  const roomParticipants = chatMembers.map((member) => ({ id: member.id, name: member.nickname }))
+
+  // ===== 모임 초대: 백엔드 모임 생성 즉시 발행되는 초대 이벤트로 갱신됩니다 =====
+  const [meetup, setMeetup] = useState(null)
+  const [participants, setParticipants] = useState([])
+  const [isCreatingMeetup, setIsCreatingMeetup] = useState(false)
+  const [meetupError, setMeetupError] = useState('')
+  const myParticipant = participants.find((participant) => participant.memberId === currentUser?.id)
+  const hasSubmittedPreference = myParticipant?.submissionStatus === 'SUBMITTED'
+  const isHost = Boolean(currentUser) && meetup?.hostMemberId === currentUser.id
+  const pendingParticipantCount = participants.filter((participant) => participant.submissionStatus === 'PENDING').length
+
+  // ===== 개인 선호 제출 + AI 추천 실행 상태: 전원 제출 완료 시 서버가 자동으로 추천을 실행합니다 =====
+  const [isPersonalPreferenceOpen, setIsPersonalPreferenceOpen] = useState(false)
+  const [isSubmittingPreference, setIsSubmittingPreference] = useState(false)
+  const [isForcingStart, setIsForcingStart] = useState(false)
+  const [preferenceError, setPreferenceError] = useState('')
+  const [recommendationStatus, setRecommendationStatus] = useState('IDLE')
+  const [round, setRound] = useState(null)
+
+  // ===== 투표: 후보별 실시간 득표는 vote-updates 웹소켓이 round를 갱신합니다 =====
+  const [isSubmittingVote, setIsSubmittingVote] = useState(false)
+  const [voteError, setVoteError] = useState('')
+
+  // ===== 최종 확정: 전원 투표 완료 시 서버가 자동으로 확정하고 채팅방 상단에 고정 공지로 알려줍니다 =====
+  const [finalNotice, setFinalNotice] = useState(null)
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function bootstrapChat() {
+      try {
+        const session = await ensureDevSession()
+        const roomId = await ensureTestChatRoom()
+        const [history, members] = await Promise.all([
+          getRecentMessages(roomId),
+          getChatRoomMembers(roomId),
+        ])
+        if (cancelled) return
+
+        chatMemberIdRef.current = session.memberId
+        const socket = await connectChatSocket(roomId, {
+          onMessage: (incoming) => {
+            setMessages((previous) => [...previous, toUiMessage(incoming, chatMemberIdRef.current)])
+          },
+          onInvitation: (event) => {
+            setMeetup(event.meetup)
+            setParticipants(event.participants)
+          },
+          onProgress: (event) => {
+            setParticipants(event.participants)
+          },
+          onRecommendationProgress: (event) => {
+            setRecommendationStatus(event.status)
+            if (event.status === 'COMPLETED') setRound(event.result)
+            if (event.status === 'FAILED') setPreferenceError(event.errorMessage || 'AI 추천에 실패했어요.')
+          },
+          onVoteUpdate: (event) => {
+            setRound(event)
+          },
+          onFinalNotice: (event) => {
+            setFinalNotice(event)
+          },
+        })
+        if (cancelled) {
+          disconnectChatSocket(socket)
+          return
+        }
+
+        chatSocketRef.current = socket
+        setChatRoomId(roomId)
+        setChatMembers(members)
+        setCurrentUser({ id: session.memberId, name: session.nickname })
+        setMessages(history.map((message) => toUiMessage(message, session.memberId)))
+
+        // ===== 새로고침/재접속 시 놓친 웹소켓 이벤트를 한 번의 조회로 복원합니다 =====
+        const activeMeetup = await getActiveMeetup(roomId)
+        if (cancelled || !activeMeetup) return
+
+        setMeetup(activeMeetup)
+        setParticipants(await getMeetupParticipants(activeMeetup.meetupId))
+        if (activeMeetup.latestRound) {
+          setRound(activeMeetup.latestRound)
+          setRecommendationStatus('COMPLETED')
+        }
+        if (activeMeetup.finalNotice) setFinalNotice(activeMeetup.finalNotice)
+      } catch {
+        if (!cancelled) setChatError('채팅 서버에 연결하지 못했어요. 백엔드가 켜져 있는지 확인해주세요.')
+      } finally {
+        if (!cancelled) setIsChatConnecting(false)
+      }
+    }
+
+    bootstrapChat()
+
+    return () => {
+      cancelled = true
+      disconnectChatSocket(chatSocketRef.current)
+    }
+  }, [])
 
   const sendMessage = (text) => {
-    setMessages((previous) => [
-      ...previous,
-      {
-        id: crypto.randomUUID(),
-        sender: 'me',
-        text,
-        time: currentTime(),
-      },
-    ])
+    if (!chatRoomId || !chatSocketRef.current) return
+    sendChatMessage(chatSocketRef.current, chatRoomId, text)
   }
 
-  // ===== 8단계 설정 완료 후 AI 추천 3곳으로 투표 세션 생성 =====
-  const createVoteSession = async (settings) => {
-    setIsCreatingVote(true)
-    setRecommendationError('')
-    setMomeokjiResult(null)
-    setVoteSession(null)
+  // ===== 공통 설정 완료 후 모임을 만들고 선택한 참가자를 초대합니다 =====
+  const createMeetupAndInvite = async (settings) => {
+    if (!chatRoomId) return
+    setIsCreatingMeetup(true)
+    setMeetupError('')
 
     try {
-      const recommendations = await recommendRestaurants(settings)
-      const sessionId = crypto.randomUUID()
-      setVoteSession({
-        id: sessionId,
-        status: 'CREATED',
-        settings,
-        recommendations,
-        votes: {},
-        excludedRestaurantIds: [],
-        generation: 0,
-        voteRound: 1,
-        tieRetryCount: 0,
-      })
-      // 설정 완료와 동시에 일반 텍스트와 구분되는 투표 기능 버블을 생성합니다.
-      setMessages((previous) => [
-        ...previous,
-        {
-          id: crypto.randomUUID(),
-          type: 'MOMEOKJI_VOTE',
-          voteSessionId: sessionId,
-          sender: 'me',
-          time: currentTime(),
+      await createMeetup({
+        chatRoomId,
+        commonOption: {
+          destinationName: settings.place.name,
+          destinationLatitude: settings.place.latitude,
+          destinationLongitude: settings.place.longitude,
+          meetingTime: `${settings.date}T${settings.time}:00`,
+          purpose: settings.themeLabel,
         },
-      ])
+        participantIds: settings.participantIds,
+      })
+      // 생성 즉시 서버가 초대 이벤트를 브로드캐스트하므로, meetup/participants는 onInvitation 핸들러가 채웁니다.
     } catch {
-      setRecommendationError('추천 가게를 불러오지 못했어요. 다시 시도해주세요.')
+      setMeetupError('모임을 만들지 못했어요. 다시 시도해주세요.')
     } finally {
-      setIsCreatingVote(false)
+      setIsCreatingMeetup(false)
+    }
+  }
+
+  // ===== 초대받은 참가자가 개인 선호를 제출합니다. 전원 제출 완료 시 서버가 자동으로 AI 추천을 실행합니다. =====
+  const submitPreference = async (preference) => {
+    if (!meetup) return
+    setIsSubmittingPreference(true)
+    setPreferenceError('')
+
+    try {
+      await submitMyPreference(meetup.meetupId, preference)
+      setIsPersonalPreferenceOpen(false)
+      // participants/round 갱신은 meetup-progress·recommendation-progress 웹소켓 이벤트가 담당합니다.
+    } catch {
+      setPreferenceError('선호를 제출하지 못했어요. 다시 시도해주세요.')
+    } finally {
+      setIsSubmittingPreference(false)
+    }
+  }
+
+  // ===== 호스트가 일부만 제출한 상태에서 강제로 AI 추천을 진행하거나, 완료된 추천을 다시 받습니다. =====
+  const forceStart = async () => {
+    if (!meetup) return
+    setIsForcingStart(true)
+    setPreferenceError('')
+
+    try {
+      await forceStartRecommendation(meetup.meetupId)
+    } catch {
+      setPreferenceError('지금까지 제출된 선호로 진행하지 못했어요.')
+    } finally {
+      setIsForcingStart(false)
+    }
+  }
+
+  // ===== 선택한 후보마다 실제 투표 API를 호출합니다(다중 선택이라 후보별로 각각 호출). =====
+  const castMyVote = async (selectedOptionIds) => {
+    if (!meetup || !round) return
+    setIsSubmittingVote(true)
+    setVoteError('')
+
+    try {
+      await Promise.all(
+        selectedOptionIds.map((candidateId) => castVote(meetup.meetupId, round.roundId, Number(candidateId))),
+      )
+      // 득표 갱신은 vote-updates 웹소켓이 round를 다시 채워줍니다.
+    } catch {
+      setVoteError('투표를 반영하지 못했어요. 다시 시도해주세요.')
+    } finally {
+      setIsSubmittingVote(false)
     }
   }
 
   // ===== 모먹지 기능 버튼은 진행 상태에 맞는 화면을 엽니다. =====
-  const openCurrentMomeokjiStage = () => {
-    if (voteSession && canViewVote) {
+  const openCurrentMomeokjiStage = async () => {
+    if (recommendationStatus === 'COMPLETED' && round) {
       setIsVotePageOpen(true)
       return
     }
-    setIsMomeokjiOpen(true)
-  }
-
-  // ===== 최다 득표 가게 또는 가게 공동 1등 중 무작위 결과로 투표 마감 =====
-  const closeVoteWithWinner = (winner, updatedVotes, decisionMethod) => {
-    if (!winner || !voteSession) return
-
-    setMomeokjiResult({
-      ...voteSession.settings,
-      selectedRestaurant: winner,
-      voteCounts: createVoteCounts(voteSession.recommendations, updatedVotes),
-      decisionMethod,
-    })
-    setVoteSession((previous) => ({ ...previous, status: 'CLOSED', votes: updatedVotes }))
-  }
-
-  // ===== 한 사람이 선택한 최대 4개 표를 저장하고 전원 참여 후 다수결 처리 =====
-  const submitVote = async (selectedOptionIds) => {
-    if (!voteSession || isResolvingVote || voteSubmissionLockRef.current) return
-    const uniqueOptionIds = [...new Set(selectedOptionIds)]
-    const validOptionIds = new Set([
-      ...voteSession.recommendations.map((restaurant) => restaurant.id),
-      RECOMMEND_AGAIN_ID,
-    ])
-    if (
-      uniqueOptionIds.length === 0
-      || uniqueOptionIds.length > 4
-      || uniqueOptionIds.some((optionId) => !validOptionIds.has(optionId))
-    ) return
-    // 이미 제출한 참가자는 같은 라운드에서 선택을 바꾸거나 다시 제출할 수 없습니다.
-    if (hasParticipantVoted(voteSession.votes, currentUser.id)) return
-    voteSubmissionLockRef.current = true
-
-    try {
-      const updatedVotes = Object.fromEntries(
-        voteSession.recommendations.map((restaurant) => [
-          restaurant.id,
-          voteSession.votes[restaurant.id] ?? [],
-        ]),
-      )
-      updatedVotes[RECOMMEND_AGAIN_ID] = voteSession.votes[RECOMMEND_AGAIN_ID] ?? []
-      // 선택한 가게와 재추천 각각에 참가자의 표를 한 개씩 기록합니다.
-      uniqueOptionIds.forEach((optionId) => {
-        updatedVotes[optionId] = [...updatedVotes[optionId], currentUser.id]
-      })
-
-      if (!hasEveryoneVoted(voteSession.settings.participantIds, updatedVotes)) {
-        setVoteSession((previous) => ({
-          ...previous,
-          status: 'IN_PROGRESS',
-          votes: updatedVotes,
-        }))
-        // 남은 참가자가 있으면 투표 화면을 유지해 게이지와 남은 인원을 즉시 표시합니다.
-        return
-      }
-
-      const shouldRecommendAgain = hasRecommendAgainWon(
-        voteSession.recommendations,
-        updatedVotes,
-      )
-
-      // ===== 재투표가 단독 1위일 때만 기존 후보를 누적 제외하고 새 가게 3곳 요청 =====
-      if (shouldRecommendAgain) {
-        setIsResolvingVote(true)
-        setRecommendationError('')
-        const excludedRestaurantIds = [
-          ...new Set([
-            ...voteSession.excludedRestaurantIds,
-            ...voteSession.recommendations.map((restaurant) => restaurant.id),
-          ]),
-        ]
-        const generation = voteSession.generation + 1
-
-        try {
-          const recommendations = await recommendRestaurants(voteSession.settings, {
-            excludeRestaurantIds: excludedRestaurantIds,
-            generation,
-          })
-          setVoteSession((previous) => ({
-            ...previous,
-            status: 'CREATED',
-            recommendations,
-            votes: {},
-            excludedRestaurantIds,
-            generation,
-            voteRound: previous.voteRound + 1,
-            tieRetryCount: previous.tieRetryCount + 1,
-          }))
-        } catch {
-          // 새 후보 조회 실패 시 현재 후보를 유지하고 해당 라운드의 표만 초기화합니다.
-          setRecommendationError('새 후보를 불러오지 못했어요. 현재 후보로 다시 투표해주세요.')
-          setVoteSession((previous) => ({
-            ...previous,
-            status: 'CREATED',
-            votes: {},
-            excludedRestaurantIds,
-            generation,
-            voteRound: previous.voteRound + 1,
-            tieRetryCount: previous.tieRetryCount + 1,
-          }))
-        } finally {
-          setIsResolvingVote(false)
-          setIsVotePageOpen(false)
-        }
-        return
-      }
-
-      // ===== 재투표와 가게가 공동 1등이면 가게를 우선하고, 가게끼리 동률이면 무작위 확정 =====
-      const restaurantVoteCounts = voteSession.recommendations.map((restaurant) => (
-        updatedVotes[restaurant.id]?.length ?? 0
-      ))
-      const highestRestaurantVoteCount = Math.max(...restaurantVoteCounts)
-      const restaurantLeaderCount = restaurantVoteCounts.filter((count) => (
-        count === highestRestaurantVoteCount
-      )).length
-      closeVoteWithWinner(
-        findWinningRestaurant(voteSession.recommendations, updatedVotes),
-        updatedVotes,
-        restaurantLeaderCount > 1 ? 'RANDOM_RESTAURANT_TIE' : 'MAJORITY',
-      )
-
-      setIsVotePageOpen(false)
-    } finally {
-      voteSubmissionLockRef.current = false
+    if (meetup && myParticipant && !hasSubmittedPreference) {
+      setIsPersonalPreferenceOpen(true)
+      return
     }
+    // 처음 연결한 뒤 새로 들어온 멤버가 있을 수 있으니, 참가자를 고르기 직전에 목록을 다시 불러옵니다.
+    if (chatRoomId) {
+      try {
+        setChatMembers(await getChatRoomMembers(chatRoomId))
+      } catch {
+        // 갱신 실패해도 기존 목록으로 마법사는 계속 열어줍니다.
+      }
+    }
+    setIsMomeokjiOpen(true)
   }
 
   return (
     <div className="chat-room">
       {/* 필요 없는 영역은 이 조립부에서 컴포넌트 한 줄만 제거. */}
-      {/* ===== 채팅방 참가자 수: 이후 room.members API 데이터와 자동 연동 ===== */}
-      <ChatHeader roomName="진원버스 가즈아" memberCount={room.members.length} />
+      <ChatHeader roomName="진원버스 가즈아" memberCount={chatMembers.length} />
 
       <div className="chat-body">
-        {/* ===== 1단계 설정 완료 후 AI 추천 생성 상태 ===== */}
-        {isCreatingVote && <ChatNotice text="AI가 추천 가게를 찾고 있어요." />}
-        {recommendationError && <ChatNotice text={recommendationError} />}
-
-        {/* ===== 참가자 전용 공지: 생성·진행·결과 상태와 연결 버튼만 표시 ===== */}
-        {voteSession && canViewVote && (
-          <ChatNotice text={getVoteNoticeText(voteSession.status)}>
-            <MomeokjiVoteNotice
-              status={voteSession.status}
-              onOpenVote={() => setIsVotePageOpen(true)}
-            />
+        {/* ===== 최종 확정 고정 공지: 전원 투표 완료 시 서버가 자동으로 확정하며, 다른 공지보다 항상 위에 표시합니다 ===== */}
+        {finalNotice && (
+          <ChatNotice text={`모먹지 결과가 나왔어요 · ${finalNotice.restaurantName}`} defaultExpanded>
+            <MomeokjiResult finalNotice={finalNotice} meetup={meetup} />
           </ChatNotice>
         )}
+
+        {/* ===== 실 채팅 연동 상태: dev 세션 발급 + 방 입장 + 소켓 연결까지의 진행 상황 ===== */}
+        {isChatConnecting && <ChatNotice text="채팅 서버에 연결하고 있어요." />}
+        {chatError && <ChatNotice text={chatError} />}
+
+        {/* ===== 공통 설정 완료 후 모임 생성 상태 ===== */}
+        {isCreatingMeetup && <ChatNotice text="모임을 만들고 있어요." />}
+        {meetupError && <ChatNotice text={meetupError} />}
+
+        {preferenceError && <ChatNotice text={preferenceError} />}
+        {voteError && <ChatNotice text={voteError} />}
+
+        {/* ===== 초대받은 참가자에게만 보이는 모임 공지: 전원 제출 완료 시 서버가 자동으로 AI 추천을 실행합니다 ===== */}
+        {!finalNotice && meetup && myParticipant && recommendationStatus !== 'COMPLETED' && (
+          <ChatNotice
+            text={
+              recommendationStatus === 'STARTED'
+                ? 'AI가 추천 가게를 찾고 있어요.'
+                : hasSubmittedPreference
+                  ? `제출 완료! 다른 참가자 ${pendingParticipantCount}명을 기다리고 있어요.`
+                  : '모먹지가 시작됐어요. 개인 선호를 입력해주세요.'
+            }
+          >
+            <MomeokjiVoteNotice
+              status="CREATED"
+              onOpenVote={
+                hasSubmittedPreference || recommendationStatus === 'STARTED'
+                  ? undefined
+                  : () => setIsPersonalPreferenceOpen(true)
+              }
+            />
+            {isHost && pendingParticipantCount > 0 && recommendationStatus !== 'STARTED' && (
+              <button
+                className="app-button app-button--small"
+                type="button"
+                disabled={isForcingStart}
+                onClick={forceStart}
+              >
+                {isForcingStart ? '진행하는 중...' : '지금까지 제출된 선호로 진행하기'}
+              </button>
+            )}
+          </ChatNotice>
+        )}
+
+        {/* ===== AI 추천 완료: 참가자는 투표하러 갈 수 있고 호스트는 다시 추천받을 수 있습니다 ===== */}
+        {!finalNotice && meetup && myParticipant && recommendationStatus === 'COMPLETED' && round && (
+          <ChatNotice text={`추천이 완료됐어요. 후보 ${round.candidates.length}곳 중에서 투표해주세요.`}>
+            <MomeokjiVoteNotice status="CREATED" onOpenVote={() => setIsVotePageOpen(true)} />
+            {isHost && (
+              <button
+                className="app-button app-button--small"
+                type="button"
+                disabled={isForcingStart}
+                onClick={forceStart}
+              >
+                {isForcingStart ? '다시 추천받는 중...' : '다시 추천받기'}
+              </button>
+            )}
+          </ChatNotice>
+        )}
+
         <ChatMessageList
           messages={messages}
-          voteSession={voteSession}
           onOpenVote={() => setIsVotePageOpen(true)}
         />
       </div>
@@ -312,22 +348,26 @@ function ChatRoomPage({ room = DEMO_ROOM, currentUser = DEMO_CURRENT_USER }) {
       <MomeokjiPage
         open={isMomeokjiOpen}
         onClose={() => setIsMomeokjiOpen(false)}
-        onComplete={createVoteSession}
+        onComplete={createMeetupAndInvite}
         messages={messages}
         participants={roomParticipants}
-        defaultParticipantIds={[currentUser.id]}
+        defaultParticipantIds={currentUser ? [currentUser.id] : []}
+      />
+
+      <PersonalPreferencePage
+        open={isPersonalPreferenceOpen}
+        onClose={() => setIsPersonalPreferenceOpen(false)}
+        onSubmit={submitPreference}
+        isSubmitting={isSubmittingPreference}
       />
 
       <MomeokjiVotePage
-        key={voteSession ? `${voteSession.id}-${voteSession.voteRound}` : 'no-vote'}
+        key={round ? `${round.meetupId}-${round.roundId}` : 'no-round'}
         open={isVotePageOpen}
-        session={voteSession}
-        currentUserId={currentUser.id}
-        participants={roomParticipants}
+        round={round}
         onClose={() => setIsVotePageOpen(false)}
-        onSubmit={submitVote}
-        isResolvingVote={isResolvingVote}
-        result={canViewMomeokjiResult ? momeokjiResult : null}
+        onSubmit={castMyVote}
+        isSubmitting={isSubmittingVote}
       />
     </div>
   )

@@ -1,6 +1,9 @@
 package com.anything.momeogji.service.chat;
 
+import com.anything.momeogji.dto.MemberDTO;
 import com.anything.momeogji.dto.chat.ChatRoomResponse;
+
+import java.util.List;
 
 public interface ChatRoomService {
 
@@ -9,4 +12,7 @@ public interface ChatRoomService {
 
     /** 이미 참여 중이면 아무 일도 하지 않는다(중복 참여 방지). */
     void joinRoom(Long chatRoomId, Long memberId);
+
+    /** 채팅방 참여자 목록을 조회한다. 모임 참가자 선택 화면 등에서 사용한다. */
+    List<MemberDTO> listMembers(Long chatRoomId);
 }

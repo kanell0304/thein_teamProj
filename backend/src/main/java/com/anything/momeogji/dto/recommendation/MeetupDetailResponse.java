@@ -9,6 +9,8 @@ public record MeetupDetailResponse(
         String status,
         CommonOptionRequest commonOption,
         RoundResponse latestRound,
-        LocalDateTime voteDeadlineAt
+        LocalDateTime voteDeadlineAt,
+        Long hostMemberId,
+        FinalNoticeResponse finalNotice
 ) {
 }

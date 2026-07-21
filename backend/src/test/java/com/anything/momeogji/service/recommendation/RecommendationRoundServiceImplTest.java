@@ -11,7 +11,6 @@ import com.anything.momeogji.entity.Member;
 import com.anything.momeogji.entity.recommendation.Meetup;
 import com.anything.momeogji.entity.recommendation.MeetupParticipant;
 import com.anything.momeogji.entity.recommendation.MeetupStatus;
-import com.anything.momeogji.entity.recommendation.ParticipantPreference;
 import com.anything.momeogji.entity.recommendation.RecommendationRound;
 import com.anything.momeogji.entity.recommendation.Restaurant;
 import com.anything.momeogji.entity.recommendation.RoundCandidate;
@@ -21,7 +20,6 @@ import com.anything.momeogji.repository.ChatRoomMemberRepository;
 import com.anything.momeogji.repository.MeetupParticipantRepository;
 import com.anything.momeogji.repository.MeetupRepository;
 import com.anything.momeogji.repository.MemberRepository;
-import com.anything.momeogji.repository.ParticipantPreferenceRepository;
 import com.anything.momeogji.repository.RecommendationRoundRepository;
 import com.anything.momeogji.repository.RestaurantRepository;
 import com.anything.momeogji.repository.RoundCandidateRepository;
@@ -60,7 +58,7 @@ class RecommendationRoundServiceImplTest {
     @Mock
     private MemberRepository memberRepository;
     @Mock
-    private ParticipantPreferenceRepository participantPreferenceRepository;
+    private ParticipantPreferenceUpserter participantPreferenceUpserter;
     @Mock
     private RecommendationRoundRepository recommendationRoundRepository;
     @Mock
@@ -102,7 +100,6 @@ class RecommendationRoundServiceImplTest {
                 .build();
         lenient().when(memberRepository.findById(1L)).thenReturn(Optional.of(host));
         lenient().when(meetupParticipantRepository.findByMeetupIdAndUserId(100L, 1L)).thenReturn(Optional.of(participant));
-        lenient().when(participantPreferenceRepository.findByMeetupParticipantId(50L)).thenReturn(Optional.empty());
     }
 
     @Test
@@ -192,29 +189,20 @@ class RecommendationRoundServiceImplTest {
     }
 
     @Test
-    void 이미_선호를_제출한_참여자가_다시_제출하면_기존값을_갱신한다() {
+    void 참여자별_선호를_업서터에_위임한다() {
         given(meetupRepository.findById(100L)).willReturn(Optional.of(meetup));
         given(chatRoomMemberRepository.existsByChatRoomIdAndUserId(10L, 1L)).willReturn(true);
         given(roundCandidateRepository.findByRound_Meetup_Id(100L)).willReturn(List.of());
-
-        ParticipantPreference existing = ParticipantPreference.builder()
-                .id(70L)
-                .meetupParticipant(MeetupParticipant.builder().id(50L).build())
-                .walkMinutes(5)
-                .preferredCategories(List.of("일식"))
-                .parkingNeeded(false)
-                .excludedFoods(List.of())
-                .build();
-        given(participantPreferenceRepository.findByMeetupParticipantId(50L)).willReturn(Optional.of(existing));
         given(restaurantRecommendationService.recommend(any())).willThrow(new AiRecommendationException("이후 흐름은 이 테스트 관심사가 아님"));
 
-        RoundCreateRequest request = new RoundCreateRequest(List.of(personalOption(1L)), null);
+        PersonalOptionRequest option = personalOption(1L);
+        RoundCreateRequest request = new RoundCreateRequest(List.of(option), null);
 
         assertThatThrownBy(() -> service.createRound(100L, request, 1L)).isInstanceOf(AiRecommendationException.class);
 
-        assertThat(existing.getWalkMinutes()).isEqualTo(10);
-        assertThat(existing.getPreferredCategories()).containsExactly("한식");
-        verify(participantPreferenceRepository, never()).save(any());
+        ArgumentCaptor<MeetupParticipant> participantCaptor = ArgumentCaptor.forClass(MeetupParticipant.class);
+        verify(participantPreferenceUpserter).upsert(participantCaptor.capture(), eq(option));
+        assertThat(participantCaptor.getValue().getId()).isEqualTo(50L);
     }
 
     private PersonalOptionRequest personalOption(Long participantId) {
