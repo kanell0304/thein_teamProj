@@ -112,11 +112,6 @@ public class MerchantUsageProcessor {
             List<CleanApprovalData> approvals,
             TimeBand timeBand
     ) {
-        // computeIfAbsent로 생성한 그룹은 한 건 이상이지만 내부 계약을 명시적 방어
-        if (approvals == null || approvals.isEmpty()) {
-            throw new IllegalArgumentException("가맹점 집계 그룹은 한 건 이상이어야 합니다.");
-        }
-
         CleanApprovalData firstApproval = approvals.get(0);
         List<MerchantUsageData.PaymentLog> payments =
                 new ArrayList<>(approvals.size());
