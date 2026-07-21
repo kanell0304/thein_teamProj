@@ -30,7 +30,7 @@ import java.util.Set;
  *
  * 카드 목록과 승인내역의 모든 페이지를 순서대로 처리한다.
  * 처리 중 한 단계라도 실패하면 부분 결과를 반환하지 않고 예외를 전달한다.
- * {@link #collectTransformed(Long, TimeBand)}를 호출하면 수집 결과를 {@link MyDataTransformer}에 전달한다.
+ * {@link #process(Long, TimeBand)}를 호출하면 수집 결과를 {@link MyDataTransformer}에 전달한다.
  * 참가자 단위 비동기 실행, 동의 여부 판단과 실패 상태 기록은 이후 이 서비스를 호출하는 상위 계층이 담당한다.
  */
 @Service
@@ -127,7 +127,7 @@ public class MyDataService {
      * @throws IllegalArgumentException 선택 시간대가 없거나 참가자 ID가 올바르지 않은 경우
      * @throws IllegalStateException 마이데이터 수집·역직렬화·페이지 처리에 실패한 경우
      */
-    public TransformedUserMyData collectTransformed(
+    public TransformedUserMyData process(
             Long participantId,
             TimeBand selectedTimeBand
     ) {
