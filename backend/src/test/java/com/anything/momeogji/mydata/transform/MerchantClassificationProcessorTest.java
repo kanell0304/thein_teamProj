@@ -4,7 +4,6 @@ import com.anything.momeogji.mydata.transform.local.MerchantPlaceSearchClient;
 import com.anything.momeogji.mydata.transform.local.MerchantPlaceSearchClient.SearchCandidate;
 import com.anything.momeogji.mydata.transform.model.KakaoPlaceMatchData;
 import com.anything.momeogji.mydata.transform.model.MerchantUsageData;
-import com.anything.momeogji.mydata.transform.model.TimeBand;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -185,7 +184,6 @@ class MerchantClassificationProcessorTest {
         return MerchantUsageData.unclassified(
                 merchantName,
                 "211-75-37672",
-                TimeBand.LUNCH,
                 List.of(new MerchantUsageData.PaymentLog(
                         LocalDateTime.of(2026, 7, 18, 13, 20),
                         BigDecimal.valueOf(11_000)

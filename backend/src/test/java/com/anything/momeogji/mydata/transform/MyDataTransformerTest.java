@@ -4,7 +4,6 @@ import com.anything.momeogji.mydata.model.UserMyData;
 import com.anything.momeogji.mydata.transform.model.CleanApprovalData;
 import com.anything.momeogji.mydata.transform.model.KakaoPlaceMatchData;
 import com.anything.momeogji.mydata.transform.model.MerchantUsageData;
-import com.anything.momeogji.mydata.transform.model.TimeBand;
 import com.anything.momeogji.mydata.transform.model.TransformedUserMyData;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -15,6 +14,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -54,7 +54,7 @@ class MyDataTransformerTest {
     }
 
     /**
-     * 정제 결과가 집계로, 집계 결과가 분류로 전달되고 최종 메타데이터가 보존되는지 확인한다.
+     * 정제 결과가 집계로, 집계 결과가 분류로 전달되고 사용자 ID가 최종 결과에 보존되는지 확인한다.
      */
     @Test
     void 정제_집계_분류_순서로_가공하고_최종_결과를_조립한다() {
@@ -70,7 +70,6 @@ class MyDataTransformerTest {
         MerchantUsageData merchantUsage = MerchantUsageData.unclassified(
                 "영인성",
                 "211-75-37672",
-                TimeBand.LUNCH,
                 List.of(new MerchantUsageData.PaymentLog(
                         approvedAt,
                         BigDecimal.valueOf(11_000)
@@ -89,20 +88,20 @@ class MyDataTransformerTest {
         List<CleanApprovalData> cleanedApprovals = List.of(cleanApproval);
         List<MerchantUsageData> merchantUsages = List.of(merchantUsage);
         List<MerchantUsageData> classifiedUsages = List.of(classifiedUsage);
+        LocalTime meetingTime = LocalTime.of(12, 0);
 
         given(userMyDataCleaner.clean(userMyData)).willReturn(cleanedApprovals);
-        given(merchantUsageProcessor.process(cleanedApprovals, TimeBand.LUNCH))
+        given(merchantUsageProcessor.process(cleanedApprovals, meetingTime))
                 .willReturn(merchantUsages);
         given(merchantClassificationProcessor.classify(merchantUsages))
                 .willReturn(classifiedUsages);
 
         TransformedUserMyData result = myDataTransformer.transform(
                 userMyData,
-                TimeBand.LUNCH
+                meetingTime
         );
 
-        assertThat(result.participantId()).isEqualTo(1L);
-        assertThat(result.selectedTimeBand()).isEqualTo(TimeBand.LUNCH);
+        assertThat(result.userId()).isEqualTo(1L);
         assertThat(result.merchantUsages()).containsExactly(classifiedUsage);
 
         InOrder processingOrder = inOrder(
@@ -113,31 +112,31 @@ class MyDataTransformerTest {
         processingOrder.verify(userMyDataCleaner).clean(userMyData);
         processingOrder.verify(merchantUsageProcessor).process(
                 cleanedApprovals,
-                TimeBand.LUNCH
+                meetingTime
         );
         processingOrder.verify(merchantClassificationProcessor).classify(merchantUsages);
     }
 
     /**
-     * 각 단계에 처리할 데이터가 없어도 참가자와 시간대를 포함한 정상 빈 결과를 만드는지 확인한다.
+     * 각 단계에 처리할 데이터가 없어도 사용자 ID를 포함한 정상 빈 결과를 만드는지 확인한다.
      */
     @Test
     void 처리할_승인내역이_없으면_빈_최종_결과를_반환한다() {
         UserMyData userMyData = new UserMyData(1L, List.of());
+        LocalTime meetingTime = LocalTime.of(9, 0);
 
         given(userMyDataCleaner.clean(userMyData)).willReturn(List.of());
-        given(merchantUsageProcessor.process(List.of(), TimeBand.MORNING))
+        given(merchantUsageProcessor.process(List.of(), meetingTime))
                 .willReturn(List.of());
         given(merchantClassificationProcessor.classify(List.of()))
                 .willReturn(List.of());
 
         TransformedUserMyData result = myDataTransformer.transform(
                 userMyData,
-                TimeBand.MORNING
+                meetingTime
         );
 
-        assertThat(result.participantId()).isEqualTo(1L);
-        assertThat(result.selectedTimeBand()).isEqualTo(TimeBand.MORNING);
+        assertThat(result.userId()).isEqualTo(1L);
         assertThat(result.merchantUsages()).isEmpty();
     }
 
@@ -148,29 +147,30 @@ class MyDataTransformerTest {
     void 중간_단계_예외를_감추지_않고_전달한다() {
         UserMyData userMyData = new UserMyData(1L, List.of());
         IllegalStateException failure = new IllegalStateException("집계 실패");
+        LocalTime meetingTime = LocalTime.of(12, 0);
 
         given(userMyDataCleaner.clean(userMyData)).willReturn(List.of());
-        given(merchantUsageProcessor.process(List.of(), TimeBand.LUNCH))
+        given(merchantUsageProcessor.process(List.of(), meetingTime))
                 .willThrow(failure);
 
         assertThatThrownBy(() -> myDataTransformer.transform(
                 userMyData,
-                TimeBand.LUNCH
+                meetingTime
         )).isSameAs(failure);
 
         verifyNoInteractions(merchantClassificationProcessor);
     }
 
     /**
-     * 선택 시간대가 없으면 불필요한 정제 작업을 시작하기 전에 요청을 거부하는지 확인한다.
+     * 선택 시각이 없으면 불필요한 정제 작업을 시작하기 전에 요청을 거부하는지 확인한다.
      */
     @Test
-    void 선택_시간대가_없으면_가공_컴포넌트를_호출하지_않는다() {
+    void 선택_시각이_없으면_가공_컴포넌트를_호출하지_않는다() {
         UserMyData userMyData = new UserMyData(1L, List.of());
 
         assertThatThrownBy(() -> myDataTransformer.transform(userMyData, null))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("selectedTimeBand는 필수입니다.");
+                .hasMessage("meetingTime은 필수입니다.");
 
         verifyNoInteractions(
                 userMyDataCleaner,
@@ -187,7 +187,6 @@ class MyDataTransformerTest {
         List<MerchantUsageData> mutableMerchantUsages = new ArrayList<>();
         TransformedUserMyData result = new TransformedUserMyData(
                 1L,
-                TimeBand.LUNCH,
                 mutableMerchantUsages
         );
 
@@ -198,19 +197,11 @@ class MyDataTransformerTest {
                 .isInstanceOf(UnsupportedOperationException.class);
         assertThatThrownBy(() -> new TransformedUserMyData(
                 0L,
-                TimeBand.LUNCH,
                 List.of()
         )).isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("participantId는 1 이상이어야 합니다.");
+                .hasMessage("userId는 1 이상이어야 합니다.");
         assertThatThrownBy(() -> new TransformedUserMyData(
                 1L,
-                null,
-                List.of()
-        )).isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("selectedTimeBand는 필수입니다.");
-        assertThatThrownBy(() -> new TransformedUserMyData(
-                1L,
-                TimeBand.LUNCH,
                 null
         )).isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("merchantUsages는 null일 수 없습니다.");

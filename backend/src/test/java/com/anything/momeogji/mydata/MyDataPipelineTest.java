@@ -14,12 +14,12 @@ import com.anything.momeogji.mydata.transform.MyDataTransformer;
 import com.anything.momeogji.mydata.transform.UserMyDataCleaner;
 import com.anything.momeogji.mydata.transform.local.MerchantPlaceSearchClient;
 import com.anything.momeogji.mydata.transform.model.KakaoPlaceMatchData;
-import com.anything.momeogji.mydata.transform.model.TimeBand;
 import com.anything.momeogji.mydata.transform.model.TransformedUserMyData;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.time.LocalTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -68,7 +68,7 @@ class MyDataPipelineTest {
     void user01의_동의_카드_승인내역_68건을_수집한다() {
         UserMyData result = myDataService.collect(1L);
 
-        assertThat(result.participantId()).isEqualTo(1L);
+        assertThat(result.userId()).isEqualTo(1L);
         assertThat(result.approvals()).hasSize(68);
         assertThat(result.approvals())
                 .extracting(approval -> approval.cardId())
@@ -80,13 +80,12 @@ class MyDataPipelineTest {
      */
     @Test
     void user01의_점심_결제를_31개_미분류_가맹점으로_가공한다() {
-        TransformedUserMyData result = myDataService.collectTransformed(
+        TransformedUserMyData result = myDataService.process(
                 1L,
-                TimeBand.LUNCH
+                LocalTime.of(12, 0)
         );
 
-        assertThat(result.participantId()).isEqualTo(1L);
-        assertThat(result.selectedTimeBand()).isEqualTo(TimeBand.LUNCH);
+        assertThat(result.userId()).isEqualTo(1L);
         assertThat(result.merchantUsages()).hasSize(31);
         assertThat(result.merchantUsages()).allSatisfy(merchantUsage -> {
             KakaoPlaceMatchData kakaoPlaceMatch = merchantUsage.kakaoPlaceMatch();
@@ -104,22 +103,22 @@ class MyDataPipelineTest {
     }
 
     /**
-     * 현재 Dummy에 없는 아침과 저녁 시간대를 선택하면 메타데이터만 남긴 빈 결과가 반환되는지 확인한다.
+     * 현재 Dummy에 없는 아침과 저녁 시각을 선택하면 사용자 ID만 남긴 빈 결과가 반환되는지 확인한다.
      */
     @Test
-    void 선택_시간대에_결제가_없으면_빈_최종_결과를_반환한다() {
-        TransformedUserMyData morningResult = myDataService.collectTransformed(
+    void 선택_시각의_시간대에_결제가_없으면_빈_최종_결과를_반환한다() {
+        TransformedUserMyData morningResult = myDataService.process(
                 1L,
-                TimeBand.MORNING
+                LocalTime.of(9, 0)
         );
-        TransformedUserMyData dinnerResult = myDataService.collectTransformed(
+        TransformedUserMyData dinnerResult = myDataService.process(
                 1L,
-                TimeBand.DINNER
+                LocalTime.of(18, 0)
         );
 
-        assertThat(morningResult.selectedTimeBand()).isEqualTo(TimeBand.MORNING);
+        assertThat(morningResult.userId()).isEqualTo(1L);
         assertThat(morningResult.merchantUsages()).isEmpty();
-        assertThat(dinnerResult.selectedTimeBand()).isEqualTo(TimeBand.DINNER);
+        assertThat(dinnerResult.userId()).isEqualTo(1L);
         assertThat(dinnerResult.merchantUsages()).isEmpty();
     }
 }
