@@ -24,30 +24,16 @@ public class CardApprovalParser {
     /**
      * 한 카드의 검증된 국내 승인내역 한 페이지를 불변 내부 데이터 목록으로 변환한다.
      *
+     * <p>호출자는 이 메서드보다 먼저 {@link CardApprovalValidator#validate(CardApprovalResponse)}를 호출해
+     * 응답과 승인 목록의 유효성을 보장하고, 검증된 카드 목록에서 얻은 카드 ID를 전달해야 한다.
      * 승인내역이 없으면 예외 대신 빈 목록을 반환한다. {@link java.util.stream.Stream#toList()}
-     * 결과를 사용하므로 반환 목록은 변경할 수 없다.
+     * 결과를 사용하므로 반환 목록은 변경할 수 없다.</p>
      *
      * @param cardId 카드 목록 조회 응답에서 얻은 카드 고유 식별자
      * @param response {@link CardApprovalValidator} 검증을 통과한 국내 승인내역 응답
      * @return 원본 순서를 유지한 카드 승인내역 불변 목록
-     * @throws IllegalArgumentException 카드 ID 또는 검증된 응답이 누락된 경우
      */
     public List<CardApprovalData> parseApprovals(String cardId, CardApprovalResponse response) {
-        // 모든 CardApprovalData에 결합할 카드 ID가 비어 있지 않은지 검사한다.
-        if (cardId == null || cardId.isBlank()) {
-            throw new IllegalArgumentException("cardId는 필수입니다.");
-        }
-
-        // Validator를 통과해 전달된 국내 승인내역 응답 객체의 누락 여부를 검사한다.
-        if (response == null) {
-            throw new IllegalArgumentException("국내 승인내역 응답은 null일 수 없습니다.");
-        }
-
-        // Validator를 통과해 전달된 approved_list의 누락 여부를 검사한다.
-        if (response.approvals() == null) {
-            throw new IllegalArgumentException("approved_list는 null일 수 없습니다.");
-        }
-
         // 승인내역의 원본 순서를 유지하면서 각 항목을 CardApprovalData로 변환한다.
         return response.approvals().stream()
                 .map(approval -> toCardApprovalData(cardId, approval))
