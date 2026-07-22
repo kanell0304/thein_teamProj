@@ -54,6 +54,9 @@ export function createMeetupRequest({ chatRoomId, settings, voteDeadlineAt = nul
 
   return {
     chatRoomId: requirePositiveNumber(chatRoomId, '채팅방 ID'),
+    participantIds: (settings.participantIds ?? []).map((participantId) => (
+      requirePositiveNumber(participantId, '참가자 ID')
+    )),
     commonOption: {
       destinationName: place.name,
       destinationLatitude: requirePositiveNumber(place.latitude, '장소 위도'),

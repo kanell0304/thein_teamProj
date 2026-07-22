@@ -9,7 +9,7 @@ import ParticipantPreferencePage from './ParticipantPreferencePage'
 import MomeokjiPreferenceNotice from '../components/momeokji/MomeokjiPreferenceNotice'
 import MomeokjiVoteNotice from '../components/momeokji/MomeokjiVoteNotice'
 import MomeokjiVotePage from '../components/momeokji/MomeokjiVotePage'
-import { getChatRoomMembers, getRecentMessages } from '../services/chatApi'
+import { getChatRoomMembers, getRecentMessages, seedDevChat } from '../services/chatApi'
 import { connectChatSocket, disconnectChatSocket, sendChatMessage } from '../services/chatSocket'
 import { createMeetup } from '../services/meetupService'
 import { recommendRestaurants } from '../services/momeokjiService'
@@ -144,11 +144,21 @@ function ChatRoomPage({ room: providedRoom, currentUser = DEMO_CURRENT_USER }) {
     let cancelled = false
     const connectChat = async () => {
       try {
-        const [history, members] = await Promise.all([
+        let [history, members] = await Promise.all([
           getRecentMessages(room.id),
           getChatRoomMembers(room.id),
         ])
         if (cancelled) return
+
+        // 개발 환경의 빈 방만 실제 백엔드에 예시 대화를 저장해 모먹지 흐름을 바로 시험합니다.
+        if (import.meta.env.DEV && history.length === 0) {
+          try {
+            history = await seedDevChat(room.id)
+            members = await getChatRoomMembers(room.id)
+          } catch {
+            // dev 시드 API가 없는 서버에서도 빈 채팅방 자체는 정상적으로 사용할 수 있습니다.
+          }
+        }
 
         setMessages(history.map((message) => toUiMessage(message, currentUser.id)))
         setChatMembers(members)

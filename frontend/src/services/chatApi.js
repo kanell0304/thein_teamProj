@@ -18,6 +18,11 @@ export function getChatRoomMembers(chatRoomId) {
   return apiFetch(`/api/chatrooms/${chatRoomId}/members`)
 }
 
+// ===== dev 프로필의 빈 방에 실제 저장·웹소켓 경로를 사용하는 예시 대화 생성 =====
+export function seedDevChat(chatRoomId) {
+  return apiFetch(`/api/dev/chatrooms/${chatRoomId}/seed`, { method: 'POST' })
+}
+
 // ===== 로그인/방 목록 화면이 없는 동안 테스트용 채팅방 하나를 자동으로 준비 =====
 export async function ensureTestChatRoom() {
   // 이 브라우저에서 이미 join/생성에 성공한 방이 있으면 그걸 우선한다. 백엔드 재시작으로 DB가
