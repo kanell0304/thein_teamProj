@@ -42,7 +42,7 @@ public class CardListValidator {
         validText(response.responseMessage(), "rsp_msg");
 
         // 응답의 조회 타임스탬프가 미회신 값, 0 또는 14자리 숫자인지 검사한다.
-        validateSearchTimestamp(response.searchTimestamp());
+        validSearchTimestamp(response.searchTimestamp());
 
         // 보유카드수 card_cnt가 누락되지 않았고 0 이상의 정수인지 검사한다.
         Integer cardCount = response.cardCount();
@@ -137,7 +137,7 @@ public class CardListValidator {
      * @param searchTimestamp 검사할 카드 목록 조회 타임스탬프
      * @throws IllegalArgumentException 허용된 타임스탬프 형식이 아닌 경우
      */
-    private void validateSearchTimestamp(String searchTimestamp) {
+    private void validSearchTimestamp(String searchTimestamp) {
         // Timestamp 로직 미지원에 따른 미회신 값과 최초 조회값 0을 정상값으로 허용한다.
         if (searchTimestamp == null || searchTimestamp.isBlank() || "0".equals(searchTimestamp)) {
             return;
