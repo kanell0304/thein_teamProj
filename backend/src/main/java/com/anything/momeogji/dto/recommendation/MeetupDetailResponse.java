@@ -10,6 +10,7 @@ public record MeetupDetailResponse(
         CommonOptionRequest commonOption,
         RoundResponse latestRound,
         LocalDateTime voteDeadlineAt,
+        Integer voteDurationMinutes,
         Long hostMemberId,
         FinalNoticeResponse finalNotice
 ) {

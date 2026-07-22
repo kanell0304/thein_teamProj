@@ -16,6 +16,7 @@ public interface MeetupService {
      * participantIds로 지정한 사람들은 이 호출 즉시 PENDING 상태의 참여자로 등록되고, 초대 이벤트가 브로드캐스트된다.
      */
     MeetupResponse createMeetup(Long chatRoomId, CommonOptionRequest commonOption, LocalDateTime voteDeadlineAt,
+                                 Integer voteDurationMinutes,
                                  List<Long> participantIds, Long hostMemberId);
 
     /** 재접속한 클라이언트가 현재 모임 상태(+최신 회차, 실시간 득표수, 확정 시 최종공지)를 조회할 때 쓴다. */

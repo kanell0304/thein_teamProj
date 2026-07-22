@@ -65,11 +65,21 @@ public class Meetup {
     @Column(name = "vote_deadline_at")
     private LocalDateTime voteDeadlineAt;
 
-    public void markVoting() {
+    @Builder.Default
+    @Column(name = "vote_duration_minutes", nullable = false, columnDefinition = "integer default 10")
+    private Integer voteDurationMinutes = 10;
+
+    /** 추천 회차가 열리는 시점부터 설정된 투표 제한시간을 새로 계산한다. */
+    public void startVoting() {
         this.status = MeetupStatus.VOTING;
+        this.voteDeadlineAt = LocalDateTime.now().plusMinutes(voteDurationMinutes == null ? 10 : voteDurationMinutes);
     }
 
     public void markFinalized() {
         this.status = MeetupStatus.FINALIZED;
+    }
+
+    public void markExpired() {
+        this.status = MeetupStatus.EXPIRED;
     }
 }

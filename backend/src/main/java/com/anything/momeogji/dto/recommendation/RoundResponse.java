@@ -1,6 +1,7 @@
 package com.anything.momeogji.dto.recommendation;
 
 import java.util.List;
+import java.time.LocalDateTime;
 
 /** 회차 생성/투표/투표취소/조회 응답과 vote-updates 웹소켓 브로드캐스트에서 공통으로 쓰는 응답 형태. */
 public record RoundResponse(
@@ -9,6 +10,8 @@ public record RoundResponse(
         int roundNo,
         int participantCount,
         int votedParticipantCount,
+        String meetupStatus,
+        LocalDateTime voteDeadlineAt,
         List<CandidateSummary> candidates
 ) {
 }

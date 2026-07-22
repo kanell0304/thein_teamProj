@@ -166,6 +166,33 @@ class MeetupFinalizeServiceImplTest {
     }
 
     @Test
+    void 마감까지_투표가_없으면_식당_후보를_무작위로_확정한다() {
+        Random alwaysSecond = new Random() {
+            @Override
+            public int nextInt(int bound) {
+                return 1;
+            }
+        };
+        MeetupFinalizeServiceImpl service = newService(alwaysSecond);
+        RecommendationRound round = RecommendationRound.builder().id(2L).meetup(meetup).roundNo(1).build();
+        RoundCandidate first = RoundCandidate.builder().id(11L).round(round)
+                .restaurant(Restaurant.builder().id(1L).kakaoPlaceId("p1").name("맛집1").build()).rankNo(1).build();
+        RoundCandidate second = RoundCandidate.builder().id(12L).round(round)
+                .restaurant(Restaurant.builder().id(2L).kakaoPlaceId("p2").name("맛집2").build()).rankNo(2).build();
+
+        given(recommendationRoundRepository.findFirstByMeetupIdOrderByRoundNoDesc(100L)).willReturn(Optional.of(round));
+        given(roundCandidateRepository.findByRoundId(2L)).willReturn(List.of(first, second));
+        given(voteRepository.countByRoundCandidateId(11L)).willReturn(0L);
+        given(voteRepository.countByRoundCandidateId(12L)).willReturn(0L);
+        given(finalNoticeRepository.save(any())).willAnswer(invocation -> invocation.getArgument(0));
+
+        FinalNoticeResponse response = service.finalizeAfterDeadlineInternal(meetup);
+
+        assertThat(response.restaurantName()).isEqualTo("맛집2");
+        assertThat(meetup.getStatus()).isEqualTo(MeetupStatus.FINALIZED);
+    }
+
+    @Test
     void 약속시간을_수정하면_변경이력을_남기고_재브로드캐스트한다() {
         MeetupFinalizeServiceImpl service = newService(new Random());
         Restaurant restaurant = Restaurant.builder().id(1L).kakaoPlaceId("p1").name("맛집1").build();

@@ -32,6 +32,8 @@ class RoundResponseAssembler {
                 round.getRoundNo(),
                 round.getParticipantCount(),
                 (int) voteRepository.countDistinctVotersByRoundId(round.getId()),
+                round.getMeetup().getStatus().name(),
+                round.getMeetup().getVoteDeadlineAt(),
                 candidates
         );
     }

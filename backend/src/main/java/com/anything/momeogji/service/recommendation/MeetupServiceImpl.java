@@ -48,6 +48,7 @@ public class MeetupServiceImpl implements MeetupService {
     @Override
     @Transactional
     public MeetupResponse createMeetup(Long chatRoomId, CommonOptionRequest commonOption, LocalDateTime voteDeadlineAt,
+                                        Integer voteDurationMinutes,
                                         List<Long> participantIds, Long hostMemberId) {
         ChatRoom chatRoom = findChatRoom(chatRoomId);
         Member host = findMember(hostMemberId);
@@ -64,6 +65,7 @@ public class MeetupServiceImpl implements MeetupService {
                 .meetingTime(commonOption.meetingTime())
                 .purpose(commonOption.purpose())
                 .voteDeadlineAt(voteDeadlineAt)
+                .voteDurationMinutes(voteDurationMinutes)
                 .build());
 
         for (Long participantId : participantIds) {
@@ -122,7 +124,8 @@ public class MeetupServiceImpl implements MeetupService {
 
     private MeetupResponse toResponse(Meetup meetup) {
         return new MeetupResponse(meetup.getId(), meetup.getChatRoom().getId(), meetup.getStatus().name(),
-                MeetupCommonOptionMapper.toCommonOption(meetup), meetup.getVoteDeadlineAt(), meetup.getHostUser().getId());
+                MeetupCommonOptionMapper.toCommonOption(meetup), meetup.getVoteDeadlineAt(),
+                meetup.getVoteDurationMinutes(), meetup.getHostUser().getId());
     }
 
     private MeetupDetailResponse toDetailResponse(Meetup meetup, RoundResponse latestRound) {
@@ -137,6 +140,7 @@ public class MeetupServiceImpl implements MeetupService {
                 MeetupCommonOptionMapper.toCommonOption(meetup),
                 latestRound,
                 meetup.getVoteDeadlineAt(),
+                meetup.getVoteDurationMinutes(),
                 meetup.getHostUser().getId(),
                 finalNotice
         );

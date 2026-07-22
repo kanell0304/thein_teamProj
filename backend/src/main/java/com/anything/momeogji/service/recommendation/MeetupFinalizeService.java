@@ -14,4 +14,7 @@ public interface MeetupFinalizeService {
 
     /** 권한 검사 없이 확정을 수행한다. 전원 투표 완료 시 시스템이 자동으로 트리거할 때 사용한다. */
     FinalNoticeResponse finalizeInternal(Meetup meetup);
+
+    /** 마감 시점에 표가 하나도 없으면 음식점 후보 중 한 곳을 무작위로 확정한다. */
+    FinalNoticeResponse finalizeAfterDeadlineInternal(Meetup meetup);
 }

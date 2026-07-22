@@ -13,4 +13,7 @@ public interface MeetupVoteService {
 
     /** 현재 사용자의 복수 선택 전체를 한 번에 교체하고, 전원 제출 시 재추천/최종 결정을 처리한다. */
     RoundResponse replaceVotes(Long meetupId, Long roundId, VoteSelectionRequest request, Long callerId);
+
+    /** 마감 시각이 지난 진행 중 투표를 현재 득표 결과로 정리한다. */
+    void resolveExpiredVotes();
 }

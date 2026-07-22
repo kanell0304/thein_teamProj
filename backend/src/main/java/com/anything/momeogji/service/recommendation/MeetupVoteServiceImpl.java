@@ -121,6 +121,34 @@ public class MeetupVoteServiceImpl implements MeetupVoteService {
         return resolveCompletedRound(meetup, round, roundCandidates, response);
     }
 
+    // ===== 마감된 서버 투표를 현재 득표 기준으로 자동 처리 =====
+    @Override
+    @Transactional
+    public void resolveExpiredVotes() {
+        meetupRepository.findByStatusAndVoteDeadlineAtLessThanEqual(MeetupStatus.VOTING, LocalDateTime.now())
+                .forEach(this::resolveExpiredVote);
+    }
+
+    private void resolveExpiredVote(Meetup meetup) {
+        RecommendationRound round = recommendationRoundRepository
+                .findFirstByMeetupIdOrderByRoundNoDesc(meetup.getId())
+                .orElse(null);
+        if (round == null) {
+            meetup.markExpired();
+            return;
+        }
+
+        List<RoundCandidate> candidates = roundCandidateRepository.findByRoundId(round.getId());
+        if (voteRepository.countDistinctVotersByRoundId(round.getId()) == 0) {
+            // 아무도 참여하지 않았어도 투표를 방치하지 않고 식당 후보 3곳 중 하나를 무작위 확정한다.
+            meetupFinalizeService.finalizeAfterDeadlineInternal(meetup);
+            return;
+        }
+
+        // 시간 초과 시에는 전원 참여 여부와 무관하게 현재 표만으로 재추천 또는 최종 결정을 수행한다.
+        resolveRoundResult(meetup, candidates);
+    }
+
     // 재투표가 단독 1위면 이전 후보가 자동 제외된 새 회차를 만들고, 공동 1위면 음식점을 우선 확정한다.
     private RoundResponse resolveCompletedRound(Meetup meetup, RecommendationRound round,
                                                 List<RoundCandidate> candidates, RoundResponse currentResponse) {
@@ -130,6 +158,17 @@ public class MeetupVoteServiceImpl implements MeetupVoteService {
             return currentResponse;
         }
 
+        return resolveRoundResult(meetup, candidates, currentResponse);
+    }
+
+    private RoundResponse resolveRoundResult(Meetup meetup, List<RoundCandidate> candidates) {
+        RecommendationRound round = candidates.isEmpty() ? null : candidates.get(0).getRound();
+        RoundResponse currentResponse = round == null ? null : roundResponseAssembler.assemble(round);
+        return resolveRoundResult(meetup, candidates, currentResponse);
+    }
+
+    private RoundResponse resolveRoundResult(Meetup meetup, List<RoundCandidate> candidates,
+                                             RoundResponse currentResponse) {
         RoundCandidate recommendAgain = candidates.stream()
                 .filter(candidate -> RecommendationRoundServiceImpl.RECOMMEND_AGAIN_PLACE_ID
                         .equals(candidate.getRestaurant().getKakaoPlaceId()))

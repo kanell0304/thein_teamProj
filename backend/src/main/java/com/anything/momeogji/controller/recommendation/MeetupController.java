@@ -29,6 +29,7 @@ public class MeetupController {
     @PostMapping
     public MeetupResponse createMeetup(@Valid @RequestBody MeetupCreateRequest request, Authentication authentication) {
         return meetupService.createMeetup(request.chatRoomId(), request.commonOption(), request.voteDeadlineAt(),
+                request.voteDurationMinutes(),
                 request.participantIds(), memberId(authentication));
     }
 

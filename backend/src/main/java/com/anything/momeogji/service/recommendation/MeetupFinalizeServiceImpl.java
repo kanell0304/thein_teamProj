@@ -89,6 +89,16 @@ public class MeetupFinalizeServiceImpl implements MeetupFinalizeService {
     @Override
     @Transactional
     public FinalNoticeResponse finalizeInternal(Meetup meetup) {
+        return finalizeInternal(meetup, false);
+    }
+
+    @Override
+    @Transactional
+    public FinalNoticeResponse finalizeAfterDeadlineInternal(Meetup meetup) {
+        return finalizeInternal(meetup, true);
+    }
+
+    private FinalNoticeResponse finalizeInternal(Meetup meetup, boolean allowRandomWhenNoVotes) {
         Long meetupId = meetup.getId();
         RecommendationRound round = recommendationRoundRepository.findFirstByMeetupIdOrderByRoundNoDesc(meetupId)
                 .orElseThrow(() -> new IllegalArgumentException("아직 추천 회차가 없어 확정할 수 없습니다: " + meetupId));
@@ -98,7 +108,7 @@ public class MeetupFinalizeServiceImpl implements MeetupFinalizeService {
             throw new IllegalArgumentException("추천 후보가 없어 확정할 수 없습니다: " + round.getId());
         }
 
-        RoundCandidate winner = pickWinner(candidates);
+        RoundCandidate winner = pickWinner(candidates, allowRandomWhenNoVotes);
 
         FinalNotice finalNotice = finalNoticeRepository.save(FinalNotice.builder()
                 .meetup(meetup)
@@ -154,7 +164,7 @@ public class MeetupFinalizeServiceImpl implements MeetupFinalizeService {
         );
     }
 
-    private RoundCandidate pickWinner(List<RoundCandidate> candidates) {
+    private RoundCandidate pickWinner(List<RoundCandidate> candidates, boolean allowRandomWhenNoVotes) {
         List<RoundCandidate> restaurantCandidates = candidates.stream()
                 .filter(candidate -> !RecommendationRoundServiceImpl.RECOMMEND_AGAIN_PLACE_ID
                         .equals(candidate.getRestaurant().getKakaoPlaceId()))
@@ -169,6 +179,9 @@ public class MeetupFinalizeServiceImpl implements MeetupFinalizeService {
                 .orElse(0);
 
         if (maxVotes == 0) {
+            if (allowRandomWhenNoVotes) {
+                return restaurantCandidates.get(random.nextInt(restaurantCandidates.size()));
+            }
             throw new IllegalArgumentException("아직 투표가 없어 확정할 수 없습니다.");
         }
 

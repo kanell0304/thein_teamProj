@@ -65,6 +65,7 @@ export function createMeetupRequest({ chatRoomId, settings, voteDeadlineAt = nul
       purpose: settings.themeLabel || settings.themeCode,
     },
     voteDeadlineAt: normalizeDeadline(voteDeadlineAt),
+    voteDurationMinutes: Number(settings.voteDurationMinutes ?? 10),
   }
 }
 
@@ -79,6 +80,7 @@ function createMockMeetup(request) {
     commonOption: request.commonOption,
     latestRound: null,
     voteDeadlineAt: request.voteDeadlineAt,
+    voteDurationMinutes: request.voteDurationMinutes,
   }
   mockMeetups.set(id, meetup)
   return meetup

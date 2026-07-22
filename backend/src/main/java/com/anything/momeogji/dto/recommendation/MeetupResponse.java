@@ -8,6 +8,7 @@ public record MeetupResponse(
         String status,
         CommonOptionRequest commonOption,
         LocalDateTime voteDeadlineAt,
+        Integer voteDurationMinutes,
         Long hostMemberId
 ) {
 }

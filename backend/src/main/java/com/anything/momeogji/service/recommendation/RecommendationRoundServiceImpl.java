@@ -82,7 +82,8 @@ public class RecommendationRoundServiceImpl implements RecommendationRoundServic
         }
 
         RecommendationRound round = persistRound(meetup, preferenceNote, result);
-        meetup.markVoting();
+        // 추천이 끝나 투표가 실제로 열린 시점부터 제한시간을 계산한다.
+        meetup.startVoting();
 
         RoundResponse response = roundResponseAssembler.assemble(round);
         eventPublisher.recommendationCompleted(chatRoomId, response);

@@ -96,7 +96,8 @@ class MeetupVoteServiceImplTest {
         lenient().when(recommendationRoundRepository.findById(2L)).thenReturn(Optional.of(round));
         lenient().when(roundCandidateRepository.findById(11L)).thenReturn(Optional.of(candidate));
         lenient().when(chatRoomMemberRepository.existsByChatRoomIdAndUserId(10L, 1L)).thenReturn(true);
-        lenient().when(roundResponseAssembler.assemble(round)).thenReturn(new RoundResponse(100L, 2L, 1, 1, 0, java.util.List.of()));
+        lenient().when(roundResponseAssembler.assemble(round)).thenReturn(new RoundResponse(
+                100L, 2L, 1, 1, 0, "VOTING", null, java.util.List.of()));
     }
 
     @Test
@@ -196,7 +197,7 @@ class MeetupVoteServiceImplTest {
                         .name("재투표").build())
                 .rankNo(4).build();
         MeetupParticipant participant = MeetupParticipant.builder().id(50L).meetup(meetup).build();
-        RoundResponse nextRound = new RoundResponse(100L, 3L, 2, 1, 0, List.of());
+        RoundResponse nextRound = new RoundResponse(100L, 3L, 2, 1, 0, "VOTING", null, List.of());
         given(roundCandidateRepository.findByRoundId(2L)).willReturn(List.of(candidate, recommendAgain));
         given(meetupParticipantRepository.findByMeetupIdAndUserId(100L, 1L)).willReturn(Optional.of(participant));
         given(voteRepository.findByRoundCandidateRoundIdAndMeetupParticipantId(2L, 50L)).willReturn(List.of());
@@ -215,6 +216,39 @@ class MeetupVoteServiceImplTest {
         verify(meetupFinalizeService, never()).finalizeInternal(any());
     }
 
+    @Test
+    void 마감된_투표에_표가_없으면_음식점을_무작위_확정한다() {
+        meetup = withDeadline(LocalDateTime.now().minusSeconds(1));
+        given(meetupRepository.findByStatusAndVoteDeadlineAtLessThanEqual(
+                org.mockito.ArgumentMatchers.eq(MeetupStatus.VOTING), any(LocalDateTime.class)))
+                .willReturn(List.of(meetup));
+        given(recommendationRoundRepository.findFirstByMeetupIdOrderByRoundNoDesc(100L))
+                .willReturn(Optional.of(round));
+        given(roundCandidateRepository.findByRoundId(2L)).willReturn(List.of(candidate));
+        given(voteRepository.countDistinctVotersByRoundId(2L)).willReturn(0L);
+
+        service.resolveExpiredVotes();
+
+        verify(meetupFinalizeService).finalizeAfterDeadlineInternal(meetup);
+    }
+
+    @Test
+    void 마감된_투표에_표가_있으면_현재_득표로_확정한다() {
+        meetup = withDeadline(LocalDateTime.now().minusSeconds(1));
+        given(meetupRepository.findByStatusAndVoteDeadlineAtLessThanEqual(
+                org.mockito.ArgumentMatchers.eq(MeetupStatus.VOTING), any(LocalDateTime.class)))
+                .willReturn(List.of(meetup));
+        given(recommendationRoundRepository.findFirstByMeetupIdOrderByRoundNoDesc(100L))
+                .willReturn(Optional.of(round));
+        given(roundCandidateRepository.findByRoundId(2L)).willReturn(List.of(candidate));
+        given(voteRepository.countDistinctVotersByRoundId(2L)).willReturn(1L);
+        given(voteRepository.countByRoundCandidateId(11L)).willReturn(1L);
+
+        service.resolveExpiredVotes();
+
+        verify(meetupFinalizeService).finalizeInternal(meetup);
+    }
+
     private Meetup withDeadline(LocalDateTime deadline) {
         Meetup deadlineMeetup = Meetup.builder()
                 .id(100L).chatRoom(meetup.getChatRoom()).hostUser(meetup.getHostUser()).status(MeetupStatus.VOTING)
@@ -231,7 +265,7 @@ class MeetupVoteServiceImplTest {
         lenient().when(recommendationRoundRepository.findById(2L)).thenReturn(Optional.of(deadlineRound));
         lenient().when(roundCandidateRepository.findById(11L)).thenReturn(Optional.of(deadlineCandidate));
         lenient().when(roundResponseAssembler.assemble(deadlineRound))
-                .thenReturn(new RoundResponse(100L, 2L, 1, 1, 0, java.util.List.of()));
+                .thenReturn(new RoundResponse(100L, 2L, 1, 1, 0, "VOTING", deadline, java.util.List.of()));
         return deadlineMeetup;
     }
 }

@@ -121,9 +121,17 @@ function toServerVoteSession(round, settings, previousSession = null) {
 
   const isNewRound = previousSession?.roundId !== round.roundId
   const createdAt = isNewRound ? new Date() : new Date(previousSession.createdAt)
-  const deadlineAt = isNewRound
-    ? new Date(createdAt.getTime() + settings.voteDurationMinutes * 60_000)
+  const deadlineAt = round.voteDeadlineAt
+    ? new Date(round.voteDeadlineAt)
+    : isNewRound
+      ? new Date(createdAt.getTime() + settings.voteDurationMinutes * 60_000)
     : new Date(previousSession.deadlineAt)
+
+  const serverStatus = round.meetupStatus === 'FINALIZED'
+    ? 'CLOSED'
+    : round.meetupStatus === 'EXPIRED'
+      ? 'EXPIRED'
+      : null
 
   return {
     id: `${round.meetupId}-${round.roundId}`,
@@ -131,7 +139,7 @@ function toServerVoteSession(round, settings, previousSession = null) {
     meetupId: round.meetupId,
     roundId: round.roundId,
     recommendAgainCandidateId: recommendAgain?.roundCandidateId ?? null,
-    status: round.votedParticipantCount > 0 ? 'IN_PROGRESS' : 'CREATED',
+    status: serverStatus ?? (round.votedParticipantCount > 0 ? 'IN_PROGRESS' : 'CREATED'),
     settings,
     recommendations: restaurantCandidates.map((candidate) => ({
       id: candidate.roundCandidateId,
@@ -215,7 +223,7 @@ function toInvitationSettings(event) {
     participantIds,
     participantNames: (event.participants ?? []).map((participant) => participant.nickname),
     personalOptionDurationMinutes: 10,
-    voteDurationMinutes: 10,
+    voteDurationMinutes: meetup.voteDurationMinutes ?? 10,
     themeCode: commonOption.purpose,
     themeLabel: commonOption.purpose,
     menus: [],
@@ -241,7 +249,7 @@ function ChatRoomPage({ room: providedRoom, currentUser = DEMO_CURRENT_USER }) {
 
   const useMockApi = String(import.meta.env.VITE_USE_MOCK ?? 'false').toLowerCase() === 'true'
   const [chatMembers, setChatMembers] = useState([])
-  const [chatConnectionError, setChatConnectionError] = useState('')
+  const [, setChatConnectionError] = useState('')
   const chatSocketRef = useRef(null)
   const pendingMeetingSettingsRef = useRef(null)
   const voteSessionRef = useRef(null)
@@ -819,7 +827,6 @@ function ChatRoomPage({ room: providedRoom, currentUser = DEMO_CURRENT_USER }) {
       />
 
       <div className="chat-body">
-        {chatConnectionError && <ChatNotice text={chatConnectionError} />}
         {/* ===== 모임 생성 REST 요청 상태를 채팅 공지로 표시 ===== */}
         {isCreatingMeetup && <ChatNotice text="모임을 만들고 있어요." />}
         {meetupCreationError && <ChatNotice text={meetupCreationError} />}
