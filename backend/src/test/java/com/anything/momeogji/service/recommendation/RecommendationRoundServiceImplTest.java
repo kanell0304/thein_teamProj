@@ -9,17 +9,13 @@ import com.anything.momeogji.dto.recommendation.RoundResponse;
 import com.anything.momeogji.entity.ChatRoom;
 import com.anything.momeogji.entity.Member;
 import com.anything.momeogji.entity.recommendation.Meetup;
-import com.anything.momeogji.entity.recommendation.MeetupParticipant;
 import com.anything.momeogji.entity.recommendation.MeetupStatus;
 import com.anything.momeogji.entity.recommendation.RecommendationRound;
 import com.anything.momeogji.entity.recommendation.Restaurant;
 import com.anything.momeogji.entity.recommendation.RoundCandidate;
-import com.anything.momeogji.entity.recommendation.SubmissionStatus;
 import com.anything.momeogji.exception.recommendation.AiRecommendationException;
 import com.anything.momeogji.repository.ChatRoomMemberRepository;
-import com.anything.momeogji.repository.MeetupParticipantRepository;
 import com.anything.momeogji.repository.MeetupRepository;
-import com.anything.momeogji.repository.MemberRepository;
 import com.anything.momeogji.repository.RecommendationRoundRepository;
 import com.anything.momeogji.repository.RestaurantRepository;
 import com.anything.momeogji.repository.RoundCandidateRepository;
@@ -41,7 +37,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
-import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -54,12 +49,6 @@ class RecommendationRoundServiceImplTest {
     private MeetupRepository meetupRepository;
     @Mock
     private ChatRoomMemberRepository chatRoomMemberRepository;
-    @Mock
-    private MeetupParticipantRepository meetupParticipantRepository;
-    @Mock
-    private MemberRepository memberRepository;
-    @Mock
-    private ParticipantPreferenceUpserter participantPreferenceUpserter;
     @Mock
     private RecommendationRoundRepository recommendationRoundRepository;
     @Mock
@@ -93,14 +82,6 @@ class RecommendationRoundServiceImplTest {
                 .meetingTime(LocalDateTime.of(2026, 7, 20, 12, 0))
                 .purpose("식사")
                 .build();
-
-        // persistPreferences()가 참여자 1L에 대해 거치는 경로 - 실제로 쓰는 테스트에서만 매칭되고, 안 쓰는 테스트는 lenient라 무시됨
-        MeetupParticipant participant = MeetupParticipant.builder()
-                .id(50L).meetup(meetup).user(host)
-                .submissionStatus(SubmissionStatus.SUBMITTED).confirmedForAi(true)
-                .build();
-        lenient().when(memberRepository.findById(1L)).thenReturn(Optional.of(host));
-        lenient().when(meetupParticipantRepository.findByMeetupIdAndUserId(100L, 1L)).thenReturn(Optional.of(participant));
     }
 
     @Test
@@ -175,37 +156,6 @@ class RecommendationRoundServiceImplTest {
         verify(eventPublisher).recommendationStarted(10L);
         verify(eventPublisher).recommendationFailed(eq(10L), any());
         verify(recommendationRoundRepository, never()).save(any());
-    }
-
-    @Test
-    void 존재하지_않는_참여자ID면_예외() {
-        given(meetupRepository.findById(100L)).willReturn(Optional.of(meetup));
-        given(chatRoomMemberRepository.existsByChatRoomIdAndUserId(10L, 1L)).willReturn(true);
-        given(memberRepository.findById(999L)).willReturn(Optional.empty());
-
-        RoundCreateRequest request = new RoundCreateRequest(List.of(personalOption(999L)), null);
-
-        assertThatThrownBy(() -> service.createRound(100L, request, 1L))
-                .isInstanceOf(IllegalArgumentException.class);
-
-        verifyNoInteractions(restaurantRecommendationService);
-    }
-
-    @Test
-    void 참여자별_선호를_업서터에_위임한다() {
-        given(meetupRepository.findById(100L)).willReturn(Optional.of(meetup));
-        given(chatRoomMemberRepository.existsByChatRoomIdAndUserId(10L, 1L)).willReturn(true);
-        given(roundCandidateRepository.findByRound_Meetup_Id(100L)).willReturn(List.of());
-        given(restaurantRecommendationService.recommend(any())).willThrow(new AiRecommendationException("이후 흐름은 이 테스트 관심사가 아님"));
-
-        PersonalOptionRequest option = personalOption(1L);
-        RoundCreateRequest request = new RoundCreateRequest(List.of(option), null);
-
-        assertThatThrownBy(() -> service.createRound(100L, request, 1L)).isInstanceOf(AiRecommendationException.class);
-
-        ArgumentCaptor<MeetupParticipant> participantCaptor = ArgumentCaptor.forClass(MeetupParticipant.class);
-        verify(participantPreferenceUpserter).upsert(participantCaptor.capture(), eq(option));
-        assertThat(participantCaptor.getValue().getId()).isEqualTo(50L);
     }
 
     private PersonalOptionRequest personalOption(Long participantId) {
