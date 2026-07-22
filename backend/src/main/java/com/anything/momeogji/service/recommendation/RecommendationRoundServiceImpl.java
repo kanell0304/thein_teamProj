@@ -6,18 +6,13 @@ import com.anything.momeogji.dto.recommendation.RecommendationResult;
 import com.anything.momeogji.dto.recommendation.RestaurantRecommendation;
 import com.anything.momeogji.dto.recommendation.RoundCreateRequest;
 import com.anything.momeogji.dto.recommendation.RoundResponse;
-import com.anything.momeogji.entity.Member;
 import com.anything.momeogji.entity.recommendation.Meetup;
-import com.anything.momeogji.entity.recommendation.MeetupParticipant;
 import com.anything.momeogji.entity.recommendation.RecommendationRound;
 import com.anything.momeogji.entity.recommendation.RecommendationRoundStatus;
 import com.anything.momeogji.entity.recommendation.Restaurant;
 import com.anything.momeogji.entity.recommendation.RoundCandidate;
-import com.anything.momeogji.entity.recommendation.SubmissionStatus;
 import com.anything.momeogji.repository.ChatRoomMemberRepository;
-import com.anything.momeogji.repository.MeetupParticipantRepository;
 import com.anything.momeogji.repository.MeetupRepository;
-import com.anything.momeogji.repository.MemberRepository;
 import com.anything.momeogji.repository.RecommendationRoundRepository;
 import com.anything.momeogji.repository.RestaurantRepository;
 import com.anything.momeogji.repository.RoundCandidateRepository;
@@ -37,9 +32,6 @@ public class RecommendationRoundServiceImpl implements RecommendationRoundServic
 
     private final MeetupRepository meetupRepository;
     private final ChatRoomMemberRepository chatRoomMemberRepository;
-    private final MeetupParticipantRepository meetupParticipantRepository;
-    private final MemberRepository memberRepository;
-    private final ParticipantPreferenceUpserter participantPreferenceUpserter;
     private final RecommendationRoundRepository recommendationRoundRepository;
     private final RoundCandidateRepository roundCandidateRepository;
     private final RestaurantRepository restaurantRepository;
@@ -52,7 +44,6 @@ public class RecommendationRoundServiceImpl implements RecommendationRoundServic
     public RoundResponse createRound(Long meetupId, RoundCreateRequest request, Long callerId) {
         Meetup meetup = findMeetup(meetupId);
         requireMembership(meetup, callerId);
-        persistPreferences(meetup, request.personalOptions());
         return executeRecommendation(meetup, request.personalOptions(), request.preferenceNote());
     }
 
@@ -146,28 +137,6 @@ public class RecommendationRoundServiceImpl implements RecommendationRoundServic
                 .map(candidate -> candidate.getRestaurant().getKakaoPlaceId())
                 .distinct()
                 .toList();
-    }
-
-    // 재추천 시 같은 참여자가 다시 제출하면 기존 선호를 최신값으로 덮어쓴다.
-    private void persistPreferences(Meetup meetup, List<PersonalOptionRequest> personalOptions) {
-        for (PersonalOptionRequest option : personalOptions) {
-            MeetupParticipant participant = findOrCreateParticipant(meetup, option.participantId());
-            participantPreferenceUpserter.upsert(participant, option);
-        }
-    }
-
-    private MeetupParticipant findOrCreateParticipant(Meetup meetup, Long memberId) {
-        return meetupParticipantRepository.findByMeetupIdAndUserId(meetup.getId(), memberId)
-                .orElseGet(() -> {
-                    Member member = memberRepository.findById(memberId)
-                            .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 참여자입니다: " + memberId));
-                    return meetupParticipantRepository.save(MeetupParticipant.builder()
-                            .meetup(meetup)
-                            .user(member)
-                            .submissionStatus(SubmissionStatus.SUBMITTED)
-                            .confirmedForAi(true)
-                            .build());
-                });
     }
 
     private void requireMembership(Meetup meetup, Long memberId) {

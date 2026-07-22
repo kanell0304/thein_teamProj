@@ -10,6 +10,7 @@ import com.anything.momeogji.entity.recommendation.Meetup;
 import com.anything.momeogji.entity.recommendation.MeetupParticipant;
 import com.anything.momeogji.entity.recommendation.ParticipantPreference;
 import com.anything.momeogji.entity.recommendation.SubmissionStatus;
+import com.anything.momeogji.mydata.MyDataService;
 import com.anything.momeogji.repository.MeetupParticipantRepository;
 import com.anything.momeogji.repository.MeetupRepository;
 import com.anything.momeogji.repository.ParticipantPreferenceRepository;
@@ -26,7 +27,7 @@ public class MeetupPreferenceServiceImpl implements MeetupPreferenceService {
     private final MeetupRepository meetupRepository;
     private final MeetupParticipantRepository meetupParticipantRepository;
     private final ParticipantPreferenceRepository participantPreferenceRepository;
-    private final ParticipantPreferenceUpserter participantPreferenceUpserter;
+    private final MyDataService myDataService;
     private final RecommendationRoundService recommendationRoundService;
     private final MeetupService meetupService;
     private final RecommendationEventPublisher eventPublisher;
@@ -38,11 +39,25 @@ public class MeetupPreferenceServiceImpl implements MeetupPreferenceService {
         MeetupParticipant participant = meetupParticipantRepository.findByMeetupIdAndUserId(meetupId, callerId)
                 .orElseThrow(() -> new IllegalArgumentException("초대받은 참여자만 개인 선호를 제출할 수 있습니다."));
 
-        PersonalOptionRequest option = new PersonalOptionRequest(callerId, request.walkMinutes(),
-                request.preferredCategories(), request.budgetLimit(), request.parkingNeeded(),
-                request.excludedFoods(), request.atmosphere());
-        participantPreferenceUpserter.upsert(participant, option);
+        if (participantPreferenceRepository.existsByMeetupParticipantId(participant.getId())) {
+            throw new IllegalStateException("개인 옵션은 한 번만 제출할 수 있습니다.");
+        }
+
+        participantPreferenceRepository.save(ParticipantPreference.builder()
+                .meetupParticipant(participant)
+                .walkMinutes(request.walkMinutes())
+                .preferredCategories(request.preferredCategories())
+                .budgetLimit(request.budgetLimit())
+                .parkingNeeded(request.parkingNeeded())
+                .excludedFoods(request.excludedFoods())
+                .atmosphere(request.atmosphere())
+                .mydataConsent(request.mydataConsent())
+                .build());
         participant.markSubmitted();
+
+        if (request.mydataConsent()) {
+            myDataService.process(callerId, meetup.getMeetingTime().toLocalTime());
+        }
 
         List<ParticipantSummaryResponse> participants = meetupService.listParticipants(meetupId);
         eventPublisher.preferenceProgress(meetup.getChatRoom().getId(), new MeetupProgressEvent(meetupId, participants));
