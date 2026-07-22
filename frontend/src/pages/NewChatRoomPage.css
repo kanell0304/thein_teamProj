@@ -1,0 +1,57 @@
+/* ===== 새 채팅방 만들기: 이름 입력과 친구 선택 ===== */
+.new-chat-submit {
+  height: 32px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 999px;
+  color: #fff;
+  background: var(--color-primary);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.new-chat-submit:disabled {
+  color: var(--color-subtle);
+  background: #e9ecef;
+}
+
+.new-chat-name-field {
+  margin: 4px 16px 10px;
+  display: grid;
+  gap: 6px;
+}
+
+.new-chat-name-field span {
+  color: var(--color-muted);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.new-chat-name-field input {
+  height: 38px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 8px;
+  color: var(--color-text);
+  background: #f5f6f7;
+  font-size: 13px;
+}
+
+.new-chat-error {
+  margin: 0 16px 10px;
+  color: var(--color-primary);
+  font-size: 12px;
+}
+
+.new-chat-friend-row {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.new-chat-friend-row input[type='checkbox'] {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+}

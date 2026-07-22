@@ -69,14 +69,24 @@ function ChatListPage() {
     <MainScreen
       title="채팅"
       headerActions={(
-        <button
-          className="main-screen-action"
-          type="button"
-          aria-label="채팅방 검색"
-          onClick={() => searchInputRef.current?.focus()}
-        >
-          <span className="material-symbols-outlined" aria-hidden="true">search</span>
-        </button>
+        <>
+          <button
+            className="main-screen-action"
+            type="button"
+            aria-label="채팅방 검색"
+            onClick={() => searchInputRef.current?.focus()}
+          >
+            <span className="material-symbols-outlined" aria-hidden="true">search</span>
+          </button>
+          <button
+            className="main-screen-action"
+            type="button"
+            aria-label="새 채팅방 만들기"
+            onClick={() => navigate('/chats/new')}
+          >
+            <span className="material-symbols-outlined" aria-hidden="true">add</span>
+          </button>
+        </>
       )}
     >
       {/* ===== 채팅방 이름과 최근 메시지 검색 ===== */}
