@@ -1,12 +1,17 @@
 ### 개발용 로그인 (실제 카카오 인증 없이 토큰 발급)
-# 이 요청을 먼저 실행하면 이후 recommendation-flow.http / recommendation-scenarios.http의
-# 요청들이 자동으로 이 토큰을 Authorization 헤더에 실어 보낼 수 있도록 전역 변수에 저장한다.
+# 이 요청을 먼저 실행하면 이후 다른 .http 파일들이 자동으로 이 토큰을 Authorization 헤더에 실어
+# 보낼 수 있도록 전역 변수에 저장한다. 전체 실행 순서/선행조건은 TESTING.md 참고.
+#
+# personalOptions[].participantId가 이제 실제 회원 ID(Long)라서, 여러 참여자가 등장하는 시나리오
+# (meetup-flow.http, recommendation-scenarios.http의 5인 시나리오 등)를 테스트하려면 이 파일의
+# 1~5번 요청을 전부 실행해서 회원을 미리 만들어둬야 한다. ddl-auto=create라 서버를 재기동할 때마다
+# 다시 실행해야 한다.
 POST http://localhost:8081/api/dev/auth/login
 Content-Type: application/json
 
 {
   "kakaoId": "dev-test-1",
-  "nickname": "테스터"
+  "nickname": "테스터1"
 }
 
 > {%
@@ -17,7 +22,7 @@ Content-Type: application/json
     client.global.set("memberId", response.body.memberId);
 %}
 
-### (참고) 다른 kakaoId로 로그인하면 별도 회원이 생성된다
+### 2. 다른 kakaoId로 로그인하면 별도 회원이 생성된다 (2명 참여 시나리오용)
 POST http://localhost:8081/api/dev/auth/login
 Content-Type: application/json
 
@@ -25,3 +30,47 @@ Content-Type: application/json
   "kakaoId": "dev-test-2",
   "nickname": "테스터2"
 }
+
+> {%
+    client.global.set("authToken2", response.body.accessToken);
+    client.global.set("memberId2", response.body.memberId);
+%}
+
+### 3. (5인 시나리오용) 세 번째 회원
+POST http://localhost:8081/api/dev/auth/login
+Content-Type: application/json
+
+{
+  "kakaoId": "dev-test-3",
+  "nickname": "테스터3"
+}
+
+> {%
+    client.global.set("memberId3", response.body.memberId);
+%}
+
+### 4. (5인 시나리오용) 네 번째 회원
+POST http://localhost:8081/api/dev/auth/login
+Content-Type: application/json
+
+{
+  "kakaoId": "dev-test-4",
+  "nickname": "테스터4"
+}
+
+> {%
+    client.global.set("memberId4", response.body.memberId);
+%}
+
+### 5. (5인 시나리오용) 다섯 번째 회원
+POST http://localhost:8081/api/dev/auth/login
+Content-Type: application/json
+
+{
+  "kakaoId": "dev-test-5",
+  "nickname": "테스터5"
+}
+
+> {%
+    client.global.set("memberId5", response.body.memberId);
+%}

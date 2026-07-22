@@ -19,7 +19,7 @@ import org.hibernate.annotations.UpdateTimestamp;
 import java.time.LocalDateTime;
 
 // 카카오 로그인 전용(일반 회원가입/로그인 없음)이라 kakao_id가 사실상 유일한 계정 식별자.
-// 실제 OAuth 플로우(인가 코드 교환, 토큰 발급/검증)는 아직 구현되지 않았고, 여기서는 스키마/엔티티만 확정했다.
+// AuthService가 카카오 인가 코드 또는 개발용 kakaoId로 회원을 조회·생성하고 자체 JWT를 발급합니다.
 @Entity
 @Table(name = "member")
 @Getter

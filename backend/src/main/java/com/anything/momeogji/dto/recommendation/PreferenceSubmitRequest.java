@@ -1,0 +1,22 @@
+package com.anything.momeogji.dto.recommendation;
+
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.NotNull;
+
+import java.util.List;
+
+/** 초대받은 참여자 본인이 제출하는 개인 선호. participantId는 JWT 인증 정보에서 구해 별도로 받지 않는다. */
+public record PreferenceSubmitRequest(
+        @NotNull @Min(1) Integer walkMinutes,
+        @NotEmpty List<String> preferredCategories,
+        Integer budgetLimit,
+        boolean parkingNeeded,
+        List<String> excludedFoods,
+        String atmosphere
+) {
+    public PreferenceSubmitRequest {
+        excludedFoods = excludedFoods == null ? List.of() : List.copyOf(excludedFoods);
+        preferredCategories = preferredCategories == null ? List.of() : List.copyOf(preferredCategories);
+    }
+}

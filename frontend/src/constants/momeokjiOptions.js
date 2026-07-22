@@ -1,4 +1,5 @@
-export const TOTAL_STEPS = 9
+// 모임 생성은 공통 설정 6개와 AI 대화 메뉴 확인 1개로 구성합니다.
+export const TOTAL_STEPS = 7
 
 // 제한시간은 화면 검증과 백엔드 DTO에서 같은 범위를 사용합니다.
 export const PERSONAL_OPTION_DURATION = { min: 3, defaultValue: 10, max: 30 }
@@ -35,3 +36,8 @@ export const MOOD_OPTIONS = [
   '새로운 메뉴',
   '상관없어요',
 ]
+
+export const CATEGORY_OPTIONS = ['한식', '중식', '일식', '양식', '분식', '카페/디저트', '고기', '아시안']
+
+// 목적지 좌표 기준 도보 이동 가능 시간(분). AI 추천의 walkMinutes 조건으로 그대로 전달됩니다.
+export const WALK_MINUTES_OPTIONS = [5, 10, 15, 20, 30]

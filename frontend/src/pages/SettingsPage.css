@@ -1,0 +1,67 @@
+/* ===== 로그인 사용자 설정 요약 ===== */
+.settings-profile {
+  margin: 10px 16px 18px;
+  padding: 18px;
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  border-radius: 14px;
+  background: #f7f7f8;
+}
+
+.settings-avatar {
+  width: 50px;
+  height: 50px;
+  display: grid;
+  place-items: center;
+  border-radius: 17px;
+  color: #fff;
+  background: var(--color-primary);
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.settings-profile div {
+  display: grid;
+  gap: 4px;
+}
+
+.settings-profile strong {
+  font-size: 15px;
+}
+
+.settings-profile small,
+.settings-row small {
+  color: var(--color-subtle);
+  font-size: 11px;
+}
+
+.settings-menu {
+  border-top: 1px solid var(--color-line-soft);
+}
+
+.settings-row {
+  min-height: 55px;
+  padding: 0 18px;
+  display: grid;
+  grid-template-columns: 28px 1fr auto;
+  align-items: center;
+  border-bottom: 1px solid var(--color-line-soft);
+  font-size: 13px;
+}
+
+.settings-row .material-symbols-outlined {
+  color: #555c62;
+  font-size: 20px;
+}
+
+.settings-logout {
+  width: calc(100% - 32px);
+  height: 48px;
+  margin: 24px 16px;
+  border: 1px solid var(--color-line);
+  border-radius: 10px;
+  color: var(--color-danger);
+  background: #fff;
+  font-weight: 600;
+}

@@ -4,41 +4,6 @@
   background: rgba(175, 192, 207, 0.96);
 }
 
-.status-bar {
-  position: relative;
-  height: 42px;
-  padding: 0 21px 0 31px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  color: #000;
-  font-size: 16px;
-  font-weight: 500;
-  line-height: 19px;
-}
-
-/* ===== 상태바와 채팅방 제목 영역 사이의 얇은 경계선 ===== */
-.status-bar::after {
-  position: absolute;
-  right: 9px;
-  bottom: 0;
-  left: 9px;
-  height: 1px;
-  content: '';
-  background: rgba(24, 25, 27, 0.14);
-}
-
-.status-icons {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.status-icons .material-symbols-outlined {
-  font-size: 18px;
-  font-variation-settings: 'FILL' 1, 'wght' 600, 'GRAD' 0, 'opsz' 20;
-}
-
 .top-bar {
   position: relative;
   height: 46px;

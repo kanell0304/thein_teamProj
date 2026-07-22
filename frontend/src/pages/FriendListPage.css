@@ -1,0 +1,78 @@
+/* ===== 내 프로필과 친구 목록 구분 ===== */
+.friend-section {
+  padding: 8px 16px 14px;
+}
+
+.friend-section--list {
+  border-top: 1px solid var(--color-line-soft);
+}
+
+.friend-section h2 {
+  margin: 0 0 8px;
+  color: var(--color-muted);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.friend-list {
+  display: grid;
+}
+
+.friend-profile {
+  min-height: 64px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.friend-profile--me {
+  min-height: 72px;
+}
+
+.friend-avatar {
+  width: 44px;
+  height: 44px;
+  flex: 0 0 44px;
+  display: grid;
+  place-items: center;
+  border-radius: 16px;
+  color: #535960;
+  background: #e9ecef;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.friend-profile--me .friend-avatar {
+  width: 52px;
+  height: 52px;
+  flex-basis: 52px;
+  color: #fff;
+  background: linear-gradient(145deg, #ff954f, var(--color-primary));
+  font-size: 19px;
+}
+
+.friend-avatar--image {
+  object-fit: cover;
+}
+
+.friend-summary {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.friend-summary strong {
+  font-size: 14px;
+}
+
+.friend-summary small {
+  overflow: hidden;
+  color: var(--color-subtle);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.friend-empty {
+  margin-top: 36px;
+}

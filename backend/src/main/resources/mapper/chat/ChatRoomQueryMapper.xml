@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.anything.momeogji.mapper.chat.ChatRoomQueryMapper">
+
+    <!-- 로그인 회원이 참여한 방에 참가자 수와 마지막 메시지를 합쳐 반환한다. -->
+    <select id="findAllByMemberId"
+            resultType="com.anything.momeogji.dto.chat.ChatRoomListItemResponse">
+        SELECT cr.id,
+               cr.name,
+               COUNT(DISTINCT room_member.user_id) AS "memberCount",
+               latest_message.content AS "lastMessage",
+               latest_message.created_at AS "lastMessageAt",
+               CAST(0 AS BIGINT) AS "unreadCount"
+        FROM chat_room_members my_room
+        JOIN chat_rooms cr
+          ON cr.id = my_room.chat_room_id
+        JOIN chat_room_members room_member
+          ON room_member.chat_room_id = cr.id
+        LEFT JOIN LATERAL (
+            SELECT cm.content, cm.created_at
+            FROM chat_messages cm
+            WHERE cm.chat_room_id = cr.id
+            ORDER BY cm.created_at DESC, cm.id DESC
+            LIMIT 1
+        ) latest_message ON TRUE
+        WHERE my_room.user_id = #{memberId}
+        GROUP BY cr.id,
+                 cr.name,
+                 latest_message.content,
+                 latest_message.created_at
+        ORDER BY latest_message.created_at DESC NULLS LAST,
+                 cr.id DESC
+    </select>
+</mapper>

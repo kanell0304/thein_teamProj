@@ -1,0 +1,107 @@
+/* ===== 채팅방 목록과 최근 메시지 ===== */
+.chat-list-search {
+  margin-bottom: 8px;
+}
+
+.chat-list-rooms {
+  margin: 0;
+  padding: 4px 0;
+  list-style: none;
+}
+
+.chat-list-room {
+  width: 100%;
+  min-height: 78px;
+  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: 0;
+  color: inherit;
+  background: transparent;
+  text-align: left;
+}
+
+.chat-list-room:hover,
+.chat-list-room:focus-visible {
+  background: #f7f7f8;
+}
+
+.chat-list-room:focus-visible {
+  outline: 2px solid rgba(255, 117, 25, 0.35);
+  outline-offset: -2px;
+}
+
+.chat-list-avatar {
+  width: 52px;
+  height: 52px;
+  flex: 0 0 52px;
+  display: grid;
+  place-items: center;
+  border-radius: 18px;
+  color: #fff;
+  background: linear-gradient(145deg, #ff954f, var(--color-primary));
+  font-size: 19px;
+  font-weight: 700;
+}
+
+.chat-list-summary {
+  min-width: 0;
+  display: grid;
+  gap: 5px;
+  flex: 1;
+}
+
+.chat-list-room-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.chat-list-room-title strong,
+.chat-list-preview {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chat-list-room-title strong {
+  font-size: 15px;
+}
+
+.chat-list-room-title small,
+.chat-list-preview,
+.chat-list-meta time {
+  color: var(--color-subtle);
+}
+
+.chat-list-room-title small,
+.chat-list-meta time {
+  font-size: 11px;
+}
+
+.chat-list-preview {
+  font-size: 13px;
+}
+
+.chat-list-meta {
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 8px;
+}
+
+.chat-list-badge {
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  color: #fff;
+  background: var(--color-primary);
+  font-size: 11px;
+  font-weight: 700;
+}

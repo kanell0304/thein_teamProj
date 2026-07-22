@@ -1,5 +1,6 @@
 package com.anything.momeogji.config.websocket;
 
+import com.anything.momeogji.config.AppCorsProperties;
 import com.anything.momeogji.config.auth.StompAuthChannelInterceptor;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Configuration;
@@ -21,6 +22,7 @@ import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerCo
 public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     private final StompAuthChannelInterceptor stompAuthChannelInterceptor;
+    private final AppCorsProperties corsProperties;
 
     @Override
     public void configureMessageBroker(MessageBrokerRegistry registry) {
@@ -30,9 +32,9 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
-        // TODO: 배포 프로필이 생기면 실제 프론트 도메인으로 제한해야 한다. 지금은 로컬 개발 편의를 위해 전체 허용.
+        // app.cors.allowed-origins로 지정한 프론트 origin만 핸드셰이크를 허용한다(application.properties 참고).
         registry.addEndpoint("/ws")
-                .setAllowedOriginPatterns("*");
+                .setAllowedOrigins(corsProperties.allowedOrigins().toArray(new String[0]));
     }
 
     @Override

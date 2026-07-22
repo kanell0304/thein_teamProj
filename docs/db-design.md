@@ -172,7 +172,10 @@ MEETUPS ─┬─ RECOMMENDATION_ROUNDS ─ ROUND_CANDIDATES
 
 ## 알려진 참고 사항
 
-- `votes`는 `round_candidate_id` 기준으로 설계했지만, 현재 API(`VoteRequest`)는 음식점 이름(name) 기준으로 매칭하고 있습니다. 영속화를 실제로 붙일 때 API도 id 기준으로 맞춰야 합니다.
+- `votes`는 설계대로 `round_candidate_id` 기준으로 영속화되어 있습니다(`POST/DELETE /api/meetups/{meetupId}/rounds/{roundId}/candidates/{roundCandidateId}/votes`). 참여자별로 idempotent하게 처리되며, 득표수는 매 투표마다 웹소켓으로 실시간 브로드캐스트됩니다.
+- `participant_preferences`도 실제로 저장됩니다. `personalOptions[].participantId`는 자유 문자열이 아니라 **실제 회원 ID(Long)**여야 하며, 채팅방 멤버십까지는 요구하지 않고 실존하는 회원인지만 확인합니다(투표는 기존처럼 채팅방 멤버십을 요구함). 재추천 시 같은 참여자가 다시 제출하면 최신값으로 갱신됩니다.
 - 재추천 시 "이전에 추천된 곳 제외" 목록은 별도 컬럼 없이, 같은 `meetup_id`의 이전 `round_candidates`를 조회해서 파생합니다.
-- `mydata_consents`는 아직 기능 자체가 구현되지 않아 v3 기획서 기준 스켈레톤 그대로입니다.
-- 로그인은 카카오 전용으로 확정. `member.kakao_id`로 계정을 식별하고, 실제 인증은 카카오 OAuth + 자체 세션/JWT 발급으로 구현 예정(미구현). 현재 `SecurityConfig`는 개발 편의를 위한 임시 `permitAll` 상태이며, 로그인 붙일 때 반드시 교체해야 함.
+- `final_notice_change_logs`도 실제로 쓰입니다(`PATCH /api/meetups/{meetupId}/final-notice`로 약속시간 수정 시 호스트/변경필드/시각을 기록). 지금은 약속시간(`meeting_datetime`)만 수정 가능합니다.
+- `meetups.vote_deadline_at`도 실제로 적용됩니다. 모임 생성 시 선택적으로 지정하며, 지나면 투표/투표취소 모두 400으로 막힙니다.
+- `mydata_consents`는 아직 기능 자체가 구현되지 않아 v3 기획서 기준 스켈레톤 그대로입니다(v3 범위 외).
+- 로그인은 카카오 전용으로 확정되어 실제로 구현되어 있습니다(카카오 OAuth + 자체 JWT 발급). `SecurityConfig`가 `/api/**`를 기본적으로 인증 필요로 막고 있고, `/api/dev/**`(dev-login 우회)는 `dev` 스프링 프로필에서만 노출됩니다.

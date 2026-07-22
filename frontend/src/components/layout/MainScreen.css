@@ -1,0 +1,138 @@
+/* ===== 로그인 이후 메인 탭 화면이 상속하는 모바일 골격 ===== */
+.main-screen-page {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  color: var(--color-text);
+  background: #f0f0f0;
+}
+
+.main-screen-shell {
+  width: min(100%, 375px);
+  height: min(812px, 100dvh);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--color-surface);
+  border-radius: 24px;
+  box-shadow: 0 12px 36px rgba(24, 25, 27, 0.08);
+}
+
+.main-screen-header {
+  flex: 0 0 56px;
+  padding: 0 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.main-screen-header h1 {
+  margin: 0;
+  font-family: var(--font-kakao-title);
+  font-size: 23px;
+  line-height: 30px;
+}
+
+.main-screen-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.main-screen-action {
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  color: var(--color-text);
+  background: transparent;
+}
+
+.main-screen-action:hover {
+  background: #f2f3f5;
+}
+
+.main-screen-content {
+  min-height: 0;
+  flex: 1;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+
+.main-screen-content::-webkit-scrollbar {
+  display: none;
+}
+
+/* ===== 메인 탭 화면이 공유하는 검색과 빈 상태 ===== */
+.main-search {
+  height: 38px;
+  margin: 4px 16px 10px;
+  padding: 0 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: 8px;
+  color: var(--color-subtle);
+  background: #f5f6f7;
+}
+
+.main-search .material-symbols-outlined {
+  font-size: 19px;
+}
+
+.main-search input {
+  min-width: 0;
+  flex: 1;
+  border: 0;
+  outline: 0;
+  color: var(--color-text);
+  background: transparent;
+  font-size: 13px;
+}
+
+.main-search input::placeholder {
+  color: var(--color-subtle);
+}
+
+.main-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+}
+
+.main-empty {
+  margin: 80px 0 0;
+  color: var(--color-subtle);
+  text-align: center;
+  font-size: 14px;
+}
+
+/* ===== API 조회 실패 시 모든 메인 탭이 공유하는 재시도 안내 ===== */
+.main-request-state {
+  margin: 64px 24px 0;
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  color: var(--color-subtle);
+  text-align: center;
+  font-size: 14px;
+}
+
+.main-request-state p {
+  margin: 0;
+}
+
+.main-request-state button {
+  min-height: 36px;
+  padding: 0 16px;
+  border: 1px solid var(--color-primary);
+  border-radius: 10px;
+  color: var(--color-primary);
+  background: var(--color-surface);
+  font-weight: 600;
+}

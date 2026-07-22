@@ -46,4 +46,10 @@ public class MeetupParticipant {
 
     @Column(name = "confirmed_for_ai", nullable = false)
     private boolean confirmedForAi;
+
+    /** 개인 선호 제출을 마쳤을 때 호출한다. */
+    public void markSubmitted() {
+        this.submissionStatus = SubmissionStatus.SUBMITTED;
+        this.confirmedForAi = true;
+    }
 }

@@ -11,12 +11,6 @@ const PARKING_OPTIONS = [
   { value: 'ANY', label: '상관없어요' },
 ]
 
-const FAMILIARITY_OPTIONS = [
-  { value: 'FAMILIAR', label: '익숙한 곳' },
-  { value: 'NEW', label: '새로운 곳' },
-  { value: 'ANY', label: '상관없어요' },
-]
-
 const BUDGET_OPTIONS = [
   { value: '10000', label: '10,000원' },
   { value: '15000', label: '15,000원' },
@@ -95,7 +89,6 @@ function ParticipantPreferencePage({
   const [myDataConsent, setMyDataConsent] = useState(null)
   const [parkingPreference, setParkingPreference] = useState('ANY')
   const [moods, setMoods] = useState([])
-  const [familiarityPreference, setFamiliarityPreference] = useState('ANY')
   const [validationMessage, setValidationMessage] = useState('')
   const [validationField, setValidationField] = useState('')
   const [showMissingChoice, setShowMissingChoice] = useState(false)
@@ -325,7 +318,6 @@ function ParticipantPreferencePage({
       myDataConsentStatus: myDataConsent,
       parkingPreference,
       moodPreferences: moods.length > 0 ? moods : ['상관없어요'],
-      familiarityPreference,
       submissionReason,
     }
   }
@@ -527,20 +519,6 @@ function ParticipantPreferencePage({
               options={MOOD_OPTIONS}
               selected={moods}
               onToggle={toggleMood}
-            />
-          </section>
-
-          <section className="participant-preference-section participant-preference-section--optional">
-            <div className="participant-preference-label">
-              <strong>장소 익숙함</strong>
-              <em>선택</em>
-            </div>
-            <PreferenceChips
-              label="장소 익숙함"
-              options={FAMILIARITY_OPTIONS}
-              selected={familiarityPreference}
-              onToggle={setFamiliarityPreference}
-              single
             />
           </section>
 

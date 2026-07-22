@@ -45,6 +45,10 @@ public class RecommendationRound {
     @Column(nullable = false, length = 20)
     private RecommendationRoundStatus status;
 
+    /** 이 회차를 요청할 때 제출된 personalOptions 인원 수. RoundResponse 재조립(투표 후/재조회 시)에 그대로 쓴다. */
+    @Column(name = "participant_count", nullable = false)
+    private Integer participantCount;
+
     /** 재추천 시 직접 입력한 우선순위. RecommendationRequest.preferenceNote와 매칭. */
     @Column(name = "preference_note", columnDefinition = "text")
     private String preferenceNote;

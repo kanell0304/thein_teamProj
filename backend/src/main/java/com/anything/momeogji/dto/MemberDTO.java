@@ -1,4 +1,4 @@
 package com.anything.momeogji.dto;
 
-public class MemberDTO {
+public record MemberDTO(Long id, String nickname, String profileImageUrl) {
 }

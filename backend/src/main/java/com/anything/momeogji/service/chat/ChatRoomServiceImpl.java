@@ -1,15 +1,20 @@
 package com.anything.momeogji.service.chat;
 
+import com.anything.momeogji.dto.MemberDTO;
 import com.anything.momeogji.dto.chat.ChatRoomResponse;
+import com.anything.momeogji.dto.chat.ChatRoomListItemResponse;
 import com.anything.momeogji.entity.ChatRoom;
 import com.anything.momeogji.entity.ChatRoomMember;
 import com.anything.momeogji.entity.Member;
 import com.anything.momeogji.repository.ChatRoomMemberRepository;
 import com.anything.momeogji.repository.ChatRoomRepository;
 import com.anything.momeogji.repository.MemberRepository;
+import com.anything.momeogji.mapper.chat.ChatRoomQueryMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -18,6 +23,7 @@ public class ChatRoomServiceImpl implements ChatRoomService {
     private final ChatRoomRepository chatRoomRepository;
     private final ChatRoomMemberRepository chatRoomMemberRepository;
     private final MemberRepository memberRepository;
+    private final ChatRoomQueryMapper chatRoomQueryMapper;
 
     @Override
     @Transactional
@@ -50,6 +56,25 @@ public class ChatRoomServiceImpl implements ChatRoomService {
                 .chatRoom(chatRoom)
                 .user(member)
                 .build());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<ChatRoomListItemResponse> getMyRooms(Long memberId) {
+        findMember(memberId);
+        return chatRoomQueryMapper.findAllByMemberId(memberId);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<MemberDTO> listMembers(Long chatRoomId) {
+        findChatRoom(chatRoomId);
+        return chatRoomMemberRepository.findByChatRoomId(chatRoomId).stream()
+                .map(chatRoomMember -> {
+                    Member member = chatRoomMember.getUser();
+                    return new MemberDTO(member.getId(), member.getNickname(), member.getProfileImageUrl());
+                })
+                .toList();
     }
 
     private ChatRoom findChatRoom(Long chatRoomId) {

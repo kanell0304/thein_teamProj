@@ -57,4 +57,15 @@ public class ParticipantPreference {
     /** null이면 상관없음. */
     @Column(length = 50)
     private String atmosphere;
+
+    /** 같은 참여자가 재추천 등으로 선호를 다시 제출했을 때 최신값으로 덮어쓴다. */
+    public void update(Integer walkMinutes, List<String> preferredCategories, Integer budgetLimit,
+                        boolean parkingNeeded, List<String> excludedFoods, String atmosphere) {
+        this.walkMinutes = walkMinutes;
+        this.preferredCategories = preferredCategories;
+        this.budgetLimit = budgetLimit;
+        this.parkingNeeded = parkingNeeded;
+        this.excludedFoods = excludedFoods;
+        this.atmosphere = atmosphere;
+    }
 }

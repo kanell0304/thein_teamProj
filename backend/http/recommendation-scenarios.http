@@ -1,27 +1,47 @@
 ### 안내
-# 이 파일은 /api/ai/recommendations 하나의 엔드포인트를 다양한 입력값으로 테스트하기 위한 것입니다.
+# 이 파일은 POST /api/meetups/{meetupId}/rounds 하나의 엔드포인트를 다양한 입력값으로 테스트하기 위한 것입니다.
+# commonOption(목적지/시간/목적)은 이제 모임 생성 시 한 번만 정해지므로, 목적지/시간/목적이 다른 시나리오는
+# 모임도 따로 만들어야 합니다(아래에 그룹별로 나눠뒀습니다).
 # 각 요청은 실제 OpenAI(gpt-5.5) 호출이라 블록당 1~2분씩 걸립니다. "전체 실행"하지 말고
-# 확인하고 싶은 시나리오의 ### 블록만 골라서 하나씩 실행하세요.
-# 투표/최종공지까지 이어지는 전체 흐름 테스트는 recommendation-flow.http를 참고하세요.
-# 실행 전에 dev-login.http의 1번 요청을 먼저 실행해서 {{authToken}}을 발급받으세요.
+# 확인하고 싶은 시나리오의 ### 블록만 골라서, 먼저 그 시나리오가 속한 그룹의 "모임 생성" 블록을 실행한 뒤 이어서 실행하세요.
+# 투표/최종공지까지 이어지는 전체 흐름 테스트는 meetup-flow.http를 참고하세요.
+# personalOptions[].participantId는 실제 회원 ID라서, 5인 시나리오(2번)까지 실행하려면
+# dev-login.http의 1~5번 요청을 전부 먼저 실행해서 {{memberId}}~{{memberId5}}를 발급받아야 합니다.
+# chat.http의 1번 요청(채팅방 생성)도 먼저 실행해서 {{chatRoomId}}를 발급받으세요.
+# 전체 실행 순서/선행조건은 TESTING.md 참고.
 
 
-### 1. 참여자 1명 (최소 인원 - 개인 선호가 그대로 반영되는지 확인)
-POST http://localhost:8081/api/ai/recommendations
+### ---- 그룹 A: 강남역 / 2026-07-20T12:00 / 식사 (시나리오 1, 2, 4, 5, 9, 10, 11이 이 모임을 사용) ----
+
+### 0-A. 모임 생성 (그룹 A)
+POST http://localhost:8081/api/meetups
 Content-Type: application/json
 Authorization: Bearer {{authToken}}
 
 {
+  "chatRoomId": {{chatRoomId}},
   "commonOption": {
     "destinationName": "강남역",
     "destinationLatitude": 37.498,
     "destinationLongitude": 127.027,
     "meetingTime": "2026-07-20T12:00:00",
     "purpose": "식사"
-  },
+  }
+}
+
+> {%
+    client.global.set("meetupIdA", response.body.id);
+%}
+
+### 1. 참여자 1명 (최소 인원 - 개인 선호가 그대로 반영되는지 확인)
+POST http://localhost:8081/api/meetups/{{meetupIdA}}/rounds
+Content-Type: application/json
+Authorization: Bearer {{authToken}}
+
+{
   "personalOptions": [
     {
-      "participantId": "u1",
+      "participantId": {{memberId}},
       "walkMinutes": 5,
       "preferredCategories": ["한식"],
       "budgetLimit": 15000,
@@ -37,29 +57,22 @@ Authorization: Bearer {{authToken}}
         client.assert(response.body.participantCount === 1, "participantCount는 1이어야 함");
     });
     client.test("추천 3곳", function () {
-        client.assert(response.body.recommendations.length === 3, "recommendations는 3개여야 함");
+        client.assert(response.body.candidates.length === 3, "candidates는 3개여야 함");
     });
 %}
 
 ### 2. 참여자 다수(5명) - 완전히 같은 조건 (합의가 쉬운 경우)
-POST http://localhost:8081/api/ai/recommendations
+POST http://localhost:8081/api/meetups/{{meetupIdA}}/rounds
 Content-Type: application/json
 Authorization: Bearer {{authToken}}
 
 {
-  "commonOption": {
-    "destinationName": "강남역",
-    "destinationLatitude": 37.498,
-    "destinationLongitude": 127.027,
-    "meetingTime": "2026-07-20T12:00:00",
-    "purpose": "식사"
-  },
   "personalOptions": [
-    {"participantId": "u1", "walkMinutes": 10, "preferredCategories": ["한식"], "budgetLimit": 15000, "parkingNeeded": false, "excludedFoods": [], "atmosphere": "개방형"},
-    {"participantId": "u2", "walkMinutes": 10, "preferredCategories": ["한식"], "budgetLimit": 15000, "parkingNeeded": false, "excludedFoods": [], "atmosphere": "개방형"},
-    {"participantId": "u3", "walkMinutes": 10, "preferredCategories": ["한식"], "budgetLimit": 15000, "parkingNeeded": false, "excludedFoods": [], "atmosphere": "개방형"},
-    {"participantId": "u4", "walkMinutes": 10, "preferredCategories": ["한식"], "budgetLimit": 15000, "parkingNeeded": false, "excludedFoods": [], "atmosphere": "개방형"},
-    {"participantId": "u5", "walkMinutes": 10, "preferredCategories": ["한식"], "budgetLimit": 15000, "parkingNeeded": false, "excludedFoods": [], "atmosphere": "개방형"}
+    {"participantId": {{memberId}}, "walkMinutes": 10, "preferredCategories": ["한식"], "budgetLimit": 15000, "parkingNeeded": false, "excludedFoods": [], "atmosphere": "개방형"},
+    {"participantId": {{memberId2}}, "walkMinutes": 10, "preferredCategories": ["한식"], "budgetLimit": 15000, "parkingNeeded": false, "excludedFoods": [], "atmosphere": "개방형"},
+    {"participantId": {{memberId3}}, "walkMinutes": 10, "preferredCategories": ["한식"], "budgetLimit": 15000, "parkingNeeded": false, "excludedFoods": [], "atmosphere": "개방형"},
+    {"participantId": {{memberId4}}, "walkMinutes": 10, "preferredCategories": ["한식"], "budgetLimit": 15000, "parkingNeeded": false, "excludedFoods": [], "atmosphere": "개방형"},
+    {"participantId": {{memberId5}}, "walkMinutes": 10, "preferredCategories": ["한식"], "budgetLimit": 15000, "parkingNeeded": false, "excludedFoods": [], "atmosphere": "개방형"}
   ]
 }
 
@@ -69,143 +82,182 @@ Authorization: Bearer {{authToken}}
     });
 %}
 
-### 3. 선호 카테고리가 완전히 갈리는 경우 (한식/중식/일식 각 1명 - 우선순위 애매)
-POST http://localhost:8081/api/ai/recommendations
+### 4. 예산 편차가 큰 경우 (5,000원 vs 50,000원 - 최저 예산 기준 필터링 확인)
+POST http://localhost:8081/api/meetups/{{meetupIdA}}/rounds
 Content-Type: application/json
 Authorization: Bearer {{authToken}}
 
 {
+  "personalOptions": [
+    {"participantId": {{memberId}}, "walkMinutes": 10, "preferredCategories": ["한식"], "budgetLimit": 5000, "parkingNeeded": false, "excludedFoods": [], "atmosphere": null},
+    {"participantId": {{memberId2}}, "walkMinutes": 10, "preferredCategories": ["한식"], "budgetLimit": 50000, "parkingNeeded": false, "excludedFoods": [], "atmosphere": null}
+  ]
+}
+
+### 5. 제외 음식이 여러 명에 걸쳐 겹치는 경우 (합집합이 커서 후보가 좁아짐)
+POST http://localhost:8081/api/meetups/{{meetupIdA}}/rounds
+Content-Type: application/json
+Authorization: Bearer {{authToken}}
+
+{
+  "personalOptions": [
+    {"participantId": {{memberId}}, "walkMinutes": 10, "preferredCategories": ["한식", "일식"], "budgetLimit": 20000, "parkingNeeded": false, "excludedFoods": ["고수", "해산물"], "atmosphere": null},
+    {"participantId": {{memberId2}}, "walkMinutes": 10, "preferredCategories": ["한식", "일식"], "budgetLimit": 20000, "parkingNeeded": false, "excludedFoods": ["돼지고기", "매운맛"], "atmosphere": null},
+    {"participantId": {{memberId3}}, "walkMinutes": 10, "preferredCategories": ["한식", "일식"], "budgetLimit": 20000, "parkingNeeded": false, "excludedFoods": ["유제품"], "atmosphere": null}
+  ]
+}
+
+> {%
+    client.test("응답 정상 여부 확인 - 제외 목록이 많아도 3곳은 채워져야 함", function () {
+        client.assert(response.body.candidates.length === 3, "candidates는 3개여야 함");
+    });
+%}
+
+### ---- 그룹 B: 홍대입구역 / 2026-07-21T19:00 / 식사 (시나리오 3) ----
+
+### 0-B. 모임 생성 (그룹 B)
+POST http://localhost:8081/api/meetups
+Content-Type: application/json
+Authorization: Bearer {{authToken}}
+
+{
+  "chatRoomId": {{chatRoomId}},
   "commonOption": {
     "destinationName": "홍대입구역",
     "destinationLatitude": 37.5572,
     "destinationLongitude": 126.9245,
     "meetingTime": "2026-07-21T19:00:00",
     "purpose": "식사"
-  },
-  "personalOptions": [
-    {"participantId": "u1", "walkMinutes": 10, "preferredCategories": ["한식"], "budgetLimit": 20000, "parkingNeeded": false, "excludedFoods": [], "atmosphere": null},
-    {"participantId": "u2", "walkMinutes": 10, "preferredCategories": ["중식"], "budgetLimit": 20000, "parkingNeeded": false, "excludedFoods": [], "atmosphere": null},
-    {"participantId": "u3", "walkMinutes": 10, "preferredCategories": ["일식"], "budgetLimit": 20000, "parkingNeeded": false, "excludedFoods": [], "atmosphere": null}
-  ]
-}
-
-### 4. 예산 편차가 큰 경우 (5,000원 vs 50,000원 - 최저 예산 기준 필터링 확인)
-POST http://localhost:8081/api/ai/recommendations
-Content-Type: application/json
-Authorization: Bearer {{authToken}}
-
-{
-  "commonOption": {
-    "destinationName": "강남역",
-    "destinationLatitude": 37.498,
-    "destinationLongitude": 127.027,
-    "meetingTime": "2026-07-20T12:00:00",
-    "purpose": "식사"
-  },
-  "personalOptions": [
-    {"participantId": "u1", "walkMinutes": 10, "preferredCategories": ["한식"], "budgetLimit": 5000, "parkingNeeded": false, "excludedFoods": [], "atmosphere": null},
-    {"participantId": "u2", "walkMinutes": 10, "preferredCategories": ["한식"], "budgetLimit": 50000, "parkingNeeded": false, "excludedFoods": [], "atmosphere": null}
-  ]
-}
-
-### 5. 제외 음식이 여러 명에 걸쳐 겹치는 경우 (합집합이 커서 후보가 좁아짐)
-POST http://localhost:8081/api/ai/recommendations
-Content-Type: application/json
-Authorization: Bearer {{authToken}}
-
-{
-  "commonOption": {
-    "destinationName": "강남역",
-    "destinationLatitude": 37.498,
-    "destinationLongitude": 127.027,
-    "meetingTime": "2026-07-20T12:00:00",
-    "purpose": "식사"
-  },
-  "personalOptions": [
-    {"participantId": "u1", "walkMinutes": 10, "preferredCategories": ["한식", "일식"], "budgetLimit": 20000, "parkingNeeded": false, "excludedFoods": ["고수", "해산물"], "atmosphere": null},
-    {"participantId": "u2", "walkMinutes": 10, "preferredCategories": ["한식", "일식"], "budgetLimit": 20000, "parkingNeeded": false, "excludedFoods": ["돼지고기", "매운맛"], "atmosphere": null},
-    {"participantId": "u3", "walkMinutes": 10, "preferredCategories": ["한식", "일식"], "budgetLimit": 20000, "parkingNeeded": false, "excludedFoods": ["유제품"], "atmosphere": null}
-  ]
+  }
 }
 
 > {%
-    client.test("응답 정상 여부 확인 - 제외 목록이 많아도 3곳은 채워져야 함", function () {
-        client.assert(response.body.recommendations.length === 3, "recommendations는 3개여야 함");
-    });
+    client.global.set("meetupIdB", response.body.id);
 %}
 
-### 6. 예산 미입력(무제한) + 선택 옵션 없음 - null/누락 값 처리 확인
-POST http://localhost:8081/api/ai/recommendations
+### 3. 선호 카테고리가 완전히 갈리는 경우 (한식/중식/일식 각 1명 - 우선순위 애매)
+POST http://localhost:8081/api/meetups/{{meetupIdB}}/rounds
 Content-Type: application/json
 Authorization: Bearer {{authToken}}
 
 {
+  "personalOptions": [
+    {"participantId": {{memberId}}, "walkMinutes": 10, "preferredCategories": ["한식"], "budgetLimit": 20000, "parkingNeeded": false, "excludedFoods": [], "atmosphere": null},
+    {"participantId": {{memberId2}}, "walkMinutes": 10, "preferredCategories": ["중식"], "budgetLimit": 20000, "parkingNeeded": false, "excludedFoods": [], "atmosphere": null},
+    {"participantId": {{memberId3}}, "walkMinutes": 10, "preferredCategories": ["일식"], "budgetLimit": 20000, "parkingNeeded": false, "excludedFoods": [], "atmosphere": null}
+  ]
+}
+
+### ---- 그룹 C: 잠실역 / 2026-07-22T18:30 / 회식 (시나리오 6) ----
+
+### 0-C. 모임 생성 (그룹 C)
+POST http://localhost:8081/api/meetups
+Content-Type: application/json
+Authorization: Bearer {{authToken}}
+
+{
+  "chatRoomId": {{chatRoomId}},
   "commonOption": {
     "destinationName": "잠실역",
     "destinationLatitude": 37.5133,
     "destinationLongitude": 127.1000,
     "meetingTime": "2026-07-22T18:30:00",
     "purpose": "회식"
-  },
-  "personalOptions": [
-    {"participantId": "u1", "walkMinutes": 15, "preferredCategories": ["고기"], "parkingNeeded": false, "excludedFoods": []},
-    {"participantId": "u2", "walkMinutes": 15, "preferredCategories": ["고기"], "parkingNeeded": true, "excludedFoods": []}
-  ]
+  }
 }
 
-### 7. 전원 주차 필요 + 도보 이동시간이 긴 경우 (도보 30분 - 외곽 지역 상정)
-POST http://localhost:8081/api/ai/recommendations
+> {%
+    client.global.set("meetupIdC", response.body.id);
+%}
+
+### 6. 예산 미입력(무제한) + 선택 옵션 없음 - null/누락 값 처리 확인
+POST http://localhost:8081/api/meetups/{{meetupIdC}}/rounds
 Content-Type: application/json
 Authorization: Bearer {{authToken}}
 
 {
+  "personalOptions": [
+    {"participantId": {{memberId}}, "walkMinutes": 15, "preferredCategories": ["고기"], "parkingNeeded": false, "excludedFoods": []},
+    {"participantId": {{memberId2}}, "walkMinutes": 15, "preferredCategories": ["고기"], "parkingNeeded": true, "excludedFoods": []}
+  ]
+}
+
+### ---- 그룹 D: 판교역 / 2026-07-23T12:30 / 식사 (시나리오 7) ----
+
+### 0-D. 모임 생성 (그룹 D)
+POST http://localhost:8081/api/meetups
+Content-Type: application/json
+Authorization: Bearer {{authToken}}
+
+{
+  "chatRoomId": {{chatRoomId}},
   "commonOption": {
     "destinationName": "판교역",
     "destinationLatitude": 37.3947,
     "destinationLongitude": 127.1112,
     "meetingTime": "2026-07-23T12:30:00",
     "purpose": "식사"
-  },
-  "personalOptions": [
-    {"participantId": "u1", "walkMinutes": 30, "preferredCategories": ["양식"], "budgetLimit": 25000, "parkingNeeded": true, "excludedFoods": [], "atmosphere": "룸"},
-    {"participantId": "u2", "walkMinutes": 30, "preferredCategories": ["양식"], "budgetLimit": 25000, "parkingNeeded": true, "excludedFoods": [], "atmosphere": "룸"}
-  ]
+  }
 }
 
-### 8. 목적이 술자리인 경우 (미팅 목적에 따라 카테고리 추천이 달라지는지)
-POST http://localhost:8081/api/ai/recommendations
+> {%
+    client.global.set("meetupIdD", response.body.id);
+%}
+
+### 7. 전원 주차 필요 + 도보 이동시간이 긴 경우 (도보 30분 - 외곽 지역 상정)
+POST http://localhost:8081/api/meetups/{{meetupIdD}}/rounds
 Content-Type: application/json
 Authorization: Bearer {{authToken}}
 
 {
+  "personalOptions": [
+    {"participantId": {{memberId}}, "walkMinutes": 30, "preferredCategories": ["양식"], "budgetLimit": 25000, "parkingNeeded": true, "excludedFoods": [], "atmosphere": "룸"},
+    {"participantId": {{memberId2}}, "walkMinutes": 30, "preferredCategories": ["양식"], "budgetLimit": 25000, "parkingNeeded": true, "excludedFoods": [], "atmosphere": "룸"}
+  ]
+}
+
+### ---- 그룹 E: 강남역 / 2026-07-24T20:00 / 술자리 (시나리오 8) ----
+
+### 0-E. 모임 생성 (그룹 E)
+POST http://localhost:8081/api/meetups
+Content-Type: application/json
+Authorization: Bearer {{authToken}}
+
+{
+  "chatRoomId": {{chatRoomId}},
   "commonOption": {
     "destinationName": "강남역",
     "destinationLatitude": 37.498,
     "destinationLongitude": 127.027,
     "meetingTime": "2026-07-24T20:00:00",
     "purpose": "술자리"
-  },
-  "personalOptions": [
-    {"participantId": "u1", "walkMinutes": 10, "preferredCategories": ["안주", "포차"], "budgetLimit": 30000, "parkingNeeded": false, "excludedFoods": [], "atmosphere": "개방형"},
-    {"participantId": "u2", "walkMinutes": 10, "preferredCategories": ["안주", "포차"], "budgetLimit": 30000, "parkingNeeded": false, "excludedFoods": [], "atmosphere": "개방형"}
-  ]
+  }
 }
 
-### ---- 검증 실패(400) 확인용 케이스 ----
+> {%
+    client.global.set("meetupIdE", response.body.id);
+%}
 
-### 9. personalOptions가 빈 배열 - 400 기대
-POST http://localhost:8081/api/ai/recommendations
+### 8. 목적이 술자리인 경우 (미팅 목적에 따라 카테고리 추천이 달라지는지)
+POST http://localhost:8081/api/meetups/{{meetupIdE}}/rounds
 Content-Type: application/json
 Authorization: Bearer {{authToken}}
 
 {
-  "commonOption": {
-    "destinationName": "강남역",
-    "destinationLatitude": 37.498,
-    "destinationLongitude": 127.027,
-    "meetingTime": "2026-07-20T12:00:00",
-    "purpose": "식사"
-  },
+  "personalOptions": [
+    {"participantId": {{memberId}}, "walkMinutes": 10, "preferredCategories": ["안주", "포차"], "budgetLimit": 30000, "parkingNeeded": false, "excludedFoods": [], "atmosphere": "개방형"},
+    {"participantId": {{memberId2}}, "walkMinutes": 10, "preferredCategories": ["안주", "포차"], "budgetLimit": 30000, "parkingNeeded": false, "excludedFoods": [], "atmosphere": "개방형"}
+  ]
+}
+
+### ---- 검증 실패(400) 확인용 케이스 (그룹 A 모임 사용) ----
+
+### 9. personalOptions가 빈 배열 - 400 기대
+POST http://localhost:8081/api/meetups/{{meetupIdA}}/rounds
+Content-Type: application/json
+Authorization: Bearer {{authToken}}
+
+{
   "personalOptions": []
 }
 
@@ -216,20 +268,13 @@ Authorization: Bearer {{authToken}}
 %}
 
 ### 10. walkMinutes가 0 이하 - 400 기대 (@Min(1) 위반)
-POST http://localhost:8081/api/ai/recommendations
+POST http://localhost:8081/api/meetups/{{meetupIdA}}/rounds
 Content-Type: application/json
 Authorization: Bearer {{authToken}}
 
 {
-  "commonOption": {
-    "destinationName": "강남역",
-    "destinationLatitude": 37.498,
-    "destinationLongitude": 127.027,
-    "meetingTime": "2026-07-20T12:00:00",
-    "purpose": "식사"
-  },
   "personalOptions": [
-    {"participantId": "u1", "walkMinutes": 0, "preferredCategories": ["한식"], "budgetLimit": 15000, "parkingNeeded": false, "excludedFoods": [], "atmosphere": "룸"}
+    {"participantId": {{memberId}}, "walkMinutes": 0, "preferredCategories": ["한식"], "budgetLimit": 15000, "parkingNeeded": false, "excludedFoods": [], "atmosphere": "룸"}
   ]
 }
 
@@ -240,20 +285,13 @@ Authorization: Bearer {{authToken}}
 %}
 
 ### 11. preferredCategories가 빈 배열 - 400 기대 (@NotEmpty 위반)
-POST http://localhost:8081/api/ai/recommendations
+POST http://localhost:8081/api/meetups/{{meetupIdA}}/rounds
 Content-Type: application/json
 Authorization: Bearer {{authToken}}
 
 {
-  "commonOption": {
-    "destinationName": "강남역",
-    "destinationLatitude": 37.498,
-    "destinationLongitude": 127.027,
-    "meetingTime": "2026-07-20T12:00:00",
-    "purpose": "식사"
-  },
   "personalOptions": [
-    {"participantId": "u1", "walkMinutes": 10, "preferredCategories": [], "budgetLimit": 15000, "parkingNeeded": false, "excludedFoods": [], "atmosphere": "룸"}
+    {"participantId": {{memberId}}, "walkMinutes": 10, "preferredCategories": [], "budgetLimit": 15000, "parkingNeeded": false, "excludedFoods": [], "atmosphere": "룸"}
   ]
 }
 
