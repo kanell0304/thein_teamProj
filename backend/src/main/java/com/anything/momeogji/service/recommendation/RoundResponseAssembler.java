@@ -31,6 +31,7 @@ class RoundResponseAssembler {
                 round.getId(),
                 round.getRoundNo(),
                 round.getParticipantCount(),
+                (int) voteRepository.countDistinctVotersByRoundId(round.getId()),
                 candidates
         );
     }
@@ -38,6 +39,12 @@ class RoundResponseAssembler {
     private CandidateSummary toSummary(RoundCandidate candidate) {
         Restaurant restaurant = candidate.getRestaurant();
         long voteCount = voteRepository.countByRoundCandidateId(candidate.getId());
+        var voterIds = voteRepository.findByRoundCandidateId(candidate.getId()).stream()
+                .map(vote -> vote.getMeetupParticipant().getUser().getId())
+                .distinct()
+                .toList();
+        boolean recommendAgain = RecommendationRoundServiceImpl.RECOMMEND_AGAIN_PLACE_ID
+                .equals(restaurant.getKakaoPlaceId());
 
         return new CandidateSummary(
                 candidate.getId(),
@@ -50,7 +57,9 @@ class RoundResponseAssembler {
                 restaurant.getLongitude() == null ? null : restaurant.getLongitude().doubleValue(),
                 candidate.getReason(),
                 candidate.getImageUrl(),
-                voteCount
+                voteCount,
+                recommendAgain ? "RECOMMEND_AGAIN" : "RESTAURANT",
+                voterIds
         );
     }
 }

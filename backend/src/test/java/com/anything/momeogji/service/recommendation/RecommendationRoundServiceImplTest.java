@@ -43,6 +43,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
@@ -125,7 +126,7 @@ class RecommendationRoundServiceImplTest {
         RecommendationRound savedRound = RecommendationRound.builder().id(2L).meetup(meetup).roundNo(2).build();
         given(recommendationRoundRepository.save(any())).willReturn(savedRound);
 
-        RoundResponse expectedResponse = new RoundResponse(100L, 2L, 2, 2, List.of());
+        RoundResponse expectedResponse = new RoundResponse(100L, 2L, 2, 2, 0, List.of());
         given(roundResponseAssembler.assemble(savedRound)).willReturn(expectedResponse);
 
         RoundCreateRequest request = new RoundCreateRequest(List.of(personalOption(1L)), null);
@@ -140,7 +141,8 @@ class RecommendationRoundServiceImplTest {
 
         verify(eventPublisher).recommendationStarted(10L);
         verify(eventPublisher).recommendationCompleted(10L, expectedResponse);
-        verify(roundCandidateRepository).save(any());
+        // AI 식당 후보 1곳과 시스템 재투표 후보 1곳이 함께 저장된다.
+        verify(roundCandidateRepository, times(2)).save(any());
         assertThat(meetup.getStatus()).isEqualTo(MeetupStatus.VOTING);
     }
 

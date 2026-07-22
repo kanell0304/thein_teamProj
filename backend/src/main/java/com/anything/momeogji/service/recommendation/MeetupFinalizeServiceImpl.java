@@ -155,7 +155,15 @@ public class MeetupFinalizeServiceImpl implements MeetupFinalizeService {
     }
 
     private RoundCandidate pickWinner(List<RoundCandidate> candidates) {
-        long maxVotes = candidates.stream()
+        List<RoundCandidate> restaurantCandidates = candidates.stream()
+                .filter(candidate -> !RecommendationRoundServiceImpl.RECOMMEND_AGAIN_PLACE_ID
+                        .equals(candidate.getRestaurant().getKakaoPlaceId()))
+                .toList();
+        if (restaurantCandidates.isEmpty()) {
+            throw new IllegalArgumentException("확정할 음식점 후보가 없습니다.");
+        }
+
+        long maxVotes = restaurantCandidates.stream()
                 .mapToLong(candidate -> voteRepository.countByRoundCandidateId(candidate.getId()))
                 .max()
                 .orElse(0);
@@ -164,7 +172,7 @@ public class MeetupFinalizeServiceImpl implements MeetupFinalizeService {
             throw new IllegalArgumentException("아직 투표가 없어 확정할 수 없습니다.");
         }
 
-        List<RoundCandidate> topCandidates = candidates.stream()
+        List<RoundCandidate> topCandidates = restaurantCandidates.stream()
                 .filter(candidate -> voteRepository.countByRoundCandidateId(candidate.getId()) == maxVotes)
                 .toList();
 

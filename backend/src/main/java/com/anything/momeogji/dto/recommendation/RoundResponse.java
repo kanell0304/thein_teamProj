@@ -8,6 +8,7 @@ public record RoundResponse(
         Long roundId,
         int roundNo,
         int participantCount,
+        int votedParticipantCount,
         List<CandidateSummary> candidates
 ) {
 }

@@ -1,5 +1,7 @@
 package com.anything.momeogji.dto.recommendation;
 
+import java.util.List;
+
 public record CandidateSummary(
         Long roundCandidateId,
         int rank,
@@ -11,6 +13,8 @@ public record CandidateSummary(
         Double longitude,
         String reason,
         String imageUrl,
-        long voteCount
+        long voteCount,
+        String candidateType,
+        List<Long> voterIds
 ) {
 }

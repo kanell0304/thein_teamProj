@@ -28,6 +28,7 @@ public class RestaurantCandidateSearchServiceImpl implements RestaurantCandidate
     private static final int MIN_ACCEPTABLE_POOL_SIZE = 3;
     private static final int MAX_POOL_SIZE = 20;
     private static final int MIN_RADIUS_METERS = 500;
+    private static final int FALLBACK_RADIUS_METERS = 3_000;
     private static final int MAX_RADIUS_METERS = 20_000;
     private static final double WALK_METERS_PER_MINUTE = 70.0;
     private static final String FALLBACK_KEYWORD = "음식점";
@@ -42,9 +43,23 @@ public class RestaurantCandidateSearchServiceImpl implements RestaurantCandidate
         Map<String, RestaurantCandidate> pool = new LinkedHashMap<>();
         collectCandidates(pool, keywords, commonOption, radius, excludedCandidateIds);
 
+        int widerRadius = radius;
         if (pool.size() < MIN_POOL_SIZE_BEFORE_EXPANDING && radius < MAX_RADIUS_METERS) {
-            int widerRadius = Math.min(radius * 2, MAX_RADIUS_METERS);
+            widerRadius = Math.min(radius * 2, MAX_RADIUS_METERS);
             collectCandidates(pool, keywords, commonOption, widerRadius, excludedCandidateIds);
+        }
+
+        // "식사", "아무거나"처럼 카카오 키워드 검색 결과가 적은 선호값은
+        // 일반 음식점 검색으로 보완한다. 좁은 도보 반경 때문에 결과가 없을 때도
+        // 최소 3km까지 넓혀 실제 추천 후보 3곳을 확보한다.
+        if (pool.size() < MIN_POOL_SIZE_BEFORE_EXPANDING) {
+            int fallbackRadius = Math.max(widerRadius, FALLBACK_RADIUS_METERS);
+            collectCandidates(pool, List.of(FALLBACK_KEYWORD), commonOption, fallbackRadius, excludedCandidateIds);
+
+            if (pool.size() < MIN_ACCEPTABLE_POOL_SIZE && fallbackRadius < MAX_RADIUS_METERS) {
+                int expandedFallbackRadius = Math.min(fallbackRadius * 2, MAX_RADIUS_METERS);
+                collectCandidates(pool, List.of(FALLBACK_KEYWORD), commonOption, expandedFallbackRadius, excludedCandidateIds);
+            }
         }
 
         if (pool.size() < MIN_ACCEPTABLE_POOL_SIZE) {

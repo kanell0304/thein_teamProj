@@ -32,6 +32,9 @@ import java.util.List;
 @RequiredArgsConstructor
 public class RecommendationRoundServiceImpl implements RecommendationRoundService {
 
+    /** 네 번째 선택지를 일반 식당과 같은 후보/투표 구조로 다루기 위한 내부 장소 ID. */
+    static final String RECOMMEND_AGAIN_PLACE_ID = "__RECOMMEND_AGAIN__";
+
     private final MeetupRepository meetupRepository;
     private final ChatRoomMemberRepository chatRoomMemberRepository;
     private final MeetupParticipantRepository meetupParticipantRepository;
@@ -106,6 +109,20 @@ public class RecommendationRoundServiceImpl implements RecommendationRoundServic
                     .imageUrl(recommendation.imageUrl())
                     .build());
         }
+
+        // 재추천도 후보로 저장해야 복수 선택, 투표 변경, 실시간 집계가 동일한 API로 동작한다.
+        Restaurant recommendAgain = restaurantRepository.findByKakaoPlaceId(RECOMMEND_AGAIN_PLACE_ID)
+                .orElseGet(() -> restaurantRepository.save(Restaurant.builder()
+                        .kakaoPlaceId(RECOMMEND_AGAIN_PLACE_ID)
+                        .name("재투표")
+                        .category("SYSTEM")
+                        .build()));
+        roundCandidateRepository.save(RoundCandidate.builder()
+                .round(round)
+                .restaurant(recommendAgain)
+                .rankNo(4)
+                .reason("마음에 드는 후보가 없으면 새로운 식당 3곳을 추천받습니다.")
+                .build());
 
         return round;
     }

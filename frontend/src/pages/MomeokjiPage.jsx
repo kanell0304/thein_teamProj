@@ -7,9 +7,7 @@ import PlacePicker from '../components/momeokji/PlacePicker'
 import TimePicker from '../components/momeokji/TimePicker'
 import AddableMenuInput from '../components/momeokji/AddableMenuInput'
 import {
-  AVOID_OPTIONS,
   MENU_ANY_OPTION,
-  MOOD_OPTIONS,
   PERSONAL_OPTION_DURATION,
   THEMES,
   TIME_OPTIONS,
@@ -118,12 +116,6 @@ function MomeokjiPage({
   const [customMenuOptions, setCustomMenuOptions] = useState([])
   const [menus, setMenus] = useState([])
   const [menuInput, setMenuInput] = useState('')
-  const [customAvoidOptions, setCustomAvoidOptions] = useState([])
-  const [avoidFoods, setAvoidFoods] = useState([])
-  const [avoidInput, setAvoidInput] = useState('')
-  const [customMoodOptions, setCustomMoodOptions] = useState([])
-  const [moods, setMoods] = useState([])
-  const [moodInput, setMoodInput] = useState('')
   const [isAnalyzing, setIsAnalyzing] = useState(false)
 
   useEffect(() => {
@@ -182,18 +174,6 @@ function MomeokjiPage({
     [customMenuOptions, menuOptions],
   )
 
-  // ===== 기본 기피 음식과 직접 추가한 항목을 중복 없이 하나의 선택 목록으로 구성 =====
-  const selectableAvoidOptions = useMemo(
-    () => [...new Set([...AVOID_OPTIONS, ...customAvoidOptions])],
-    [customAvoidOptions],
-  )
-
-  // ===== 기본 분위기와 직접 추가한 항목을 중복 없이 하나의 선택 목록으로 구성 =====
-  const selectableMoodOptions = useMemo(
-    () => [...new Set([...MOOD_OPTIONS, ...customMoodOptions])],
-    [customMoodOptions],
-  )
-
   const toggleArrayValue = (setter, value) => {
     setter((previous) => (
       previous.includes(value)
@@ -218,38 +198,6 @@ function MomeokjiPage({
     setMenuInput('')
   }
 
-  // ===== 직접 입력한 기피 음식을 칩으로 추가하고 즉시 다중 선택 상태로 전환 =====
-  const addCustomAvoidFood = () => {
-    const newAvoidFood = avoidInput.trim()
-    if (!newAvoidFood) return
-
-    setCustomAvoidOptions((previous) => (
-      AVOID_OPTIONS.includes(newAvoidFood) || previous.includes(newAvoidFood)
-        ? previous
-        : [...previous, newAvoidFood]
-    ))
-    setAvoidFoods((previous) => (
-      previous.includes(newAvoidFood) ? previous : [...previous, newAvoidFood]
-    ))
-    setAvoidInput('')
-  }
-
-  // ===== 직접 입력한 분위기를 칩으로 추가하고 즉시 다중 선택 상태로 전환 =====
-  const addCustomMood = () => {
-    const newMood = moodInput.trim()
-    if (!newMood) return
-
-    setCustomMoodOptions((previous) => (
-      MOOD_OPTIONS.includes(newMood) || previous.includes(newMood)
-        ? previous
-        : [...previous, newMood]
-    ))
-    setMoods((previous) => (
-      previous.includes(newMood) ? previous : [...previous, newMood]
-    ))
-    setMoodInput('')
-  }
-
   const isStepValid = [
     Boolean(date),
     Boolean(time),
@@ -261,8 +209,6 @@ function MomeokjiPage({
       && voteDurationMinutes <= VOTE_DURATION.max,
     Boolean(themeCode),
     menus.length > 0,
-    true,
-    true,
   ][step]
 
   const handleNext = () => {
@@ -285,8 +231,9 @@ function MomeokjiPage({
       themeCode,
       themeLabel: THEMES.find((option) => option.value === themeCode)?.label ?? themeCode,
       menus,
-      avoidFoods,
-      moods,
+      // 개인 취향은 주최자를 포함한 각 참가자의 개인 조건 화면에서만 수집합니다.
+      avoidFoods: [],
+      moods: [],
     })
     setStep(0)
     onClose()
@@ -388,35 +335,8 @@ function MomeokjiPage({
             />
           </div>
         )
-      case 7:
-        return (
-          <div className="momeokji-step">
-            <h3>피하고 싶은 음식이 있나요?</h3>
-            <p className="momeokji-description">알레르기나 못 먹는 음식을 알려주세요.</p>
-            <ChipGroup label="피하고 싶은 음식" options={selectableAvoidOptions} selected={avoidFoods} onToggle={(value) => toggleArrayValue(setAvoidFoods, value)} />
-            <AddableMenuInput
-              value={avoidInput}
-              placeholder="알레르기나 못 먹는 음식 입력"
-              ariaLabel="피하고 싶은 음식 직접 입력"
-              onChange={setAvoidInput}
-              onAdd={addCustomAvoidFood}
-            />
-          </div>
-        )
       default:
-        return (
-          <div className="momeokji-step">
-            <h3>원하는 분위기를 골라주세요</h3>
-            <ChipGroup label="원하는 분위기" options={selectableMoodOptions} selected={moods} onToggle={(value) => toggleArrayValue(setMoods, value)} />
-            <AddableMenuInput
-              value={moodInput}
-              placeholder="원하는 분위기 직접 입력"
-              ariaLabel="원하는 분위기 직접 입력"
-              onChange={setMoodInput}
-              onAdd={addCustomMood}
-            />
-          </div>
-        )
+        return null
     }
   }
 

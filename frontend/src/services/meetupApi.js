@@ -43,6 +43,14 @@ export function retractVote(meetupId, roundId, roundCandidateId) {
   })
 }
 
+// ===== 복수 선택 전체를 한 번에 교체해 마지막 참가자도 모든 선택을 안전하게 저장 =====
+export function replaceVotes(meetupId, roundId, candidateIds) {
+  return apiFetch(`/api/meetups/${meetupId}/rounds/${roundId}/votes`, {
+    method: 'PUT',
+    body: JSON.stringify({ candidateIds }),
+  })
+}
+
 export function updateFinalNotice(meetupId, meetingDatetime) {
   return apiFetch(`/api/meetups/${meetupId}/final-notice`, {
     method: 'PATCH',

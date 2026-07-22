@@ -94,6 +94,20 @@ class RestaurantCandidateSearchServiceImplTest {
     }
 
     @Test
+    void 선호_키워드_검색결과가_부족하면_일반_음식점_검색으로_보완한다() {
+        AggregatedCondition condition = condition(10.0, List.of(new CategoryCount("식사", 1)));
+        given(kakaoLocalClient.searchNearby(eq("식사"), eq(127.027), eq(37.498), anyInt(), anyInt()))
+                .willReturn(candidates("preferred", 1, 100));
+        given(kakaoLocalClient.searchNearby(eq("음식점"), eq(127.027), eq(37.498), eq(3000), anyInt()))
+                .willReturn(candidates("fallback", 5, 200));
+
+        List<RestaurantCandidate> result = service.search(commonOption, condition, Set.of());
+
+        assertThat(result).hasSize(6);
+        verify(kakaoLocalClient).searchNearby(eq("음식점"), eq(127.027), eq(37.498), eq(3000), anyInt());
+    }
+
+    @Test
     void 제외_id로_지정된_후보는_풀에서_빠지고_그로_인해_반경도_확장된다() {
         AggregatedCondition condition = condition(10.0, List.of(new CategoryCount("한식", 2)));
         // h0~h5 6곳 중 4곳을 제외하면 2곳만 남아 반경 확장이 필요해진다.

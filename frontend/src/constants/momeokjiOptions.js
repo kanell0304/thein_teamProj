@@ -1,4 +1,5 @@
-export const TOTAL_STEPS = 9
+// 모임 생성은 공통 설정 6개와 AI 대화 메뉴 확인 1개로 구성합니다.
+export const TOTAL_STEPS = 7
 
 // 제한시간은 화면 검증과 백엔드 DTO에서 같은 범위를 사용합니다.
 export const PERSONAL_OPTION_DURATION = { min: 3, defaultValue: 10, max: 30 }
