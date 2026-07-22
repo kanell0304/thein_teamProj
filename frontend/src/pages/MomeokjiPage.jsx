@@ -48,7 +48,8 @@ function getNearestTimeValue(now = new Date()) {
   }, TIME_OPTIONS[0].value)
 }
 
-function ChipGroup({ label, options, selected, onToggle, single = false }) {
+// ===== PersonalPreferencePage 등 다른 화면에서도 재사용하는 칩 선택 그룹 =====
+export function ChipGroup({ label, options, selected, onToggle, single = false }) {
   return (
     <div className="ui-chip-group momeokji-chips" aria-label={label}>
       {options.map((option) => {

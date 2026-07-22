@@ -9,6 +9,8 @@ import ParticipantPreferencePage from './ParticipantPreferencePage'
 import MomeokjiPreferenceNotice from '../components/momeokji/MomeokjiPreferenceNotice'
 import MomeokjiVoteNotice from '../components/momeokji/MomeokjiVoteNotice'
 import MomeokjiVotePage from '../components/momeokji/MomeokjiVotePage'
+import { getChatRoomMembers, getRecentMessages } from '../services/chatApi'
+import { connectChatSocket, disconnectChatSocket, sendChatMessage } from '../services/chatSocket'
 import { createMeetup } from '../services/meetupService'
 import { recommendRestaurants } from '../services/momeokjiService'
 import {
@@ -36,6 +38,20 @@ function currentTime() {
     hour: 'numeric',
     minute: '2-digit',
   })
+}
+
+// ===== 서버 채팅 메시지를 기존 말풍선 컴포넌트 형식으로 변환 =====
+function toUiMessage(serverMessage, myMemberId) {
+  return {
+    id: serverMessage.id,
+    sender: serverMessage.memberId === myMemberId ? 'me' : 'other',
+    name: serverMessage.nickname,
+    text: serverMessage.content,
+    time: new Date(serverMessage.createdAt).toLocaleTimeString('ko-KR', {
+      hour: 'numeric',
+      minute: '2-digit',
+    }),
+  }
 }
 
 // 채팅방을 처음 열었을 때의 시각으로 기본 대화를 생성.
@@ -93,8 +109,15 @@ function ChatRoomPage({ room: providedRoom, currentUser = DEMO_CURRENT_USER }) {
     ],
   }
 
-  // API 연결 후 room.members에 채팅방 참가자 DTO(id, name)를 그대로 전달합니다.
-  const roomParticipants = room.members
+  const useMockApi = String(import.meta.env.VITE_USE_MOCK ?? 'false').toLowerCase() === 'true'
+  const [chatMembers, setChatMembers] = useState([])
+  const [chatConnectionError, setChatConnectionError] = useState('')
+  const chatSocketRef = useRef(null)
+
+  // 실제 연결 시 서버 회원을 사용하고, 목업 모드에서는 기존 고정 참가자를 유지합니다.
+  const roomParticipants = chatMembers.length > 0
+    ? chatMembers.map((member) => ({ id: member.id, name: member.nickname }))
+    : room.members
   // API 연결 후에는 createInitialMessages 대신 채팅 조회 응답으로 초기화
   const [messages, setMessages] = useState(createInitialMessages)
   const [isMomeokjiOpen, setIsMomeokjiOpen] = useState(false)
@@ -113,6 +136,43 @@ function ChatRoomPage({ room: providedRoom, currentUser = DEMO_CURRENT_USER }) {
   const canViewVote = voteSession?.settings.participantIds.includes(currentUser.id)
   const canViewPreference = preferenceSession?.participantIds.includes(currentUser.id)
   const canViewMomeokjiResult = momeokjiResult?.participantIds.includes(currentUser.id)
+
+  // ===== 채팅 이력 조회 후 STOMP를 구독해 새 메시지를 실시간으로 추가 =====
+  useEffect(() => {
+    if (useMockApi || !room.id || !currentUser?.id) return undefined
+
+    let cancelled = false
+    const connectChat = async () => {
+      try {
+        const [history, members] = await Promise.all([
+          getRecentMessages(room.id),
+          getChatRoomMembers(room.id),
+        ])
+        if (cancelled) return
+
+        setMessages(history.map((message) => toUiMessage(message, currentUser.id)))
+        setChatMembers(members)
+        chatSocketRef.current = await connectChatSocket(room.id, {
+          onMessage: (message) => {
+            setMessages((previous) => [...previous, toUiMessage(message, currentUser.id)])
+          },
+        })
+      } catch (error) {
+        if (!cancelled) {
+          setChatConnectionError(error instanceof Error
+            ? error.message
+            : '채팅 서버에 연결하지 못했습니다.')
+        }
+      }
+    }
+
+    connectChat()
+    return () => {
+      cancelled = true
+      disconnectChatSocket(chatSocketRef.current)
+      chatSocketRef.current = null
+    }
+  }, [currentUser?.id, room.id, useMockApi])
 
   // ===== 투표 생성 시각부터 설정된 제한시간이 지나면 현재 득표로 자동 결정 =====
   useEffect(() => {
@@ -167,6 +227,11 @@ function ChatRoomPage({ room: providedRoom, currentUser = DEMO_CURRENT_USER }) {
   }, [voteSession])
 
   const sendMessage = (text) => {
+    if (chatSocketRef.current?.connected) {
+      sendChatMessage(chatSocketRef.current, room.id, text)
+      return
+    }
+
     setMessages((previous) => [
       ...previous,
       {
@@ -450,11 +515,12 @@ function ChatRoomPage({ room: providedRoom, currentUser = DEMO_CURRENT_USER }) {
       {/* ===== 채팅방 참가자 수: 이후 room.members API 데이터와 자동 연동 ===== */}
       <ChatHeader
         roomName="진원버스 가즈아"
-        memberCount={room.members.length}
+        memberCount={roomParticipants.length}
         onBack={() => navigate('/chats')}
       />
 
       <div className="chat-body">
+        {chatConnectionError && <ChatNotice text={chatConnectionError} />}
         {/* ===== 모임 생성 REST 요청 상태를 채팅 공지로 표시 ===== */}
         {isCreatingMeetup && <ChatNotice text="모임을 만들고 있어요." />}
         {meetupCreationError && <ChatNotice text={meetupCreationError} />}

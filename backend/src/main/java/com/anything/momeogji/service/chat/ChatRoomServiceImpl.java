@@ -1,5 +1,6 @@
 package com.anything.momeogji.service.chat;
 
+import com.anything.momeogji.dto.MemberDTO;
 import com.anything.momeogji.dto.chat.ChatRoomResponse;
 import com.anything.momeogji.dto.chat.ChatRoomListItemResponse;
 import com.anything.momeogji.entity.ChatRoom;
@@ -62,6 +63,18 @@ public class ChatRoomServiceImpl implements ChatRoomService {
     public List<ChatRoomListItemResponse> getMyRooms(Long memberId) {
         findMember(memberId);
         return chatRoomQueryMapper.findAllByMemberId(memberId);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<MemberDTO> listMembers(Long chatRoomId) {
+        findChatRoom(chatRoomId);
+        return chatRoomMemberRepository.findByChatRoomId(chatRoomId).stream()
+                .map(chatRoomMember -> {
+                    Member member = chatRoomMember.getUser();
+                    return new MemberDTO(member.getId(), member.getNickname(), member.getProfileImageUrl());
+                })
+                .toList();
     }
 
     private ChatRoom findChatRoom(Long chatRoomId) {

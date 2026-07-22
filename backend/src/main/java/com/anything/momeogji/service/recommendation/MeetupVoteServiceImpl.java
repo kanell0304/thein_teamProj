@@ -4,6 +4,7 @@ import com.anything.momeogji.dto.recommendation.RoundResponse;
 import com.anything.momeogji.entity.Member;
 import com.anything.momeogji.entity.recommendation.Meetup;
 import com.anything.momeogji.entity.recommendation.MeetupParticipant;
+import com.anything.momeogji.entity.recommendation.MeetupStatus;
 import com.anything.momeogji.entity.recommendation.RecommendationRound;
 import com.anything.momeogji.entity.recommendation.RoundCandidate;
 import com.anything.momeogji.entity.recommendation.SubmissionStatus;
@@ -34,6 +35,7 @@ public class MeetupVoteServiceImpl implements MeetupVoteService {
     private final VoteRepository voteRepository;
     private final RecommendationEventPublisher eventPublisher;
     private final RoundResponseAssembler roundResponseAssembler;
+    private final MeetupFinalizeService meetupFinalizeService;
 
     @Override
     @Transactional
@@ -53,7 +55,22 @@ public class MeetupVoteServiceImpl implements MeetupVoteService {
                     .build());
         }
 
-        return broadcastAndReturn(candidate.getRound(), meetup);
+        RoundResponse response = broadcastAndReturn(candidate.getRound(), meetup);
+        autoFinalizeIfEveryoneVoted(meetup, candidate.getRound());
+        return response;
+    }
+
+    // 투표 대상 전원(개인 선호를 제출한 참여자 전원)이 이 회차에서 한 표 이상 행사하면 자동으로 확정한다.
+    private void autoFinalizeIfEveryoneVoted(Meetup meetup, RecommendationRound round) {
+        if (meetup.getStatus() == MeetupStatus.FINALIZED) return;
+
+        long submittedCount = meetupParticipantRepository.countByMeetupIdAndSubmissionStatus(meetup.getId(), SubmissionStatus.SUBMITTED);
+        if (submittedCount == 0) return;
+
+        long votedCount = voteRepository.countDistinctVotersByRoundId(round.getId());
+        if (votedCount >= submittedCount) {
+            meetupFinalizeService.finalizeInternal(meetup);
+        }
     }
 
     @Override

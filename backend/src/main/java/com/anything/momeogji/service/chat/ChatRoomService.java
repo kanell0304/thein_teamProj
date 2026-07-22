@@ -1,5 +1,6 @@
 package com.anything.momeogji.service.chat;
 
+import com.anything.momeogji.dto.MemberDTO;
 import com.anything.momeogji.dto.chat.ChatRoomResponse;
 import com.anything.momeogji.dto.chat.ChatRoomListItemResponse;
 
@@ -15,4 +16,7 @@ public interface ChatRoomService {
 
     /** 로그인 회원이 참여한 채팅방을 최근 메시지 순으로 조회한다. */
     List<ChatRoomListItemResponse> getMyRooms(Long memberId);
+
+    /** 채팅방 참가자 선택 화면에 사용할 회원 목록을 조회한다. */
+    List<MemberDTO> listMembers(Long chatRoomId);
 }

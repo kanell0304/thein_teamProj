@@ -1,15 +1,24 @@
 package com.anything.momeogji.service.recommendation;
 
 import com.anything.momeogji.dto.recommendation.CommonOptionRequest;
+import com.anything.momeogji.dto.recommendation.FinalNoticeResponse;
 import com.anything.momeogji.dto.recommendation.MeetupDetailResponse;
+import com.anything.momeogji.dto.recommendation.MeetupInvitationEvent;
 import com.anything.momeogji.dto.recommendation.MeetupResponse;
+import com.anything.momeogji.dto.recommendation.ParticipantSummaryResponse;
 import com.anything.momeogji.dto.recommendation.RoundResponse;
 import com.anything.momeogji.entity.ChatRoom;
 import com.anything.momeogji.entity.Member;
+import com.anything.momeogji.entity.recommendation.FinalNotice;
 import com.anything.momeogji.entity.recommendation.Meetup;
+import com.anything.momeogji.entity.recommendation.MeetupParticipant;
 import com.anything.momeogji.entity.recommendation.MeetupStatus;
+import com.anything.momeogji.entity.recommendation.Restaurant;
+import com.anything.momeogji.entity.recommendation.SubmissionStatus;
 import com.anything.momeogji.repository.ChatRoomMemberRepository;
 import com.anything.momeogji.repository.ChatRoomRepository;
+import com.anything.momeogji.repository.FinalNoticeRepository;
+import com.anything.momeogji.repository.MeetupParticipantRepository;
 import com.anything.momeogji.repository.MeetupRepository;
 import com.anything.momeogji.repository.MemberRepository;
 import com.anything.momeogji.repository.RecommendationRoundRepository;
@@ -19,6 +28,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -28,20 +39,25 @@ public class MeetupServiceImpl implements MeetupService {
     private final ChatRoomRepository chatRoomRepository;
     private final ChatRoomMemberRepository chatRoomMemberRepository;
     private final MemberRepository memberRepository;
+    private final MeetupParticipantRepository meetupParticipantRepository;
     private final RecommendationRoundRepository recommendationRoundRepository;
+    private final FinalNoticeRepository finalNoticeRepository;
     private final RoundResponseAssembler roundResponseAssembler;
+    private final RecommendationEventPublisher eventPublisher;
 
     @Override
     @Transactional
-    public MeetupResponse createMeetup(Long chatRoomId, CommonOptionRequest commonOption, LocalDateTime voteDeadlineAt, Long hostMemberId) {
+    public MeetupResponse createMeetup(Long chatRoomId, CommonOptionRequest commonOption, LocalDateTime voteDeadlineAt,
+                                        List<Long> participantIds, Long hostMemberId) {
         ChatRoom chatRoom = findChatRoom(chatRoomId);
         Member host = findMember(hostMemberId);
         requireMembership(chatRoomId, hostMemberId);
+        participantIds.forEach(participantId -> requireMembership(chatRoomId, participantId));
 
         Meetup meetup = meetupRepository.save(Meetup.builder()
                 .chatRoom(chatRoom)
                 .hostUser(host)
-                .status(MeetupStatus.RECOMMENDING)
+                .status(MeetupStatus.PREFERENCE_COLLECTING)
                 .destinationName(commonOption.destinationName())
                 .destinationLatitude(BigDecimal.valueOf(commonOption.destinationLatitude()))
                 .destinationLongitude(BigDecimal.valueOf(commonOption.destinationLongitude()))
@@ -50,7 +66,20 @@ public class MeetupServiceImpl implements MeetupService {
                 .voteDeadlineAt(voteDeadlineAt)
                 .build());
 
-        return toResponse(meetup);
+        for (Long participantId : participantIds) {
+            Member participantMember = findMember(participantId);
+            meetupParticipantRepository.save(MeetupParticipant.builder()
+                    .meetup(meetup)
+                    .user(participantMember)
+                    .submissionStatus(SubmissionStatus.PENDING)
+                    .confirmedForAi(false)
+                    .build());
+        }
+
+        MeetupResponse response = toResponse(meetup);
+        eventPublisher.meetupInvitationSent(chatRoomId,
+                new MeetupInvitationEvent(toDetailResponse(meetup, null), listParticipants(meetup.getId())));
+        return response;
     }
 
     @Override
@@ -61,19 +90,71 @@ public class MeetupServiceImpl implements MeetupService {
                 .map(roundResponseAssembler::assemble)
                 .orElse(null);
 
+        return toDetailResponse(meetup, latestRound);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<ParticipantSummaryResponse> listParticipants(Long meetupId) {
+        Meetup meetup = findMeetup(meetupId);
+        return meetupParticipantRepository.findByMeetupId(meetupId).stream()
+                .map(participant -> new ParticipantSummaryResponse(
+                        participant.getId(),
+                        participant.getUser().getId(),
+                        participant.getUser().getNickname(),
+                        participant.getSubmissionStatus().name(),
+                        participant.getUser().getId().equals(meetup.getHostUser().getId())
+                ))
+                .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<MeetupDetailResponse> getActiveMeetupForChatRoom(Long chatRoomId) {
+        return meetupRepository.findFirstByChatRoomIdOrderByIdDesc(chatRoomId)
+                .map(meetup -> {
+                    RoundResponse latestRound = recommendationRoundRepository.findFirstByMeetupIdOrderByRoundNoDesc(meetup.getId())
+                            .map(roundResponseAssembler::assemble)
+                            .orElse(null);
+                    return toDetailResponse(meetup, latestRound);
+                });
+    }
+
+    private MeetupResponse toResponse(Meetup meetup) {
+        return new MeetupResponse(meetup.getId(), meetup.getChatRoom().getId(), meetup.getStatus().name(),
+                MeetupCommonOptionMapper.toCommonOption(meetup), meetup.getVoteDeadlineAt(), meetup.getHostUser().getId());
+    }
+
+    private MeetupDetailResponse toDetailResponse(Meetup meetup, RoundResponse latestRound) {
+        FinalNoticeResponse finalNotice = meetup.getStatus() == MeetupStatus.FINALIZED
+                ? finalNoticeRepository.findByMeetupId(meetup.getId()).map(notice -> toFinalNoticeResponse(notice, meetup.getId())).orElse(null)
+                : null;
+
         return new MeetupDetailResponse(
                 meetup.getId(),
                 meetup.getChatRoom().getId(),
                 meetup.getStatus().name(),
                 MeetupCommonOptionMapper.toCommonOption(meetup),
                 latestRound,
-                meetup.getVoteDeadlineAt()
+                meetup.getVoteDeadlineAt(),
+                meetup.getHostUser().getId(),
+                finalNotice
         );
     }
 
-    private MeetupResponse toResponse(Meetup meetup) {
-        return new MeetupResponse(meetup.getId(), meetup.getChatRoom().getId(), meetup.getStatus().name(),
-                MeetupCommonOptionMapper.toCommonOption(meetup), meetup.getVoteDeadlineAt());
+    private FinalNoticeResponse toFinalNoticeResponse(FinalNotice finalNotice, Long meetupId) {
+        Restaurant restaurant = finalNotice.getRestaurant();
+        int participantCount = (int) meetupParticipantRepository.countByMeetupId(meetupId);
+        return new FinalNoticeResponse(
+                restaurant.getName(),
+                restaurant.getRoadAddress(),
+                restaurant.getAddress(),
+                restaurant.getLatitude() == null ? null : restaurant.getLatitude().doubleValue(),
+                restaurant.getLongitude() == null ? null : restaurant.getLongitude().doubleValue(),
+                finalNotice.getImageUrl(),
+                participantCount,
+                finalNotice.getMeetingDatetime()
+        );
     }
 
     private void requireMembership(Long chatRoomId, Long memberId) {
