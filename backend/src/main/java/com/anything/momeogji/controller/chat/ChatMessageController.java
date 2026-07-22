@@ -11,7 +11,7 @@ import org.springframework.stereotype.Controller;
 
 import java.security.Principal;
 
-/** 실시간 채팅 메시지 수신(WebSocket/STOMP). 이력 조회는 ChatMessageRestController가 담당한다. */
+// 실시간 채팅 메시지 수신(WebSocket/STOMP). 이력 조회는 ChatMessageRestController가 담당한다.
 @Controller
 @RequiredArgsConstructor
 public class ChatMessageController {

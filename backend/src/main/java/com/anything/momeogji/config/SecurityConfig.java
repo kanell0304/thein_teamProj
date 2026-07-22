@@ -40,6 +40,8 @@ public class SecurityConfig {
                         // 프론트가 JSON body로 요청하면 브라우저가 먼저 OPTIONS 프리플라이트를 보낸다 — 인증 없이 항상 통과시켜야 한다.
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/api/auth/**", "/api/dev/**", "/ws/**").permitAll()
+                        // Swagger UI / OpenAPI 문서는 인증 없이 열람 가능 (실제 API 호출 테스트는 문서 내 Authorize로 토큰 입력)
+                        .requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**").permitAll()
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);

@@ -3,6 +3,7 @@ package com.anything.momeogji.controller.recommendation;
 import com.anything.momeogji.dto.recommendation.RoundCreateRequest;
 import com.anything.momeogji.dto.recommendation.RoundResponse;
 import com.anything.momeogji.service.recommendation.RecommendationRoundService;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
@@ -12,6 +13,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+@Tag(name = "Recommendation Round [추천 회차]")
 @RestController
 @RequestMapping("/api/meetups/{meetupId}/rounds")
 @RequiredArgsConstructor

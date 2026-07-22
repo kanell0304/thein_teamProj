@@ -3,6 +3,7 @@ package com.anything.momeogji.controller.recommendation;
 import com.anything.momeogji.dto.recommendation.FinalNoticeResponse;
 import com.anything.momeogji.dto.recommendation.FinalNoticeUpdateRequest;
 import com.anything.momeogji.service.recommendation.MeetupFinalizeService;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
@@ -13,6 +14,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+@Tag(name = "Meetup Finalize [최종 확정]")
 @RestController
 @RequestMapping("/api/meetups/{meetupId}/final-notice")
 @RequiredArgsConstructor

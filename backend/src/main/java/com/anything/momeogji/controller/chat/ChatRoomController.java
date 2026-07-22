@@ -4,6 +4,7 @@ import com.anything.momeogji.dto.MemberDTO;
 import com.anything.momeogji.dto.chat.ChatRoomCreateRequest;
 import com.anything.momeogji.dto.chat.ChatRoomResponse;
 import com.anything.momeogji.service.chat.ChatRoomService;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -18,6 +19,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
+@Tag(name = "Chat Room [채팅방]")
 @RestController
 @RequestMapping("/api/chatrooms")
 @RequiredArgsConstructor

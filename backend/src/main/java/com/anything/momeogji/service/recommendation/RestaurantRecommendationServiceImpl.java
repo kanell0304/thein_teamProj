@@ -40,21 +40,22 @@ public class RestaurantRecommendationServiceImpl implements RestaurantRecommenda
     private final KakaoImageSearchClient kakaoImageSearchClient;
     private final ObjectMapper objectMapper;
 
+    // ai 추천 로직
     @Override
     public RecommendationResult recommend(RecommendationRequest request) {
-        AggregatedCondition condition = conditionAggregator.aggregate(request.personalOptions());
-        Set<String> excludedCandidateIds = Set.copyOf(request.excludedRestaurantIds());
-        List<RestaurantCandidate> candidates = candidateSearchService.search(request.commonOption(), condition, excludedCandidateIds);
-        Map<String, RestaurantCandidate> candidateById = candidates.stream()
+        AggregatedCondition condition = conditionAggregator.aggregate(request.personalOptions()); // 개인 선택 분위기
+        Set<String> excludedCandidateIds = Set.copyOf(request.excludedRestaurantIds()); // 제외하고 싶은 음식
+        List<RestaurantCandidate> candidates = candidateSearchService.search(request.commonOption(), condition, excludedCandidateIds); // 검색/추천
+        Map<String, RestaurantCandidate> candidateById = candidates.stream() // 추천 목록을 리스트로 저장
                 .collect(Collectors.toMap(RestaurantCandidate::id, Function.identity()));
 
-        String systemPrompt = promptBuilder.buildSystemPrompt();
-        String userPrompt = promptBuilder.buildUserPrompt(request.commonOption(), condition, candidates, request.preferenceNote());
-        String rawContent = openAiChatClient.requestStructuredJson(systemPrompt, userPrompt);
+        String systemPrompt = promptBuilder.buildSystemPrompt(); // ai 프롬프트 생성
+        String userPrompt = promptBuilder.buildUserPrompt(request.commonOption(), condition, candidates, request.preferenceNote()); // 각각의 개인 선택 사항을 프롬프트에 추가
+        String rawContent = openAiChatClient.requestStructuredJson(systemPrompt, userPrompt); // 위의 2개를 포함하여 api 전송 및 결과(응답) 저장
 
-        AiSelectionPayload payload = parsePayload(rawContent);
-        List<AiSelection> selections = validateSelections(payload);
-        List<RestaurantRecommendation> recommendations = selections.stream()
+        AiSelectionPayload payload = parsePayload(rawContent); // 응답 받은 데이터를 파싱
+        List<AiSelection> selections = validateSelections(payload); // 추천 리스트가 비어있는지 확인
+        List<RestaurantRecommendation> recommendations = selections.stream() // 추천받은 음식점들을 리스트로 저장 ->
                 .map(selection -> toRecommendation(selection, candidateById))
                 .sorted(Comparator.comparingInt(RestaurantRecommendation::rank))
                 .toList();
@@ -70,23 +71,25 @@ public class RestaurantRecommendationServiceImpl implements RestaurantRecommenda
         }
     }
 
+    // 추천 응답이 비어있는지 확인하는 메서드
     private List<AiSelection> validateSelections(AiSelectionPayload payload) {
-        if (payload == null || payload.selections() == null) {
-            throw new AiRecommendationException("AI 추천 응답이 비어 있습니다.");
+        if (payload == null || payload.selections() == null) { // 응답 값이 null인지 확인
+            throw new AiRecommendationException("AI 추천 응답이 비어 있습니다."); // 없으면 예외 발생
         }
 
-        List<AiSelection> selections = payload.selections();
-        long distinctCandidateCount = selections.stream().map(AiSelection::candidateId).distinct().count();
+        List<AiSelection> selections = payload.selections(); // 있으면 리스트형태로 받아옴
+        long distinctCandidateCount = selections.stream().map(AiSelection::candidateId).distinct().count(); // 받아온 리스트 개수 확인
 
-        if (selections.size() != RECOMMENDATION_COUNT || distinctCandidateCount != RECOMMENDATION_COUNT) {
+        if (selections.size() != RECOMMENDATION_COUNT || distinctCandidateCount != RECOMMENDATION_COUNT) { // 받아온 리스트 개수가 요구 사항에 맞는 개수 미만일 시
             throw new AiRecommendationException(
-                    "AI 추천 결과 개수/중복이 올바르지 않습니다. (개수=%d, 중복제외개수=%d, 기대값=%d)"
+                    "AI 추천 결과 개수/중복이 올바르지 않습니다. (개수=%d, 중복제외개수=%d, 기대값=%d)" // 추천 개수가 부족하다는 메세지 예외 발생
                             .formatted(selections.size(), distinctCandidateCount, RECOMMENDATION_COUNT));
         }
 
         return selections;
     }
 
+    // 음식점 추천 로직
     private RestaurantRecommendation toRecommendation(AiSelection selection, Map<String, RestaurantCandidate> candidateById) {
         RestaurantCandidate candidate = candidateById.get(selection.candidateId());
         if (candidate == null) {
@@ -94,20 +97,20 @@ public class RestaurantRecommendationServiceImpl implements RestaurantRecommenda
         }
         return new RestaurantRecommendation(
                 candidate.id(),
-                selection.rank(),
-                candidate.name(),
-                candidate.category(),
-                candidate.roadAddress(),
-                candidate.address(),
-                candidate.latitude(),
-                candidate.longitude(),
-                selection.reason(),
+                selection.rank(), // (우선순위인데 현재 사용하지 않음 ㅇㅅㅇ)
+                candidate.name(), // 음식점 이름
+                candidate.category(), // 카테고리
+                candidate.roadAddress(), // 도로명
+                candidate.address(), // 주소
+                candidate.latitude(), // 위도
+                candidate.longitude(), // 경도
+                selection.reason(), // 추천 이유
                 null
         );
     }
 
-    // AI가 최종적으로 고른 3곳에 대해서만 이미지를 조회한다(후보 전체에 조회하면 쿼터가 금방 소진됨).
-    // 3건을 순차 호출하면 지연이 그대로 합산되니 병렬로 조회한다.
+    // AI가 최종적으로 고른 3곳에 대해서만 이미지를 조회.
+    // 3건을 순차 호출하면 지연이 그대로 합산되니 병렬로 조회.
     private List<RestaurantRecommendation> attachImages(List<RestaurantRecommendation> recommendations) {
         List<CompletableFuture<RestaurantRecommendation>> futures = recommendations.stream()
                 .map(recommendation -> CompletableFuture.supplyAsync(() -> withImage(recommendation)))
@@ -115,7 +118,7 @@ public class RestaurantRecommendationServiceImpl implements RestaurantRecommenda
         return futures.stream().map(CompletableFuture::join).toList();
     }
 
-    // 구글이 더 정확하므로 먼저 시도하고(그 가게에 실제 등록된 사진), 키가 없거나 실패하면 카카오 이미지 검색으로 폴백한다.
+    // 구글이 더 정확하므로 먼저 시도하고(그 가게에 실제 등록된 사진), 키가 없거나 검색에 실패하면 카카오 이미지 검색으로 폴백한다.
     private RestaurantRecommendation withImage(RestaurantRecommendation recommendation) {
         Optional<String> googleImage = hasCoordinates(recommendation)
                 ? googlePlacesImageClient.searchFirstImageUrl(recommendation.name(), recommendation.latitude(), recommendation.longitude())
@@ -135,7 +138,7 @@ public class RestaurantRecommendationServiceImpl implements RestaurantRecommenda
                 recommendation.latitude(),
                 recommendation.longitude(),
                 recommendation.reason(),
-                imageUrl
+                imageUrl // 이미지 url이 추가됨
         );
     }
 

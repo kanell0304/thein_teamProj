@@ -18,6 +18,7 @@ public class AuthServiceImpl implements AuthService {
     private final MemberRepository memberRepository;
     private final JwtTokenProvider jwtTokenProvider;
 
+    // 카카오 소셜 로그인
     @Override
     @Transactional
     public TokenResponse loginWithKakao(String code) {
@@ -27,6 +28,7 @@ public class AuthServiceImpl implements AuthService {
         return issueToken(member);
     }
 
+    // 개발용 로그인
     @Override
     @Transactional
     public TokenResponse devLogin(String kakaoId, String nickname) {
@@ -35,6 +37,7 @@ public class AuthServiceImpl implements AuthService {
         return issueToken(member);
     }
 
+    // 회원 생성(회원 여부 확인 선행)
     private Member findOrCreateMember(String kakaoId, String nickname, String profileImageUrl) {
         return memberRepository.findByKakaoId(kakaoId)
                 .orElseGet(() -> memberRepository.save(Member.builder()

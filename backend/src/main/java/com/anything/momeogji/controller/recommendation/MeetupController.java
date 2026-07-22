@@ -5,6 +5,7 @@ import com.anything.momeogji.dto.recommendation.MeetupDetailResponse;
 import com.anything.momeogji.dto.recommendation.MeetupResponse;
 import com.anything.momeogji.dto.recommendation.ParticipantSummaryResponse;
 import com.anything.momeogji.service.recommendation.MeetupService;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -19,6 +20,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
+@Tag(name = "Meetup [모임]")
 @RestController
 @RequestMapping("/api/meetups")
 @RequiredArgsConstructor

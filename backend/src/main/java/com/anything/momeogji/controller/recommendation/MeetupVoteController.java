@@ -2,6 +2,7 @@ package com.anything.momeogji.controller.recommendation;
 
 import com.anything.momeogji.dto.recommendation.RoundResponse;
 import com.anything.momeogji.service.recommendation.MeetupVoteService;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -10,6 +11,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+@Tag(name = "Meetup Vote [투표]")
 @RestController
 @RequestMapping("/api/meetups/{meetupId}/rounds/{roundId}/candidates/{roundCandidateId}/votes")
 @RequiredArgsConstructor

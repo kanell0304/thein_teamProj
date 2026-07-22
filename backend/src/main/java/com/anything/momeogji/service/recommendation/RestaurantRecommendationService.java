@@ -5,5 +5,6 @@ import com.anything.momeogji.dto.recommendation.RecommendationResult;
 
 public interface RestaurantRecommendationService {
 
+    // 음식점 추천 결과
     RecommendationResult recommend(RecommendationRequest request);
 }

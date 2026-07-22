@@ -14,7 +14,7 @@ import java.time.Instant;
 import java.util.Date;
 import java.util.Optional;
 
-/** 자체 발급 액세스 토큰(JWT)의 생성/검증을 담당한다. 리프레시 토큰은 아직 다루지 않는다. */
+// 자체 발급 액세스 토큰(JWT)의 생성/검증을 담당한다. 리프레시 토큰은 아직 다루지 않는다.
 @Component
 public class JwtTokenProvider {
 
@@ -28,6 +28,7 @@ public class JwtTokenProvider {
         this.accessTokenExpirationMillis = properties.accessTokenExpirationMinutes() * 60_000L;
     }
 
+    // accessToken 생성
     public String createAccessToken(Long memberId, MemberRole role) {
         Instant now = Instant.now();
         return Jwts.builder()
@@ -39,7 +40,7 @@ public class JwtTokenProvider {
                 .compact();
     }
 
-    /** 서명/만료가 유효하지 않으면 빈 Optional을 반환한다(예외를 던지지 않음). */
+    // 서명/만료가 유효하지 않으면 빈 Optional을 반환한다(예외를 던지지 않음).
     public Optional<Claims> parseClaims(String token) {
         try {
             return Optional.of(Jwts.parser().verifyWith(key).build().parseSignedClaims(token).getPayload());

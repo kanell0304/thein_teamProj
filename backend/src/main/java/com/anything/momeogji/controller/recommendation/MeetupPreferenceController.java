@@ -4,6 +4,7 @@ import com.anything.momeogji.dto.recommendation.PreferenceSubmitRequest;
 import com.anything.momeogji.dto.recommendation.PreferenceSubmitResponse;
 import com.anything.momeogji.dto.recommendation.RoundResponse;
 import com.anything.momeogji.service.recommendation.MeetupPreferenceService;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
@@ -13,6 +14,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+@Tag(name = "Meetup Preference [개인 선호]")
 @RestController
 @RequestMapping("/api/meetups/{meetupId}/preferences")
 @RequiredArgsConstructor
