@@ -27,6 +27,8 @@ public class MeetupPreferenceServiceImpl implements MeetupPreferenceService {
     private final MeetupParticipantRepository meetupParticipantRepository;
     private final ParticipantPreferenceRepository participantPreferenceRepository;
     private final ParticipantPreferenceUpserter participantPreferenceUpserter;
+    private final MyDataConsentProcessor myDataConsentProcessor;
+    private final MyDataCategoryEnricher myDataCategoryEnricher;
     private final RecommendationRoundService recommendationRoundService;
     private final MeetupService meetupService;
     private final RecommendationEventPublisher eventPublisher;
@@ -43,6 +45,7 @@ public class MeetupPreferenceServiceImpl implements MeetupPreferenceService {
                 request.excludedFoods(), request.atmosphere());
         participantPreferenceUpserter.upsert(participant, option);
         participant.markSubmitted();
+        myDataConsentProcessor.process(participant, request.myDataConsent(), meetup.getMeetingTime());
 
         List<ParticipantSummaryResponse> participants = meetupService.listParticipants(meetupId);
         eventPublisher.preferenceProgress(meetup.getChatRoom().getId(), new MeetupProgressEvent(meetupId, participants));
@@ -90,6 +93,7 @@ public class MeetupPreferenceServiceImpl implements MeetupPreferenceService {
                         preference.getExcludedFoods(),
                         preference.getAtmosphere()))
                 .toList();
+        options = myDataCategoryEnricher.enrich(preferences, options);
         return recommendationRoundService.triggerAutoRecommendation(meetup, options);
     }
 

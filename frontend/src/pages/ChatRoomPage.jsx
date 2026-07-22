@@ -180,6 +180,7 @@ function toPreferenceRequest(preference, settings) {
     atmosphere: (preference.moodPreferences ?? [])
       .filter((mood) => mood !== '상관없어요')
       .join(', ') || null,
+    myDataConsent: preference.myDataConsent === true,
   }
 }
 

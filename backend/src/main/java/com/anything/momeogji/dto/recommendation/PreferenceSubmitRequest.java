@@ -13,7 +13,8 @@ public record PreferenceSubmitRequest(
         Integer budgetLimit,
         boolean parkingNeeded,
         List<String> excludedFoods,
-        String atmosphere
+        String atmosphere,
+        boolean myDataConsent
 ) {
     public PreferenceSubmitRequest {
         excludedFoods = excludedFoods == null ? List.of() : List.copyOf(excludedFoods);
