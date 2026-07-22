@@ -21,12 +21,12 @@ import org.junit.jupiter.api.Test;
 
 import java.time.LocalTime;
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * user-01 Dummy JSON을 실제 수집·정제·집계·분류 구현으로 처리해 전체 파이프라인을 검증한다.
+ * user-01~03 실행용 Dummy JSON을 실제 수집·정제·집계·분류 구현으로 처리한다.
  */
 class MyDataPipelineTest {
 
@@ -62,63 +62,102 @@ class MyDataPipelineTest {
     }
 
     /**
-     * user-01의 동의 카드 한 장에서 현재 Dummy 승인내역 68건을 모두 수집하는지 확인한다.
+     * user-01은 미동의 card-003을 호출하지 않고 동의 카드 두 장만 수집한다.
      */
     @Test
-    void user01의_동의_카드_승인내역_68건을_수집한다() {
+    void user01은_동의_카드_두_장의_승인내역_92건을_수집한다() {
         UserMyData result = myDataService.collect(1L);
 
         assertThat(result.userId()).isEqualTo(1L);
+        assertThat(result.approvals()).hasSize(92);
+        assertThat(result.approvals().stream()
+                .collect(java.util.stream.Collectors.groupingBy(
+                        approval -> approval.cardId(),
+                        java.util.stream.Collectors.counting()
+                )))
+                .containsExactlyInAnyOrderEntriesOf(Map.of("001", 68L, "002", 24L));
+    }
+
+    /**
+     * user-02의 세 승인 페이지를 연결해 계획한 상태별 68건을 모두 수집한다.
+     */
+    @Test
+    void user02는_세_페이지의_승인내역_68건을_수집한다() {
+        UserMyData result = myDataService.collect(2L);
+
         assertThat(result.approvals()).hasSize(68);
-        assertThat(result.approvals())
-                .extracting(approval -> approval.cardId())
-                .containsOnly("001");
+        assertThat(result.approvals().stream()
+                .collect(java.util.stream.Collectors.groupingBy(
+                        approval -> approval.statusCode(),
+                        java.util.stream.Collectors.counting()
+                )))
+                .containsExactlyInAnyOrderEntriesOf(
+                        Map.of("01", 60L, "02", 3L, "03", 2L, "04", 3L)
+                );
     }
 
     /**
-     * 점심 시간대 결제를 31개 가맹점으로 묶고 검색 실패 결과를 모두 미분류로 보존하는지 확인한다.
+     * 취소·정정을 제외하고 승인·무승인매입을 추천 가공 대상으로 유지한다.
      */
     @Test
-    void user01의_점심_결제를_31개_미분류_가맹점으로_가공한다() {
-        TransformedUserMyData result = myDataService.process(
-                1L,
-                LocalTime.of(12, 0)
-        );
+    void user02의_취소와_정정은_정제에서_제외된다() {
+        UserMyData collected = myDataService.collect(2L);
+        var cleaned = new UserMyDataCleaner().clean(collected);
 
-        assertThat(result.userId()).isEqualTo(1L);
-        assertThat(result.merchantUsages()).hasSize(31);
-        assertThat(result.merchantUsages()).allSatisfy(merchantUsage -> {
-            KakaoPlaceMatchData kakaoPlaceMatch = merchantUsage.kakaoPlaceMatch();
-            assertThat(kakaoPlaceMatch.categoryCode())
-                    .isEqualTo(KakaoPlaceMatchData.UNKNOWN_CATEGORY_CODE);
-            assertThat(kakaoPlaceMatch.matchConfidence()).isZero();
-            assertThat(kakaoPlaceMatch.placeId()).isNull();
-            assertThat(kakaoPlaceMatch.placeName()).isNull();
-            assertThat(kakaoPlaceMatch.longitude()).isNull();
-            assertThat(kakaoPlaceMatch.latitude()).isNull();
-        });
-
-        assertThatThrownBy(() -> result.merchantUsages().add(null))
-                .isInstanceOf(UnsupportedOperationException.class);
+        assertThat(cleaned).hasSize(63);
+        assertThat(collected.approvals())
+                .filteredOn(approval -> "04".equals(approval.statusCode()))
+                .hasSize(3);
+        assertThat(cleaned)
+                .extracting(approval -> approval.approvalNumber())
+                .containsAll(collected.approvals().stream()
+                        .filter(approval -> "04".equals(approval.statusCode()))
+                        .map(approval -> approval.approvalNumber())
+                        .toList());
     }
 
     /**
-     * 현재 Dummy에 없는 아침과 저녁 시각을 선택하면 사용자 ID만 남긴 빈 결과가 반환되는지 확인한다.
+     * user-03의 빈 card-003을 포함한 네 카드 흐름과 세 시간대 경계 fixture를 처리한다.
      */
     @Test
-    void 선택_시각의_시간대에_결제가_없으면_빈_최종_결과를_반환한다() {
+    void user03은_빈_카드를_포함해_36건을_수집하고_시간대별로_가공한다() {
+        UserMyData collected = myDataService.collect(3L);
         TransformedUserMyData morningResult = myDataService.process(
-                1L,
+                3L,
                 LocalTime.of(9, 0)
         );
+        TransformedUserMyData lunchResult = myDataService.process(
+                3L,
+                LocalTime.of(12, 0)
+        );
         TransformedUserMyData dinnerResult = myDataService.process(
-                1L,
+                3L,
                 LocalTime.of(18, 0)
         );
 
-        assertThat(morningResult.userId()).isEqualTo(1L);
-        assertThat(morningResult.merchantUsages()).isEmpty();
-        assertThat(dinnerResult.userId()).isEqualTo(1L);
-        assertThat(dinnerResult.merchantUsages()).isEmpty();
+        assertThat(collected.approvals()).hasSize(36);
+        assertThat(collected.approvals().stream()
+                .collect(java.util.stream.Collectors.groupingBy(
+                        approval -> approval.cardId(),
+                        java.util.stream.Collectors.counting()
+                )))
+                .containsExactlyInAnyOrderEntriesOf(
+                        Map.of("001", 12L, "002", 12L, "004", 12L)
+                );
+        assertThat(morningResult.merchantUsages()).hasSize(12);
+        assertThat(lunchResult.merchantUsages()).hasSize(11);
+        assertThat(dinnerResult.merchantUsages()).hasSize(12);
+        assertThat(morningResult.merchantUsages())
+                .allSatisfy(merchantUsage -> assertUnknownPlace(merchantUsage.kakaoPlaceMatch()));
+    }
+
+    private void assertUnknownPlace(KakaoPlaceMatchData kakaoPlaceMatch) {
+        assertThat(kakaoPlaceMatch.categoryCode())
+                .isEqualTo(KakaoPlaceMatchData.UNKNOWN_CATEGORY_CODE);
+        assertThat(kakaoPlaceMatch.matchConfidence()).isZero();
+        assertThat(kakaoPlaceMatch.placeId()).isNull();
+        assertThat(kakaoPlaceMatch.placeName()).isNull();
+        assertThat(kakaoPlaceMatch.longitude()).isNull();
+        assertThat(kakaoPlaceMatch.latitude()).isNull();
     }
 }

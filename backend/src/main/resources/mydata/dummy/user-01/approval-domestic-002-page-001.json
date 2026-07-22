@@ -1,0 +1,223 @@
+{
+  "rsp_code": "00000",
+  "rsp_msg": "정상 처리",
+  "approved_cnt": 24,
+  "approved_list": [
+    {
+      "approved_num": "010020010001",
+      "approved_dtime": "20260721083000",
+      "status": "01",
+      "pay_type": "02",
+      "merchant_name": "버거킹 양재점",
+      "merchant_regno": "000-00-10052",
+      "approved_amt": 11200
+    },
+    {
+      "approved_num": "010020010002",
+      "approved_dtime": "20260720122000",
+      "status": "01",
+      "pay_type": "02",
+      "merchant_name": "금강수림",
+      "merchant_regno": "000-00-10009",
+      "approved_amt": 13600
+    },
+    {
+      "approved_num": "010020010003",
+      "approved_dtime": "20260719184000",
+      "status": "01",
+      "pay_type": "02",
+      "merchant_name": "마성떡볶이 양재역점",
+      "merchant_regno": "000-00-10027",
+      "approved_amt": 18000
+    },
+    {
+      "approved_num": "010020010004",
+      "approved_dtime": "20260718083000",
+      "status": "01",
+      "pay_type": "02",
+      "merchant_name": "BGT호두단팥빵 양재역점",
+      "merchant_regno": "000-00-10043",
+      "approved_amt": 24100
+    },
+    {
+      "approved_num": "010020010005",
+      "approved_dtime": "20260717122000",
+      "status": "01",
+      "pay_type": "02",
+      "merchant_name": "곱창왕김형제 양재본점",
+      "merchant_regno": "000-00-10050",
+      "approved_amt": 32200
+    },
+    {
+      "approved_num": "010020010006",
+      "approved_dtime": "20260716184000",
+      "status": "01",
+      "pay_type": "02",
+      "merchant_name": "찌개집1979 양재역점",
+      "merchant_regno": "000-00-10006",
+      "approved_amt": 2100
+    },
+    {
+      "approved_num": "010020010007",
+      "approved_dtime": "20260715083000",
+      "status": "01",
+      "pay_type": "02",
+      "merchant_name": "지세포세꼬시",
+      "merchant_regno": "000-00-10041",
+      "approved_amt": 3800
+    },
+    {
+      "approved_num": "010020010008",
+      "approved_dtime": "20260714122000",
+      "status": "01",
+      "pay_type": "02",
+      "merchant_name": "석화촌",
+      "merchant_regno": "000-00-10021",
+      "approved_amt": 5500
+    },
+    {
+      "approved_num": "010020010009",
+      "approved_dtime": "20260713184000",
+      "status": "01",
+      "pay_type": "02",
+      "merchant_name": "하우 양재역점",
+      "merchant_regno": "000-00-10058",
+      "approved_amt": 7900
+    },
+    {
+      "approved_num": "010020010010",
+      "approved_dtime": "20260712083000",
+      "status": "01",
+      "pay_type": "02",
+      "merchant_name": "메가MGC커피 양재역지하상가점",
+      "merchant_regno": "000-00-10024",
+      "approved_amt": 10000
+    },
+    {
+      "approved_num": "010020010011",
+      "approved_dtime": "20260711122000",
+      "status": "01",
+      "pay_type": "02",
+      "merchant_name": "GS25 S양재역점",
+      "merchant_regno": "000-00-10022",
+      "approved_amt": 11100
+    },
+    {
+      "approved_num": "010020010012",
+      "approved_dtime": "20260710184000",
+      "status": "01",
+      "pay_type": "02",
+      "merchant_name": "양재미소약국",
+      "merchant_regno": "000-00-10045",
+      "approved_amt": 13700
+    },
+    {
+      "approved_num": "010020010013",
+      "approved_dtime": "20260709083000",
+      "status": "01",
+      "pay_type": "02",
+      "merchant_name": "버거킹 양재점",
+      "merchant_regno": "000-00-10052",
+      "approved_amt": 18000
+    },
+    {
+      "approved_num": "010020010014",
+      "approved_dtime": "20260708122000",
+      "status": "01",
+      "pay_type": "02",
+      "merchant_name": "금강수림",
+      "merchant_regno": "000-00-10009",
+      "approved_amt": 24100
+    },
+    {
+      "approved_num": "010020010015",
+      "approved_dtime": "20260707184000",
+      "status": "01",
+      "pay_type": "02",
+      "merchant_name": "마성떡볶이 양재역점",
+      "merchant_regno": "000-00-10027",
+      "approved_amt": 32200
+    },
+    {
+      "approved_num": "010020010016",
+      "approved_dtime": "20260706083000",
+      "status": "01",
+      "pay_type": "02",
+      "merchant_name": "BGT호두단팥빵 양재역점",
+      "merchant_regno": "000-00-10043",
+      "approved_amt": 2200
+    },
+    {
+      "approved_num": "010020010017",
+      "approved_dtime": "20260705122000",
+      "status": "01",
+      "pay_type": "02",
+      "merchant_name": "곱창왕김형제 양재본점",
+      "merchant_regno": "000-00-10050",
+      "approved_amt": 3800
+    },
+    {
+      "approved_num": "010020010018",
+      "approved_dtime": "20260704184000",
+      "status": "01",
+      "pay_type": "02",
+      "merchant_name": "찌개집1979 양재역점",
+      "merchant_regno": "000-00-10006",
+      "approved_amt": 5600
+    },
+    {
+      "approved_num": "010020010019",
+      "approved_dtime": "20260703083000",
+      "status": "01",
+      "pay_type": "02",
+      "merchant_name": "지세포세꼬시",
+      "merchant_regno": "000-00-10041",
+      "approved_amt": 8100
+    },
+    {
+      "approved_num": "010020010020",
+      "approved_dtime": "20260702122000",
+      "status": "01",
+      "pay_type": "02",
+      "merchant_name": "석화촌",
+      "merchant_regno": "000-00-10021",
+      "approved_amt": 10000
+    },
+    {
+      "approved_num": "010020010021",
+      "approved_dtime": "20260701184000",
+      "status": "01",
+      "pay_type": "02",
+      "merchant_name": "하우 양재역점",
+      "merchant_regno": "000-00-10058",
+      "approved_amt": 11100
+    },
+    {
+      "approved_num": "010020010022",
+      "approved_dtime": "20260630083000",
+      "status": "01",
+      "pay_type": "02",
+      "merchant_name": "메가MGC커피 양재역지하상가점",
+      "merchant_regno": "000-00-10024",
+      "approved_amt": 13600
+    },
+    {
+      "approved_num": "010020010023",
+      "approved_dtime": "20260629122000",
+      "status": "01",
+      "pay_type": "02",
+      "merchant_name": "GS25 S양재역점",
+      "merchant_regno": "000-00-10022",
+      "approved_amt": 18200
+    },
+    {
+      "approved_num": "010020010024",
+      "approved_dtime": "20260628184000",
+      "status": "01",
+      "pay_type": "02",
+      "merchant_name": "양재미소약국",
+      "merchant_regno": "000-00-10045",
+      "approved_amt": 24000
+    }
+  ]
+}

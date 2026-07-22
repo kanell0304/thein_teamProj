@@ -1,0 +1,115 @@
+{
+  "rsp_code": "00000",
+  "rsp_msg": "정상 처리",
+  "approved_cnt": 12,
+  "approved_list": [
+    {
+      "approved_num": "030040010001",
+      "approved_dtime": "20260721160000",
+      "status": "01",
+      "pay_type": "02",
+      "merchant_name": "디트로이트1달러피자",
+      "merchant_regno": "000-00-10013",
+      "approved_amt": 32200
+    },
+    {
+      "approved_num": "030040010002",
+      "approved_dtime": "20260720015900",
+      "status": "01",
+      "pay_type": "02",
+      "merchant_name": "육랩 여의도점",
+      "merchant_regno": "000-00-10008",
+      "approved_amt": 2200
+    },
+    {
+      "approved_num": "030040010003",
+      "approved_dtime": "20260719182000",
+      "status": "01",
+      "pay_type": "02",
+      "merchant_name": "브로트아트 여의도역2호점",
+      "merchant_regno": "000-00-10003",
+      "approved_amt": 4000
+    },
+    {
+      "approved_num": "030040010004",
+      "approved_dtime": "20260718231000",
+      "status": "01",
+      "pay_type": "02",
+      "merchant_name": "리나스 여의도역점",
+      "merchant_regno": "000-00-10004",
+      "approved_amt": 5500
+    },
+    {
+      "approved_num": "030040010005",
+      "approved_dtime": "20260717160000",
+      "status": "01",
+      "pay_type": "02",
+      "merchant_name": "카이저호프",
+      "merchant_regno": "000-00-10018",
+      "approved_amt": 7900
+    },
+    {
+      "approved_num": "030040010006",
+      "approved_dtime": "20260716015900",
+      "status": "01",
+      "pay_type": "02",
+      "merchant_name": "우아 여의도점",
+      "merchant_regno": "000-00-10033",
+      "approved_amt": 10000
+    },
+    {
+      "approved_num": "030040010007",
+      "approved_dtime": "20260715182000",
+      "status": "04",
+      "pay_type": "02",
+      "merchant_name": "로비스불닭바베큐",
+      "merchant_regno": "000-00-10038",
+      "approved_amt": 11200
+    },
+    {
+      "approved_num": "030040010008",
+      "approved_dtime": "20260714231000",
+      "status": "01",
+      "pay_type": "02",
+      "merchant_name": "유일양꼬치",
+      "merchant_regno": "000-00-10014",
+      "approved_amt": 13700
+    },
+    {
+      "approved_num": "030040010009",
+      "approved_dtime": "20260713160000",
+      "status": "01",
+      "pay_type": "02",
+      "merchant_name": "공차 여의도역사점",
+      "merchant_regno": "000-00-10037",
+      "approved_amt": 18000
+    },
+    {
+      "approved_num": "030040010010",
+      "approved_dtime": "20260712015900",
+      "status": "01",
+      "pay_type": "02",
+      "merchant_name": "브루다커피 여의도역점",
+      "merchant_regno": "000-00-10031",
+      "approved_amt": 24100
+    },
+    {
+      "approved_num": "030040010011",
+      "approved_dtime": "20260711182000",
+      "status": "01",
+      "pay_type": "02",
+      "merchant_name": "세븐일레븐 S여의도역점",
+      "merchant_regno": "000-00-10053",
+      "approved_amt": 32100
+    },
+    {
+      "approved_num": "030040010012",
+      "approved_dtime": "20260710231000",
+      "status": "01",
+      "pay_type": "02",
+      "merchant_name": "여의도약국",
+      "merchant_regno": "000-00-10010",
+      "approved_amt": 2300
+    }
+  ]
+}

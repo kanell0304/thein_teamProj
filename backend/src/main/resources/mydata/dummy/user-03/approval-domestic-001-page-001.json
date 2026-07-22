@@ -1,0 +1,115 @@
+{
+  "rsp_code": "00000",
+  "rsp_msg": "정상 처리",
+  "approved_cnt": 12,
+  "approved_list": [
+    {
+      "approved_num": "030010010001",
+      "approved_dtime": "20260721095900",
+      "status": "01",
+      "pay_type": "02",
+      "merchant_name": "포490베트남쌀국수 강남점",
+      "merchant_regno": "000-00-10034",
+      "approved_amt": 13500
+    },
+    {
+      "approved_num": "030010010002",
+      "approved_dtime": "20260720020000",
+      "status": "01",
+      "pay_type": "02",
+      "merchant_name": "사이공본가 강남역점",
+      "merchant_regno": "000-00-10056",
+      "approved_amt": 18100
+    },
+    {
+      "approved_num": "030010010003",
+      "approved_dtime": "20260719081000",
+      "status": "01",
+      "pay_type": "02",
+      "merchant_name": "명인만두 강남역지하상가점",
+      "merchant_regno": "000-00-10049",
+      "approved_amt": 24000
+    },
+    {
+      "approved_num": "030010010004",
+      "approved_dtime": "20260718092000",
+      "status": "01",
+      "pay_type": "02",
+      "merchant_name": "브릭샌드 강남역점",
+      "merchant_regno": "000-00-10054",
+      "approved_amt": 32100
+    },
+    {
+      "approved_num": "030010010005",
+      "approved_dtime": "20260717095900",
+      "status": "01",
+      "pay_type": "02",
+      "merchant_name": "강다짐 강남역지하상가점",
+      "merchant_regno": "000-00-10048",
+      "approved_amt": 2100
+    },
+    {
+      "approved_num": "030010010006",
+      "approved_dtime": "20260716020000",
+      "status": "01",
+      "pay_type": "02",
+      "merchant_name": "삼형제김밥 강남역점",
+      "merchant_regno": "000-00-10007",
+      "approved_amt": 4000
+    },
+    {
+      "approved_num": "030010010007",
+      "approved_dtime": "20260715081000",
+      "status": "01",
+      "pay_type": "02",
+      "merchant_name": "로봇김밥 신분당선강남역점",
+      "merchant_regno": "000-00-10011",
+      "approved_amt": 5600
+    },
+    {
+      "approved_num": "030010010008",
+      "approved_dtime": "20260714092000",
+      "status": "01",
+      "pay_type": "02",
+      "merchant_name": "킹즈 치아바타",
+      "merchant_regno": "000-00-10030",
+      "approved_amt": 8100
+    },
+    {
+      "approved_num": "030010010009",
+      "approved_dtime": "20260713095900",
+      "status": "01",
+      "pay_type": "02",
+      "merchant_name": "빽다방 강남역지하도점",
+      "merchant_regno": "000-00-10039",
+      "approved_amt": 9800
+    },
+    {
+      "approved_num": "030010010010",
+      "approved_dtime": "20260712020000",
+      "status": "01",
+      "pay_type": "02",
+      "merchant_name": "공차 강남역점",
+      "merchant_regno": "000-00-10029",
+      "approved_amt": 11100
+    },
+    {
+      "approved_num": "030010010011",
+      "approved_dtime": "20260711081000",
+      "status": "01",
+      "pay_type": "02",
+      "merchant_name": "GS25 S강남역1호점",
+      "merchant_regno": "000-00-10015",
+      "approved_amt": 13600
+    },
+    {
+      "approved_num": "030010010012",
+      "approved_dtime": "20260710092000",
+      "status": "01",
+      "pay_type": "02",
+      "merchant_name": "365강남역약국",
+      "merchant_regno": "000-00-10028",
+      "approved_amt": 18000
+    }
+  ]
+}

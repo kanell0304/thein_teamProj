@@ -1,0 +1,16 @@
+{
+  "rsp_code": "00000",
+  "rsp_msg": "정상 처리",
+  "search_timestamp": "20260722090000",
+  "card_cnt": 1,
+  "card_list": [
+    {
+      "card_id": "001",
+      "card_num": "444444******4444",
+      "is_consent": true,
+      "card_name": "모먹지 지역혼합 신용카드",
+      "card_member": "1",
+      "card_type": "01"
+    }
+  ]
+}

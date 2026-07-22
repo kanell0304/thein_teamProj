@@ -19,6 +19,8 @@ public class DummyMyDataProvider implements MyDataProvider {
 
     private static final String DUMMY_BASE_PATH = "mydata/dummy";
     private static final Pattern SAFE_CARD_ID = Pattern.compile("[A-Za-z0-9_-]{1,64}");
+    private static final Pattern SAFE_PAGE_TOKEN = Pattern.compile("page-\\d{3}");
+    private static final String FIRST_PAGE_TOKEN = "page-001";
 
     /**
      * 상세 호출 계약은 {@link MyDataProvider#fetchCardList(Long, String, String, int)}를 참조한다.
@@ -41,9 +43,10 @@ public class DummyMyDataProvider implements MyDataProvider {
                                          LocalDate toDate, String nextPage, int limit) {
         validUserId(userId);
         validCardId(cardId);
+        String pageToken = nextPage == null ? FIRST_PAGE_TOKEN : validNextPage(nextPage);
 
         String resourcePath = getDirectory(userId)
-                + "/approval-domestic-" + cardId + ".json";
+                + "/approval-domestic-" + cardId + "-" + pageToken + ".json";
         return getDummyFile(resourcePath);
     }
 
@@ -109,5 +112,23 @@ public class DummyMyDataProvider implements MyDataProvider {
         if (cardId == null || !SAFE_CARD_ID.matcher(cardId).matches()) {
             throw new IllegalArgumentException("cardId 형식이 올바르지 않습니다: " + cardId);
         }
+    }
+
+    /**
+     * 다음 페이지 토큰이 고정 Dummy 파일명에 안전하게 사용할 수 있는 형식인지 확인한다.
+     *
+     * <p>최초 페이지는 호출자가 {@code null}로 전달하며 이 클래스가
+     * {@code page-001}로 변환한다. 후속 페이지는 응답의 {@code next_page}를
+     * 변경하지 않고 전달받되 {@code page-숫자 3자리} 형식만 허용한다.</p>
+     *
+     * @param nextPage 국내 승인내역 응답에서 받은 다음 페이지 토큰
+     * @return 검증을 통과한 원본 페이지 토큰
+     * @throws IllegalArgumentException 페이지 토큰이 허용된 형식이 아닌 경우
+     */
+    private String validNextPage(String nextPage) {
+        if (!SAFE_PAGE_TOKEN.matcher(nextPage).matches()) {
+            throw new IllegalArgumentException("nextPage 형식이 올바르지 않습니다: " + nextPage);
+        }
+        return nextPage;
     }
 }

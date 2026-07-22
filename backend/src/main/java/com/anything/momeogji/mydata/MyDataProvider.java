@@ -59,15 +59,16 @@ public interface MyDataProvider {
      * 다음 페이지를 요청해야 한다.</p>
      *
      * <p>현재 {@code DummyMyDataProvider}는 참가자 디렉터리에서
-     * {@code approval-domestic-카드ID.json} 파일을 읽는다. 파일 선택에는
-     * {@code userId}와 {@code cardId}만 사용하며, 정적 Dummy 데이터이므로
-     * 조회 기간·페이지·조회 개수는 별도로 검증하거나 파일 선택에 사용하지 않는다.</p>
+     * {@code approval-domestic-카드ID-page-NNN.json} 파일을 읽는다. 최초 요청의
+     * {@code null} 페이지는 {@code page-001}에 대응하고, 후속 요청은 직전 응답의
+     * {@code next_page}가 가리키는 파일을 선택한다. 조회 기간과 조회 개수는 정적
+     * Dummy 파일 선택에 사용하지 않는다.</p>
      *
      * @param userId 사용자별 Dummy 응답 또는 실제 API 인증 문맥을 찾기 위한 내부 ID
      * @param cardId 카드 목록 조회 응답에서 얻은 카드 고유 식별자
      * @param fromDate 호출일 기준 1년 전인 국내 승인내역 조회 시작일; 현재 Dummy에서는 사용하지 않음
      * @param toDate 수집을 호출한 당일인 국내 승인내역 조회 종료일; 현재 Dummy에서는 사용하지 않음
-     * @param nextPage 다음 페이지 기준개체. 최초 페이지이면 {@code null}; 현재 Dummy에서는 사용하지 않음
+     * @param nextPage 다음 페이지 기준개체. 최초 페이지이면 {@code null}; Dummy 후속 페이지는 {@code page-NNN} 형식
      * @param limit 페이지당 최대 조회 개수. 호출 계층에서 {@code 500}을 고정 전달하며 현재 Dummy에서는 사용하지 않음
      * @return 가공하거나 파싱하지 않은 UTF-8 국내 승인내역 JSON 문자열
      * @throws IllegalArgumentException 사용자 ID 또는 카드 ID 형식이 올바르지 않은 경우
