@@ -12,7 +12,12 @@ import MomeokjiVotePage from '../components/momeokji/MomeokjiVotePage'
 import { getChatRoomMembers, getRecentMessages, seedDevChat } from '../services/chatApi'
 import { connectChatSocket, disconnectChatSocket, sendChatMessage } from '../services/chatSocket'
 import { createMeetup } from '../services/meetupService'
-import { replaceVotes, submitMyPreference } from '../services/meetupApi'
+import {
+  getActiveMeetup,
+  getMeetupParticipants,
+  replaceVotes,
+  submitMyPreference,
+} from '../services/meetupApi'
 import { recommendRestaurants } from '../services/momeokjiService'
 import {
   createVoteCounts,
@@ -45,6 +50,11 @@ function currentTime() {
 function getErrorMessage(error, fallbackMessage) {
   return error?.userMessage
     || (error instanceof Error ? error.message : fallbackMessage)
+}
+
+// ===== API 숫자 ID와 목업 문자열 ID를 같은 기준으로 비교 =====
+function includesMemberId(memberIds = [], memberId) {
+  return memberIds.some((candidateId) => String(candidateId) === String(memberId))
 }
 
 // ===== 서버 채팅 메시지를 기존 말풍선 컴포넌트 형식으로 변환 =====
@@ -202,12 +212,11 @@ function toServerResult(finalNotice, settings, recommendations = []) {
   }
 }
 
-// ===== 다른 참가자가 받은 모임 초대 이벤트를 개인 조건 입력 화면 설정으로 복원 =====
-function toInvitationSettings(event) {
-  const meetup = event.meetup
+// ===== 서버 모임 상세와 참가자 목록을 개인 조건 입력 화면 설정으로 복원 =====
+function toRestoredSettings(meetup, participants = []) {
   const commonOption = meetup.commonOption
   const meetingTime = String(commonOption.meetingTime || '')
-  const participantIds = (event.participants ?? []).map((participant) => participant.memberId)
+  const participantIds = participants.map((participant) => participant.memberId)
   return {
     meetupId: meetup.meetupId,
     date: meetingTime.slice(0, 10),
@@ -221,7 +230,7 @@ function toInvitationSettings(event) {
       longitude: commonOption.destinationLongitude,
     },
     participantIds,
-    participantNames: (event.participants ?? []).map((participant) => participant.nickname),
+    participantNames: participants.map((participant) => participant.nickname),
     personalOptionDurationMinutes: 10,
     voteDurationMinutes: meetup.voteDurationMinutes ?? 10,
     themeCode: commonOption.purpose,
@@ -229,8 +238,13 @@ function toInvitationSettings(event) {
     menus: [],
     avoidFoods: [],
     moods: [],
-    participantPreferenceDeadlineAt: new Date(Date.now() + 10 * 60_000).toISOString(),
+    participantPreferenceDeadlineAt: meetup.personalOptionDeadlineAt,
   }
+}
+
+// ===== 다른 참가자가 실시간으로 받은 모임 초대도 조회 복원과 같은 형식으로 변환 =====
+function toInvitationSettings(event) {
+  return toRestoredSettings(event.meetup, event.participants ?? [])
 }
 
 function ChatRoomPage({ room: providedRoom, currentUser = DEMO_CURRENT_USER }) {
@@ -274,9 +288,9 @@ function ChatRoomPage({ room: providedRoom, currentUser = DEMO_CURRENT_USER }) {
   const [voteSession, setVoteSession] = useState(null)
   const [momeokjiResult, setMomeokjiResult] = useState(null)
   const voteSubmissionLockRef = useRef(false)
-  const canViewVote = voteSession?.settings.participantIds.includes(currentUser.id)
-  const canViewPreference = preferenceSession?.participantIds.includes(currentUser.id)
-  const canViewMomeokjiResult = momeokjiResult?.participantIds.includes(currentUser.id)
+  const canViewVote = includesMemberId(voteSession?.settings.participantIds, currentUser.id)
+  const canViewPreference = includesMemberId(preferenceSession?.participantIds, currentUser.id)
+  const canViewMomeokjiResult = includesMemberId(momeokjiResult?.participantIds, currentUser.id)
 
   useEffect(() => {
     pendingMeetingSettingsRef.current = pendingMeetingSettings
@@ -329,13 +343,55 @@ function ChatRoomPage({ room: providedRoom, currentUser = DEMO_CURRENT_USER }) {
 
         setMessages(history.map((message) => toUiMessage(message, currentUser.id)))
         setChatMembers(members)
+
+        // 새 로그인·새로고침으로 초대 웹소켓을 놓쳐도 진행 중인 개인 조건 공지를 복원합니다.
+        try {
+          const activeMeetup = await getActiveMeetup(room.id)
+          if (cancelled) return
+
+          if (activeMeetup && ['PREFERENCE_COLLECTING', 'RECOMMENDING'].includes(activeMeetup.status)) {
+            const meetupParticipants = await getMeetupParticipants(activeMeetup.meetupId)
+            if (cancelled) return
+
+            const settings = toRestoredSettings(activeMeetup, meetupParticipants)
+            const isSelectedParticipant = includesMemberId(settings.participantIds, currentUser.id)
+            const deadlineAt = settings.participantPreferenceDeadlineAt
+            const isStillOpen = !deadlineAt || new Date(deadlineAt).getTime() > Date.now()
+
+            if (isSelectedParticipant && (activeMeetup.status === 'RECOMMENDING' || isStillOpen)) {
+              const submittedParticipantIds = meetupParticipants
+                .filter((participant) => participant.submissionStatus === 'SUBMITTED')
+                .map((participant) => participant.memberId)
+
+              pendingMeetingSettingsRef.current = settings
+              setPendingMeetingSettings(settings)
+              setPreferenceSession({
+                meetupId: activeMeetup.meetupId,
+                status: activeMeetup.status === 'RECOMMENDING' ? 'GENERATING' : 'IN_PROGRESS',
+                participantIds: settings.participantIds,
+                submittedParticipantIds,
+                deadlineAt,
+              })
+              // 공지는 복원하되 사용자가 버튼을 누르기 전까지 입력 시트는 닫아둡니다.
+              setIsParticipantPreferenceOpen(false)
+            }
+          }
+        } catch (error) {
+          if (!cancelled) {
+            setMeetupCreationError(getErrorMessage(
+              error,
+              '진행 중인 모임 정보를 불러오지 못했습니다.',
+            ))
+          }
+        }
+
         chatSocketRef.current = await connectChatSocket(room.id, {
           onMessage: (message) => {
             setMessages((previous) => [...previous, toUiMessage(message, currentUser.id)])
           },
           onInvitation: (event) => {
             const settings = toInvitationSettings(event)
-            if (!settings.participantIds.includes(currentUser.id)) return
+            if (!includesMemberId(settings.participantIds, currentUser.id)) return
             pendingMeetingSettingsRef.current = settings
             setPendingMeetingSettings(settings)
             setPreferenceSession({
@@ -498,17 +554,18 @@ function ChatRoomPage({ room: providedRoom, currentUser = DEMO_CURRENT_USER }) {
 
     try {
       // 투표 마감은 추천 회차가 열린 시점부터 계산해야 하므로 최초 모임 생성에는 보내지 않습니다.
+      const participantPreferenceDeadlineAt = new Date(
+        Date.now() + settings.personalOptionDurationMinutes * 60_000,
+      ).toISOString()
       const meetup = await createMeetup({
         chatRoomId: room.id,
         settings,
+        personalOptionDeadlineAt: participantPreferenceDeadlineAt,
       })
       const meetupId = meetup.id ?? meetup.meetupId
       if (meetupId == null) throw new Error('서버가 모임 ID를 반환하지 않았습니다.')
 
-      const isCurrentUserSelected = settings.participantIds.includes(currentUser.id)
-      const participantPreferenceDeadlineAt = new Date(
-        Date.now() + settings.personalOptionDurationMinutes * 60_000,
-      ).toISOString()
+      const isCurrentUserSelected = includesMemberId(settings.participantIds, currentUser.id)
       const savedSettings = {
         ...settings,
         meetupId,
@@ -841,7 +898,10 @@ function ChatRoomPage({ room: providedRoom, currentUser = DEMO_CURRENT_USER }) {
               participantCount={preferenceSession.participantIds.length}
               submittedCount={preferenceSession.submittedParticipantIds.length}
               deadlineAt={preferenceSession.deadlineAt}
-              hasSubmitted={preferenceSession.submittedParticipantIds.includes(currentUser.id)}
+              hasSubmitted={includesMemberId(
+                preferenceSession.submittedParticipantIds,
+                currentUser.id,
+              )}
               onOpen={() => setIsParticipantPreferenceOpen(true)}
             />
           </ChatNotice>

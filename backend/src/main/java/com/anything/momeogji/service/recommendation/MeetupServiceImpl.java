@@ -47,7 +47,8 @@ public class MeetupServiceImpl implements MeetupService {
 
     @Override
     @Transactional
-    public MeetupResponse createMeetup(Long chatRoomId, CommonOptionRequest commonOption, LocalDateTime voteDeadlineAt,
+    public MeetupResponse createMeetup(Long chatRoomId, CommonOptionRequest commonOption,
+                                        LocalDateTime personalOptionDeadlineAt, LocalDateTime voteDeadlineAt,
                                         Integer voteDurationMinutes,
                                         List<Long> participantIds, Long hostMemberId) {
         ChatRoom chatRoom = findChatRoom(chatRoomId);
@@ -64,6 +65,7 @@ public class MeetupServiceImpl implements MeetupService {
                 .destinationLongitude(BigDecimal.valueOf(commonOption.destinationLongitude()))
                 .meetingTime(commonOption.meetingTime())
                 .purpose(commonOption.purpose())
+                .personalOptionDeadlineAt(personalOptionDeadlineAt)
                 .voteDeadlineAt(voteDeadlineAt)
                 .voteDurationMinutes(voteDurationMinutes)
                 .build());
@@ -124,8 +126,8 @@ public class MeetupServiceImpl implements MeetupService {
 
     private MeetupResponse toResponse(Meetup meetup) {
         return new MeetupResponse(meetup.getId(), meetup.getChatRoom().getId(), meetup.getStatus().name(),
-                MeetupCommonOptionMapper.toCommonOption(meetup), meetup.getVoteDeadlineAt(),
-                meetup.getVoteDurationMinutes(), meetup.getHostUser().getId());
+                MeetupCommonOptionMapper.toCommonOption(meetup), meetup.getPersonalOptionDeadlineAt(),
+                meetup.getVoteDeadlineAt(), meetup.getVoteDurationMinutes(), meetup.getHostUser().getId());
     }
 
     private MeetupDetailResponse toDetailResponse(Meetup meetup, RoundResponse latestRound) {
@@ -139,6 +141,7 @@ public class MeetupServiceImpl implements MeetupService {
                 meetup.getStatus().name(),
                 MeetupCommonOptionMapper.toCommonOption(meetup),
                 latestRound,
+                meetup.getPersonalOptionDeadlineAt(),
                 meetup.getVoteDeadlineAt(),
                 meetup.getVoteDurationMinutes(),
                 meetup.getHostUser().getId(),
