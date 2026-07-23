@@ -47,7 +47,8 @@ public class MeetupServiceImpl implements MeetupService {
 
     @Override
     @Transactional
-    public MeetupResponse createMeetup(Long chatRoomId, CommonOptionRequest commonOption, LocalDateTime voteDeadlineAt,
+    public MeetupResponse createMeetup(Long chatRoomId, CommonOptionRequest commonOption,
+                                        LocalDateTime personalOptionDeadlineAt, LocalDateTime voteDeadlineAt,
                                         Integer voteDurationMinutes,
                                         List<Long> participantIds, Long hostMemberId) {
         ChatRoom chatRoom = findChatRoom(chatRoomId);
@@ -64,6 +65,7 @@ public class MeetupServiceImpl implements MeetupService {
                 .destinationLongitude(BigDecimal.valueOf(commonOption.destinationLongitude()))
                 .meetingTime(commonOption.meetingTime())
                 .purpose(commonOption.purpose())
+                .personalOptionDeadlineAt(personalOptionDeadlineAt)
                 .voteDeadlineAt(voteDeadlineAt)
                 .voteDurationMinutes(voteDurationMinutes)
                 .build());
@@ -113,7 +115,15 @@ public class MeetupServiceImpl implements MeetupService {
     @Override
     @Transactional(readOnly = true)
     public Optional<MeetupDetailResponse> getActiveMeetupForChatRoom(Long chatRoomId) {
-        return meetupRepository.findFirstByChatRoomIdOrderByIdDesc(chatRoomId)
+        // 종료·만료된 모임은 재접속 시 현재 진행 중인 모임으로 복원하지 않는다.
+        List<MeetupStatus> activeStatuses = List.of(
+                MeetupStatus.DRAFT,
+                MeetupStatus.PARTICIPANT_CONFIRMING,
+                MeetupStatus.PREFERENCE_COLLECTING,
+                MeetupStatus.RECOMMENDING,
+                MeetupStatus.VOTING
+        );
+        return meetupRepository.findFirstByChatRoomIdAndStatusInOrderByIdDesc(chatRoomId, activeStatuses)
                 .map(meetup -> {
                     RoundResponse latestRound = recommendationRoundRepository.findFirstByMeetupIdOrderByRoundNoDesc(meetup.getId())
                             .map(roundResponseAssembler::assemble)
@@ -124,8 +134,8 @@ public class MeetupServiceImpl implements MeetupService {
 
     private MeetupResponse toResponse(Meetup meetup) {
         return new MeetupResponse(meetup.getId(), meetup.getChatRoom().getId(), meetup.getStatus().name(),
-                MeetupCommonOptionMapper.toCommonOption(meetup), meetup.getVoteDeadlineAt(),
-                meetup.getVoteDurationMinutes(), meetup.getHostUser().getId());
+                MeetupCommonOptionMapper.toCommonOption(meetup), meetup.getPersonalOptionDeadlineAt(),
+                meetup.getVoteDeadlineAt(), meetup.getVoteDurationMinutes(), meetup.getHostUser().getId());
     }
 
     private MeetupDetailResponse toDetailResponse(Meetup meetup, RoundResponse latestRound) {
@@ -139,6 +149,7 @@ public class MeetupServiceImpl implements MeetupService {
                 meetup.getStatus().name(),
                 MeetupCommonOptionMapper.toCommonOption(meetup),
                 latestRound,
+                meetup.getPersonalOptionDeadlineAt(),
                 meetup.getVoteDeadlineAt(),
                 meetup.getVoteDurationMinutes(),
                 meetup.getHostUser().getId(),

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import MainScreen from '../components/layout/MainScreen'
+import { ChatAddIcon } from '../components/layout/HeaderActionIcons'
 import { getChatRooms } from '../services/chatRoomService'
 import './ChatListPage.css'
 
@@ -84,7 +85,7 @@ function ChatListPage() {
             aria-label="새 채팅방 만들기"
             onClick={() => navigate('/chats/new')}
           >
-            <span className="material-symbols-outlined" aria-hidden="true">add</span>
+            <ChatAddIcon />
           </button>
         </>
       )}

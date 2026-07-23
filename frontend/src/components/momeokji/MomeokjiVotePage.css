@@ -20,3 +20,8 @@
 .momeokji-vote-sheet__description { margin: 0 0 4px; color: var(--color-subtle); font-size: 13px; line-height: 18px; }
 .momeokji-vote-sheet__multiple { margin: -4px 0 0; color: var(--color-primary); font-size: 12px; font-weight: 600; line-height: 17px; }
 .momeokji-vote-sheet__complete { margin: 0; padding: 9px 10px; border-radius: 8px; color: #d95c0b; background: var(--color-primary-soft); font-size: 12px; line-height: 17px; }
+
+/* ===== 투표 결과의 닫기·새로 만들기 2열 버튼 ===== */
+.momeokji-vote-sheet__footer--result { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.momeokji-vote-sheet__close-button { color: var(--color-text); background: var(--button-hover-bg) !important; }
+.momeokji-vote-sheet__close-button:hover:not(:disabled) { background: #c4c7ca !important; }

@@ -1,9 +1,23 @@
 import { apiFetch } from './apiClient'
 
-export function createMeetup({ chatRoomId, commonOption, voteDeadlineAt = null, voteDurationMinutes = 10, participantIds }) {
+export function createMeetup({
+  chatRoomId,
+  commonOption,
+  personalOptionDeadlineAt,
+  voteDeadlineAt = null,
+  voteDurationMinutes = 10,
+  participantIds,
+}) {
   return apiFetch('/api/meetups', {
     method: 'POST',
-    body: JSON.stringify({ chatRoomId, commonOption, voteDeadlineAt, voteDurationMinutes, participantIds }),
+    body: JSON.stringify({
+      chatRoomId,
+      commonOption,
+      personalOptionDeadlineAt,
+      voteDeadlineAt,
+      voteDurationMinutes,
+      participantIds,
+    }),
   })
 }
 

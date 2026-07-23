@@ -55,6 +55,18 @@
   background: #f2f3f5;
 }
 
+/* ===== 친구·채팅 추가 SVG 아이콘 공통 선 규격 ===== */
+.main-screen-action-icon {
+  width: 23px;
+  height: 23px;
+  overflow: visible;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
 .main-screen-content {
   min-height: 0;
   flex: 1;

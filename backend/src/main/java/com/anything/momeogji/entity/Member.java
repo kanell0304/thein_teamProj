@@ -53,4 +53,9 @@ public class Member {
     @UpdateTimestamp
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
+
+    /** 카카오 닉네임 동의를 거부해 임시 닉네임으로 가입한 경우, ID가 배정된 뒤 겹치지 않는 값으로 확정한다. */
+    public void updateNickname(String nickname) {
+        this.nickname = nickname;
+    }
 }
