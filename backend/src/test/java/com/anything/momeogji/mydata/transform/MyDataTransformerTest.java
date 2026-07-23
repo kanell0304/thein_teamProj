@@ -77,28 +77,26 @@ class MyDataTransformerTest {
         );
         MerchantUsageData classifiedUsage = merchantUsage.withKakaoPlaceMatch(
                 new KakaoPlaceMatchData(
-                        KakaoPlaceMatchData.RESTAURANT_CATEGORY_CODE,
-                        "123456",
                         "영인성",
-                        100,
-                        new BigDecimal("127.12345"),
-                        new BigDecimal("37.12345")
+                        "음식점 > 중식 > 중화요리"
                 )
         );
         List<CleanApprovalData> cleanedApprovals = List.of(cleanApproval);
         List<MerchantUsageData> merchantUsages = List.of(merchantUsage);
         List<MerchantUsageData> classifiedUsages = List.of(classifiedUsage);
         LocalTime meetingTime = LocalTime.of(12, 0);
+        String categoryGroupCode = "FD6";
 
         given(userMyDataCleaner.clean(userMyData)).willReturn(cleanedApprovals);
         given(merchantUsageProcessor.process(cleanedApprovals, meetingTime))
                 .willReturn(merchantUsages);
-        given(merchantClassificationProcessor.classify(merchantUsages))
+        given(merchantClassificationProcessor.classify(merchantUsages, categoryGroupCode))
                 .willReturn(classifiedUsages);
 
         TransformedUserMyData result = myDataTransformer.transform(
                 userMyData,
-                meetingTime
+                meetingTime,
+                categoryGroupCode
         );
 
         assertThat(result.userId()).isEqualTo(1L);
@@ -114,7 +112,10 @@ class MyDataTransformerTest {
                 cleanedApprovals,
                 meetingTime
         );
-        processingOrder.verify(merchantClassificationProcessor).classify(merchantUsages);
+        processingOrder.verify(merchantClassificationProcessor).classify(
+                merchantUsages,
+                categoryGroupCode
+        );
     }
 
     /**
@@ -124,16 +125,18 @@ class MyDataTransformerTest {
     void 처리할_승인내역이_없으면_빈_최종_결과를_반환한다() {
         UserMyData userMyData = new UserMyData(1L, List.of());
         LocalTime meetingTime = LocalTime.of(9, 0);
+        String categoryGroupCode = "FD6";
 
         given(userMyDataCleaner.clean(userMyData)).willReturn(List.of());
         given(merchantUsageProcessor.process(List.of(), meetingTime))
                 .willReturn(List.of());
-        given(merchantClassificationProcessor.classify(List.of()))
+        given(merchantClassificationProcessor.classify(List.of(), categoryGroupCode))
                 .willReturn(List.of());
 
         TransformedUserMyData result = myDataTransformer.transform(
                 userMyData,
-                meetingTime
+                meetingTime,
+                categoryGroupCode
         );
 
         assertThat(result.userId()).isEqualTo(1L);
@@ -155,7 +158,8 @@ class MyDataTransformerTest {
 
         assertThatThrownBy(() -> myDataTransformer.transform(
                 userMyData,
-                meetingTime
+                meetingTime,
+                "FD6"
         )).isSameAs(failure);
 
         verifyNoInteractions(merchantClassificationProcessor);
@@ -168,7 +172,7 @@ class MyDataTransformerTest {
     void 선택_시각이_없으면_가공_컴포넌트를_호출하지_않는다() {
         UserMyData userMyData = new UserMyData(1L, List.of());
 
-        assertThatThrownBy(() -> myDataTransformer.transform(userMyData, null))
+        assertThatThrownBy(() -> myDataTransformer.transform(userMyData, null, "FD6"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("meetingTime은 필수입니다.");
 

@@ -6,14 +6,12 @@ import com.anything.momeogji.mydata.cardlist.CardListParser;
 import com.anything.momeogji.mydata.cardlist.CardListValidator;
 import com.anything.momeogji.mydata.model.UserMyData;
 import com.anything.momeogji.mydata.transform.MerchantClassificationProcessor;
-import com.anything.momeogji.mydata.transform.MerchantMatchScoreCalculator;
 import com.anything.momeogji.mydata.transform.MerchantNameParser;
 import com.anything.momeogji.mydata.transform.MerchantPlaceMatcher;
 import com.anything.momeogji.mydata.transform.MerchantUsageProcessor;
 import com.anything.momeogji.mydata.transform.MyDataTransformer;
 import com.anything.momeogji.mydata.transform.UserMyDataCleaner;
 import com.anything.momeogji.mydata.transform.local.MerchantPlaceSearchClient;
-import com.anything.momeogji.mydata.transform.model.KakaoPlaceMatchData;
 import com.anything.momeogji.mydata.transform.model.TransformedUserMyData;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -38,11 +36,11 @@ class MyDataPipelineTest {
     @BeforeEach
     void setUp() {
         MerchantNameParser merchantNameParser = new MerchantNameParser();
-        MerchantPlaceSearchClient noCandidateSearchClient = query -> List.of();
+        MerchantPlaceSearchClient noCandidateSearchClient =
+                (query, categoryGroupCode) -> List.of();
         MerchantPlaceMatcher merchantPlaceMatcher = new MerchantPlaceMatcher(
                 noCandidateSearchClient,
-                merchantNameParser,
-                new MerchantMatchScoreCalculator(merchantNameParser)
+                merchantNameParser
         );
         MyDataTransformer myDataTransformer = new MyDataTransformer(
                 new UserMyDataCleaner(),
@@ -124,15 +122,18 @@ class MyDataPipelineTest {
         UserMyData collected = myDataService.collect(3L);
         TransformedUserMyData morningResult = myDataService.process(
                 3L,
-                LocalTime.of(9, 0)
+                LocalTime.of(9, 0),
+                "식사"
         );
         TransformedUserMyData lunchResult = myDataService.process(
                 3L,
-                LocalTime.of(12, 0)
+                LocalTime.of(12, 0),
+                "식사"
         );
         TransformedUserMyData dinnerResult = myDataService.process(
                 3L,
-                LocalTime.of(18, 0)
+                LocalTime.of(18, 0),
+                "식사"
         );
 
         assertThat(collected.approvals()).hasSize(36);
@@ -144,20 +145,8 @@ class MyDataPipelineTest {
                 .containsExactlyInAnyOrderEntriesOf(
                         Map.of("001", 12L, "002", 12L, "004", 12L)
                 );
-        assertThat(morningResult.merchantUsages()).hasSize(12);
-        assertThat(lunchResult.merchantUsages()).hasSize(11);
-        assertThat(dinnerResult.merchantUsages()).hasSize(12);
-        assertThat(morningResult.merchantUsages())
-                .allSatisfy(merchantUsage -> assertUnknownPlace(merchantUsage.kakaoPlaceMatch()));
-    }
-
-    private void assertUnknownPlace(KakaoPlaceMatchData kakaoPlaceMatch) {
-        assertThat(kakaoPlaceMatch.categoryCode())
-                .isEqualTo(KakaoPlaceMatchData.UNKNOWN_CATEGORY_CODE);
-        assertThat(kakaoPlaceMatch.matchConfidence()).isZero();
-        assertThat(kakaoPlaceMatch.placeId()).isNull();
-        assertThat(kakaoPlaceMatch.placeName()).isNull();
-        assertThat(kakaoPlaceMatch.longitude()).isNull();
-        assertThat(kakaoPlaceMatch.latitude()).isNull();
+        assertThat(morningResult.merchantUsages()).isEmpty();
+        assertThat(lunchResult.merchantUsages()).isEmpty();
+        assertThat(dinnerResult.merchantUsages()).isEmpty();
     }
 }

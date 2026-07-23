@@ -2,141 +2,72 @@ package com.anything.momeogji.mydata.transform.model;
 
 import org.junit.jupiter.api.Test;
 
-import java.math.BigDecimal;
-
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * {@link KakaoPlaceMatchData}가 최종 결과에 필요한 카카오 장소 계약을 강제하는지 검증한다.
+ * {@link KakaoPlaceMatchData}가 AI 전달 전 단계에 필요한 장소명·전체 카테고리 경로 계약을 강제하는지 검증한다.
  */
 class KakaoPlaceMatchDataTest {
 
     /**
-     * 검색 실패와 이름 미매칭에 사용하는 기본 객체가 미분류 상태를 명확히 표현하는지 확인한다.
+     * 가맹점 집계 직후 사용하는 분류 전 객체가 장소 정보를 포함하지 않는지 확인한다.
      */
     @Test
-    void 미매칭_기본값은_UNKNOWN과_빈_장소_정보를_가진다() {
-        KakaoPlaceMatchData result = KakaoPlaceMatchData.unmatched();
+    void 분류전_기본값은_장소명과_카테고리가_비어있다() {
+        KakaoPlaceMatchData result = KakaoPlaceMatchData.unclassified();
 
-        assertThat(result.categoryCode())
-                .isEqualTo(KakaoPlaceMatchData.UNKNOWN_CATEGORY_CODE);
-        assertThat(result.placeId()).isNull();
         assertThat(result.placeName()).isNull();
-        assertThat(result.matchConfidence()).isZero();
-        assertThat(result.longitude()).isNull();
-        assertThat(result.latitude()).isNull();
+        assertThat(result.categoryName()).isNull();
     }
 
     /**
-     * 양수와 음수 좌표가 모두 0 방향으로 소수점 다섯째 자리까지 절삭되는지 확인한다.
+     * 카카오에서 확정한 장소명과 전체 카테고리 경로를 원본 그대로 보존하는지 확인한다.
      */
     @Test
-    void 좌표는_소수점_다섯째_자리까지_절삭한다() {
-        KakaoPlaceMatchData positive = new KakaoPlaceMatchData(
-                KakaoPlaceMatchData.RESTAURANT_CATEGORY_CODE,
-                "1001",
-                "영인성",
-                100,
-                new BigDecimal("127.123456"),
-                new BigDecimal("37.987654")
-        );
-        KakaoPlaceMatchData negative = new KakaoPlaceMatchData(
-                KakaoPlaceMatchData.CAFE_CATEGORY_CODE,
-                "1002",
-                "테스트 카페",
-                90,
-                new BigDecimal("-127.123456"),
-                new BigDecimal("-37.987654")
-        );
-
-        assertThat(positive.longitude()).isEqualByComparingTo("127.12345");
-        assertThat(positive.latitude()).isEqualByComparingTo("37.98765");
-        assertThat(negative.longitude()).isEqualByComparingTo("-127.12345");
-        assertThat(negative.latitude()).isEqualByComparingTo("-37.98765");
-        assertThat(positive.longitude().scale()).isEqualTo(5);
-        assertThat(positive.latitude().scale()).isEqualTo(5);
-    }
-
-    /**
-     * 같은 최고 후보의 카테고리가 충돌한 경우 장소 정보가 있는 UNKNOWN 결과를 허용하는지 확인한다.
-     */
-    @Test
-    void 장소를_찾았지만_카테고리가_충돌하면_UNKNOWN과_신뢰도를_함께_보존한다() {
+    void 매칭된_장소명과_전체_카테고리_경로를_보존한다() {
         KakaoPlaceMatchData result = new KakaoPlaceMatchData(
-                KakaoPlaceMatchData.UNKNOWN_CATEGORY_CODE,
-                "1001",
                 "영인성",
-                100,
-                null,
-                null
+                "음식점 > 중식 > 중화요리"
         );
 
-        assertThat(result.categoryCode())
-                .isEqualTo(KakaoPlaceMatchData.UNKNOWN_CATEGORY_CODE);
-        assertThat(result.placeId()).isEqualTo("1001");
-        assertThat(result.matchConfidence()).isEqualTo(100);
+        assertThat(result.placeName()).isEqualTo("영인성");
+        assertThat(result.categoryName()).isEqualTo("음식점 > 중식 > 중화요리");
     }
 
     /**
-     * 장소·신뢰도·좌표의 존재 조합이 서로 모순되는 객체 생성을 거부하는지 확인한다.
+     * 같은 카카오 응답에서 얻는 장소명과 카테고리 중 한쪽만 존재하는 상태를 거부하는지 확인한다.
      */
     @Test
-    void 장소_신뢰도_좌표의_잘못된_조합을_거부한다() {
+    void 장소명과_카테고리는_함께_존재해야_한다() {
         assertThatThrownBy(() -> new KakaoPlaceMatchData(
-                KakaoPlaceMatchData.RESTAURANT_CATEGORY_CODE,
-                "1001",
-                null,
-                100,
-                null,
-                null
-        )).isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("placeId와 placeName은 함께 존재하거나 함께 null이어야 합니다.");
-
-        assertThatThrownBy(() -> new KakaoPlaceMatchData(
-                KakaoPlaceMatchData.RESTAURANT_CATEGORY_CODE,
-                null,
-                null,
-                90,
-                null,
-                null
-        )).isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("matchConfidence가 0보다 크면 장소 정보가 필요합니다.");
-
-        assertThatThrownBy(() -> new KakaoPlaceMatchData(
-                KakaoPlaceMatchData.RESTAURANT_CATEGORY_CODE,
-                "1001",
                 "영인성",
-                100,
-                new BigDecimal("127.1"),
                 null
         )).isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("longitude와 latitude는 함께 존재하거나 함께 null이어야 합니다.");
+                .hasMessage("placeName과 categoryName은 함께 존재하거나 함께 null이어야 합니다.");
+
+        assertThatThrownBy(() -> new KakaoPlaceMatchData(
+                null,
+                "음식점 > 중식 > 중화요리"
+        )).isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("placeName과 categoryName은 함께 존재하거나 함께 null이어야 합니다.");
     }
 
     /**
-     * 허용하지 않는 카테고리와 범위를 벗어난 좌표가 최종 값에 들어오지 못하는지 확인한다.
+     * 값이 존재하는 장소명과 카테고리가 공백 문자열인 경우를 거부하는지 확인한다.
      */
     @Test
-    void 허용하지_않는_카테고리와_좌표_범위를_거부한다() {
+    void 장소명과_카테고리의_공백값을_거부한다() {
         assertThatThrownBy(() -> new KakaoPlaceMatchData(
-                "CS2",
-                "1001",
-                "편의점",
-                100,
-                null,
-                null
+                "  ",
+                "음식점 > 중식 > 중화요리"
         )).isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("categoryCode는 FD6, CE7, UNKNOWN 중 하나여야 합니다.");
+                .hasMessage("placeName은(는) 공백일 수 없습니다.");
 
         assertThatThrownBy(() -> new KakaoPlaceMatchData(
-                KakaoPlaceMatchData.RESTAURANT_CATEGORY_CODE,
-                "1001",
                 "영인성",
-                100,
-                new BigDecimal("180.000001"),
-                new BigDecimal("37.1")
+                "  "
         )).isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("longitude이(가) 허용 범위를 벗어났습니다.");
+                .hasMessage("categoryName은(는) 공백일 수 없습니다.");
     }
 }

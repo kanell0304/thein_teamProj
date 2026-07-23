@@ -11,6 +11,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -81,12 +83,13 @@ class MyDataServiceTest {
                 List.of()
         );
         LocalTime meetingTime = LocalTime.of(12, 0);
-        given(myDataTransformer.transform(any(UserMyData.class), eq(meetingTime)))
+        given(myDataTransformer.transform(any(UserMyData.class), eq(meetingTime), eq("FD6")))
                 .willReturn(transformed);
 
         TransformedUserMyData result = myDataService.process(
                 1L,
-                meetingTime
+                meetingTime,
+                "식사"
         );
 
         assertThat(result).isSameAs(transformed);
@@ -104,7 +107,8 @@ class MyDataServiceTest {
                 ArgumentCaptor.forClass(UserMyData.class);
         verify(myDataTransformer).transform(
                 userMyDataCaptor.capture(),
-                eq(meetingTime)
+                eq(meetingTime),
+                eq("FD6")
         );
         assertThat(userMyDataCaptor.getValue().userId()).isEqualTo(1L);
         assertThat(userMyDataCaptor.getValue().approvals()).isEmpty();
@@ -115,9 +119,67 @@ class MyDataServiceTest {
      */
     @Test
     void 선택_시각이_없으면_수집을_시작하지_않는다() {
-        assertThatThrownBy(() -> myDataService.process(1L, null))
+        assertThatThrownBy(() -> myDataService.process(1L, null, "식사"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("meetingTime은 필수입니다.");
+
+        verifyNoInteractions(myDataProvider, myDataTransformer);
+    }
+
+    /**
+     * 카페 관련 목적의 앞뒤 공백을 제거하고 카페 그룹 코드로 전달하는지 확인한다.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"카페", "디저트"})
+    void 카페와_디저트_목적은_CE7로_변환한다(String purpose) {
+        given(myDataProvider.fetchCardList(1L, "0", null, 500))
+                .willReturn(EMPTY_CARD_LIST_RESPONSE);
+        TransformedUserMyData transformed = new TransformedUserMyData(1L, List.of());
+        LocalTime meetingTime = LocalTime.of(15, 0);
+        given(myDataTransformer.transform(any(UserMyData.class), eq(meetingTime), eq("CE7")))
+                .willReturn(transformed);
+
+        TransformedUserMyData result = myDataService.process(
+                1L,
+                meetingTime,
+                "  " + purpose + "  "
+        );
+
+        assertThat(result).isSameAs(transformed);
+        verify(myDataTransformer).transform(any(UserMyData.class), eq(meetingTime), eq("CE7"));
+    }
+
+    /**
+     * 카페 관련 목적 이외의 유효한 목적을 음식점 그룹 코드로 전달하는지 확인한다.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"식사", "술자리", "회식", "미팅"})
+    void 일반_목적은_FD6로_변환한다(String purpose) {
+        given(myDataProvider.fetchCardList(1L, "0", null, 500))
+                .willReturn(EMPTY_CARD_LIST_RESPONSE);
+        TransformedUserMyData transformed = new TransformedUserMyData(1L, List.of());
+        LocalTime meetingTime = LocalTime.of(19, 0);
+        given(myDataTransformer.transform(any(UserMyData.class), eq(meetingTime), eq("FD6")))
+                .willReturn(transformed);
+
+        TransformedUserMyData result = myDataService.process(
+                1L,
+                meetingTime,
+                purpose
+        );
+
+        assertThat(result).isSameAs(transformed);
+        verify(myDataTransformer).transform(any(UserMyData.class), eq(meetingTime), eq("FD6"));
+    }
+
+    /**
+     * 공백 목적은 카드 조회를 시작하기 전에 거부하는지 확인한다.
+     */
+    @Test
+    void 목적이_공백이면_수집을_시작하지_않는다() {
+        assertThatThrownBy(() -> myDataService.process(1L, LocalTime.NOON, "  "))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("purpose는 필수입니다.");
 
         verifyNoInteractions(myDataProvider, myDataTransformer);
     }

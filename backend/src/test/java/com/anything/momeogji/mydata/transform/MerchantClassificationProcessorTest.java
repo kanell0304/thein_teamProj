@@ -2,39 +2,40 @@ package com.anything.momeogji.mydata.transform;
 
 import com.anything.momeogji.mydata.transform.local.MerchantPlaceSearchClient;
 import com.anything.momeogji.mydata.transform.local.MerchantPlaceSearchClient.SearchCandidate;
-import com.anything.momeogji.mydata.transform.model.KakaoPlaceMatchData;
 import com.anything.momeogji.mydata.transform.model.MerchantUsageData;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * {@link MerchantClassificationProcessor}가 카카오 후보를 최종 {@link MerchantUsageData}에 올바르게 반영하는지 검증한다.
+ * {@link MerchantClassificationProcessor}가 목적 그룹에 맞는 카카오 장소명과 세부 카테고리만 최종 결과에 남기는지 검증한다.
  */
 class MerchantClassificationProcessorTest {
 
     /**
-     * 완전히 일치하는 음식점 후보를 선택하고 원본 사용 이력과 절삭된 좌표를 보존하는지 확인한다.
+     * 완전히 일치하는 음식점 후보의 장소명과 전체 카테고리 경로를 사용 이력에 결합하는지 확인한다.
      */
     @Test
-    void 완전일치_음식점_후보를_사용_이력에_결합한다() {
+    void 완전일치_음식점_후보를_최종_결과에_결합한다() {
         MerchantUsageData input = createUnclassifiedUsage("영인성");
-        MerchantClassificationProcessor processor = createProcessor(query -> List.of(
-                new SearchCandidate(
-                        "1001",
-                        "영인성",
-                        KakaoPlaceMatchData.RESTAURANT_CATEGORY_CODE,
-                        "127.123456",
-                        "37.987654"
-                )
-        ));
+        List<String> requestedCategoryCodes = new ArrayList<>();
+        MerchantClassificationProcessor processor = createProcessor((query, categoryGroupCode) -> {
+            requestedCategoryCodes.add(categoryGroupCode);
+            return List.of(new SearchCandidate(
+                    "영인성",
+                    "FD6",
+                    "음식점 > 중식 > 중화요리"
+            ));
+        });
 
-        List<MerchantUsageData> result = processor.classify(List.of(input));
+        List<MerchantUsageData> result = processor.classify(List.of(input), "FD6");
 
         assertThat(result).hasSize(1);
         MerchantUsageData classified = result.get(0);
@@ -42,125 +43,294 @@ class MerchantClassificationProcessorTest {
         assertThat(classified.merchantName()).isEqualTo(input.merchantName());
         assertThat(classified.merchantCode()).isEqualTo(input.merchantCode());
         assertThat(classified.payments()).isEqualTo(input.payments());
-        assertThat(classified.kakaoPlaceMatch().categoryCode())
-                .isEqualTo(KakaoPlaceMatchData.RESTAURANT_CATEGORY_CODE);
-        assertThat(classified.kakaoPlaceMatch().placeId()).isEqualTo("1001");
-        assertThat(classified.kakaoPlaceMatch().matchConfidence()).isEqualTo(100);
-        assertThat(classified.kakaoPlaceMatch().longitude())
-                .isEqualByComparingTo("127.12345");
-        assertThat(classified.kakaoPlaceMatch().latitude())
-                .isEqualByComparingTo("37.98765");
-    }
-
-    /**
-     * 검색 결과가 없으면 집계 단계에서 생성한 미매칭 사용 이력을 그대로 유지하는지 확인한다.
-     */
-    @Test
-    void 검색_결과가_없으면_미매칭_사용_이력을_유지한다() {
-        MerchantUsageData input = createUnclassifiedUsage("영인성");
-        MerchantClassificationProcessor processor = createProcessor(query -> List.of());
-
-        List<MerchantUsageData> result = processor.classify(List.of(input));
-
-        assertThat(result).hasSize(1);
-        assertThat(result.get(0)).isSameAs(input);
-        assertThat(result.get(0).kakaoPlaceMatch())
-                .isEqualTo(KakaoPlaceMatchData.unmatched());
+        assertThat(classified.kakaoPlaceMatch().placeName()).isEqualTo("영인성");
+        assertThat(classified.kakaoPlaceMatch().categoryName())
+                .isEqualTo("음식점 > 중식 > 중화요리");
+        assertThat(requestedCategoryCodes).containsExactly("FD6");
         assertThatThrownBy(() -> result.add(input))
                 .isInstanceOf(UnsupportedOperationException.class);
     }
 
     /**
-     * 같은 점수의 음식점·카페 후보가 충돌하면 첫 장소 추적값과 UNKNOWN 카테고리를 보존하는지 확인한다.
+     * 원본명 검색과 비교용 이름 재검색에 같은 목적 그룹 코드가 전달되는지 확인한다.
      */
     @Test
-    void 최고점_후보의_카테고리가_충돌하면_UNKNOWN으로_보존한다() {
+    void 두_검색_회차에_동일한_그룹_코드를_전달한다() {
+        MerchantUsageData input = createUnclassifiedUsage("강남모밀　무이");
+        List<String> requestedCategoryCodes = new ArrayList<>();
+        MerchantClassificationProcessor processor = createProcessor((query, categoryGroupCode) -> {
+            requestedCategoryCodes.add(categoryGroupCode);
+            if ("강남모밀무이".equals(query)) {
+                return List.of(new SearchCandidate(
+                        "강남모밀 무이",
+                        "FD6",
+                        "음식점 > 일식 > 국수"
+                ));
+            }
+            return List.of();
+        });
+
+        List<MerchantUsageData> result = processor.classify(List.of(input), "FD6");
+
+        assertThat(result).hasSize(1);
+        assertThat(requestedCategoryCodes).containsExactly("FD6", "FD6");
+    }
+
+    /**
+     * 검색 결과가 없거나 장소명 매칭에 실패하면 해당 가맹점을 최종 목록에서 제외하는지 확인한다.
+     */
+    @Test
+    void 검색_결과가_없으면_가맹점을_제외한다() {
         MerchantUsageData input = createUnclassifiedUsage("영인성");
-        MerchantClassificationProcessor processor = createProcessor(query -> List.of(
-                new SearchCandidate(
-                        "1001",
-                        "영인성",
-                        KakaoPlaceMatchData.RESTAURANT_CATEGORY_CODE,
-                        "127.1",
-                        "37.1"
-                ),
-                new SearchCandidate(
-                        "1002",
-                        "영인성",
-                        KakaoPlaceMatchData.CAFE_CATEGORY_CODE,
-                        "127.2",
-                        "37.2"
-                )
-        ));
-
-        MerchantUsageData result = processor.classify(List.of(input)).get(0);
-        KakaoPlaceMatchData kakaoPlaceMatch = result.kakaoPlaceMatch();
-
-        assertThat(kakaoPlaceMatch.categoryCode())
-                .isEqualTo(KakaoPlaceMatchData.UNKNOWN_CATEGORY_CODE);
-        assertThat(kakaoPlaceMatch.placeId()).isEqualTo("1001");
-        assertThat(kakaoPlaceMatch.placeName()).isEqualTo("영인성");
-        assertThat(kakaoPlaceMatch.matchConfidence()).isEqualTo(100);
-        assertThat(kakaoPlaceMatch.longitude()).isNull();
-        assertThat(kakaoPlaceMatch.latitude()).isNull();
-    }
-
-    /**
-     * 이름은 일치하지만 음식점·카페가 아닌 명시적 카카오 카테고리를 최종 목록에서 제외하는지 확인한다.
-     */
-    @Test
-    void 음식점과_카페가_아닌_카테고리는_제외한다() {
-        MerchantUsageData input = createUnclassifiedUsage("테스트 편의점");
-        MerchantClassificationProcessor processor = createProcessor(query -> List.of(
-                new SearchCandidate(
-                        "2001",
-                        "테스트 편의점",
-                        "CS2",
-                        "127.1",
-                        "37.1"
-                )
-        ));
-
-        assertThat(processor.classify(List.of(input))).isEmpty();
-    }
-
-    /**
-     * 누락·숫자 형식 오류·범위 오류 좌표를 장소 분류 실패가 아닌 좌표 미보강으로 처리하는지 확인한다.
-     */
-    @Test
-    void 잘못된_외부_좌표는_둘_다_null로_처리한다() {
-        List<InvalidCoordinateCase> cases = List.of(
-                new InvalidCoordinateCase("좌표 누락", null, "37.1"),
-                new InvalidCoordinateCase("좌표 형식 오류", "not-a-number", "37.1"),
-                new InvalidCoordinateCase("좌표 범위 오류", "181", "37.1")
+        MerchantClassificationProcessor processor = createProcessor(
+                (query, categoryGroupCode) -> List.of()
         );
 
-        for (InvalidCoordinateCase testCase : cases) {
-            MerchantUsageData input = createUnclassifiedUsage(testCase.merchantName());
-            MerchantClassificationProcessor processor = createProcessor(query -> List.of(
-                    new SearchCandidate(
-                            "3001",
-                            testCase.merchantName(),
-                            KakaoPlaceMatchData.RESTAURANT_CATEGORY_CODE,
-                            testCase.longitude(),
-                            testCase.latitude()
-                    )
-            ));
+        assertThat(processor.classify(List.of(input), "FD6")).isEmpty();
+    }
 
-            KakaoPlaceMatchData result = processor.classify(List.of(input))
-                    .get(0)
-                    .kakaoPlaceMatch();
+    /**
+     * 최고 후보의 그룹이 요청과 다르거나 세부 카테고리가 누락되면 결과를 제외하는지 확인한다.
+     */
+    @Test
+    void 그룹_불일치와_세부_카테고리_누락은_제외한다() {
+        MerchantUsageData input = createUnclassifiedUsage("영인성");
+        List<SearchCandidate> invalidCandidates = List.of(
+                new SearchCandidate("영인성", "CE7", "카페 > 커피전문점"),
+                new SearchCandidate("영인성", "FD6", null)
+        );
 
-            assertThat(result.longitude()).isNull();
-            assertThat(result.latitude()).isNull();
+        for (SearchCandidate invalidCandidate : invalidCandidates) {
+            MerchantClassificationProcessor processor = createProcessor(
+                    (query, categoryGroupCode) -> List.of(invalidCandidate)
+            );
+
+            assertThat(processor.classify(List.of(input), "FD6")).isEmpty();
         }
+    }
+
+    /**
+     * 카테고리가 충돌한 동일 우선순위 후보의 최고 이름 유사도가 같으면 결과를 제외하는지 확인한다.
+     */
+    @Test
+    void 카테고리_충돌_후보의_최고_이름_유사도가_같으면_제외한다() {
+        MerchantUsageData input = createUnclassifiedUsage("영인성");
+        MerchantClassificationProcessor processor = createProcessor(
+                (query, categoryGroupCode) -> List.of(
+                        new SearchCandidate("영인성", "FD6", "음식점 > 중식 > 중화요리"),
+                        new SearchCandidate("영인성", "FD6", "음식점 > 한식 > 백반")
+                )
+        );
+
+        assertThat(processor.classify(List.of(input), "FD6")).isEmpty();
+    }
+
+    /**
+     * 동일 우선순위 후보들의 카테고리가 같으면 이름 유사도를 다시 비교하지 않고 첫 후보를 사용하는지 확인한다.
+     */
+    @Test
+    void 동일_우선순위_후보의_카테고리가_같으면_첫_장소를_사용한다() {
+        String merchantName = "abcdefghij";
+        MerchantUsageData input = createUnclassifiedUsage(merchantName);
+        MerchantClassificationProcessor processor = createProcessor(
+                (query, categoryGroupCode) -> List.of(
+                        new SearchCandidate(
+                                merchantName + "xy",
+                                "FD6",
+                                "음식점 > 중식 > 중화요리"
+                        ),
+                        new SearchCandidate(
+                                merchantName + "x",
+                                "FD6",
+                                "음식점 > 중식 > 중화요리"
+                        )
+                )
+        );
+
+        MerchantUsageData result = processor.classify(List.of(input), "FD6").get(0);
+
+        assertThat(result.kakaoPlaceMatch().placeName()).isEqualTo(merchantName + "xy");
+        assertThat(result.kakaoPlaceMatch().categoryName())
+                .isEqualTo("음식점 > 중식 > 중화요리");
+    }
+
+    /**
+     * 카테고리가 충돌하면 근소한 길이 비율 차이도 허용해 유일하게 가장 유사한 장소를 선택하는지 확인한다.
+     */
+    @Test
+    void 카테고리가_충돌하면_근소한_차이여도_가장_유사한_후보를_선택한다() {
+        String merchantName = "가".repeat(100);
+        String mostSimilarPlaceName = merchantName + "나";
+        MerchantUsageData input = createUnclassifiedUsage(merchantName);
+        MerchantClassificationProcessor processor = createProcessor(
+                (query, categoryGroupCode) -> List.of(
+                        new SearchCandidate(
+                                mostSimilarPlaceName,
+                                "FD6",
+                                "음식점 > 한식 > 백반"
+                        ),
+                        new SearchCandidate(
+                                merchantName + "나다",
+                                "FD6",
+                                "음식점 > 중식 > 중화요리"
+                        )
+                )
+        );
+
+        MerchantUsageData result = processor.classify(List.of(input), "FD6").get(0);
+
+        assertThat(result.kakaoPlaceMatch().placeName()).isEqualTo(mostSimilarPlaceName);
+        assertThat(result.kakaoPlaceMatch().categoryName()).isEqualTo("음식점 > 한식 > 백반");
+    }
+
+    /**
+     * 세 후보의 카테고리가 충돌해도 최고 길이 비율 후보가 하나면 해당 장소를 선택하는지 확인한다.
+     */
+    @Test
+    void 세_후보_중_최고_이름_유사도가_하나면_해당_후보를_선택한다() {
+        String merchantName = "abcdefghij";
+        MerchantUsageData input = createUnclassifiedUsage(merchantName);
+        MerchantClassificationProcessor processor = createProcessor(
+                (query, categoryGroupCode) -> List.of(
+                        new SearchCandidate(
+                                merchantName + "x",
+                                "FD6",
+                                "음식점 > 한식 > 백반"
+                        ),
+                        new SearchCandidate(
+                                merchantName + "xy",
+                                "FD6",
+                                "음식점 > 중식 > 중화요리"
+                        ),
+                        new SearchCandidate(
+                                merchantName + "xyz",
+                                "FD6",
+                                "음식점 > 일식 > 초밥"
+                        )
+                )
+        );
+
+        MerchantUsageData result = processor.classify(List.of(input), "FD6").get(0);
+
+        assertThat(result.kakaoPlaceMatch().placeName()).isEqualTo(merchantName + "x");
+        assertThat(result.kakaoPlaceMatch().categoryName()).isEqualTo("음식점 > 한식 > 백반");
+    }
+
+    /**
+     * 세 후보 중 최고 이름 유사도 동률이 둘 이상이면 더 낮은 후보로 대체하지 않고 제외하는지 확인한다.
+     */
+    @Test
+    void 세_후보_중_최고_이름_유사도가_동률이면_낮은_후보를_사용하지_않는다() {
+        String merchantName = "abcdefghij";
+        MerchantUsageData input = createUnclassifiedUsage(merchantName);
+        MerchantClassificationProcessor processor = createProcessor(
+                (query, categoryGroupCode) -> List.of(
+                        new SearchCandidate(
+                                merchantName + "x",
+                                "FD6",
+                                "음식점 > 한식 > 백반"
+                        ),
+                        new SearchCandidate(
+                                "y" + merchantName,
+                                "FD6",
+                                "음식점 > 중식 > 중화요리"
+                        ),
+                        new SearchCandidate(
+                                merchantName + "zz",
+                                "FD6",
+                                "음식점 > 일식 > 초밥"
+                        )
+                )
+        );
+
+        assertThat(processor.classify(List.of(input), "FD6")).isEmpty();
+    }
+
+    /**
+     * 전각 문자와 대소문자 차이가 있어도 정규화된 이름 길이로 카테고리 충돌을 해소하는지 확인한다.
+     */
+    @Test
+    void 정규화된_이름을_기준으로_유사도를_비교한다() {
+        MerchantUsageData input = createUnclassifiedUsage("ＡＢＣＤＥＦＧＨＩＪ");
+        MerchantClassificationProcessor processor = createProcessor(
+                (query, categoryGroupCode) -> List.of(
+                        new SearchCandidate(
+                                "abcdefghijx",
+                                "FD6",
+                                "음식점 > 한식 > 백반"
+                        ),
+                        new SearchCandidate(
+                                "ABCDEFGHIJxy",
+                                "FD6",
+                                "음식점 > 중식 > 중화요리"
+                        )
+                )
+        );
+
+        MerchantUsageData result = processor.classify(List.of(input), "FD6").get(0);
+
+        assertThat(result.kakaoPlaceMatch().placeName()).isEqualTo("abcdefghijx");
+        assertThat(result.kakaoPlaceMatch().categoryName()).isEqualTo("음식점 > 한식 > 백반");
+    }
+
+    /**
+     * 부분일치 길이 비율이 정확히 60%면 포함하고 60% 미만이면 제외하는지 확인한다.
+     */
+    @Test
+    void 부분일치_60퍼센트_경계를_교차곱으로_판정한다() {
+        MerchantUsageData input = createUnclassifiedUsage("abc");
+        MerchantClassificationProcessor boundaryProcessor = createProcessor(
+                (query, categoryGroupCode) -> List.of(new SearchCandidate(
+                        "abcde",
+                        "FD6",
+                        "음식점 > 한식 > 백반"
+                ))
+        );
+        MerchantClassificationProcessor belowBoundaryProcessor = createProcessor(
+                (query, categoryGroupCode) -> List.of(new SearchCandidate(
+                        "abcdef",
+                        "FD6",
+                        "음식점 > 한식 > 백반"
+                ))
+        );
+
+        assertThat(boundaryProcessor.classify(List.of(input), "FD6")).hasSize(1);
+        assertThat(belowBoundaryProcessor.classify(List.of(input), "FD6")).isEmpty();
+    }
+
+    /**
+     * 최종 장소 매칭 모델에는 내부 유사도나 신뢰도 속성이 추가되지 않았는지 확인한다.
+     */
+    @Test
+    void 최종_결과에는_내부_유사도_필드가_노출되지_않는다() {
+        MerchantUsageData input = createUnclassifiedUsage("영인성");
+
+        assertThat(Arrays.stream(
+                        input.kakaoPlaceMatch().getClass().getRecordComponents()
+                ).map(component -> component.getName()))
+                .containsExactly("placeName", "categoryName");
+    }
+
+    /**
+     * 음식점·카페 이외 그룹 코드는 외부 검색 전에 거부하는지 확인한다.
+     */
+    @Test
+    void 허용하지_않는_그룹_코드를_거부한다() {
+        MerchantUsageData input = createUnclassifiedUsage("테스트 편의점");
+        MerchantClassificationProcessor processor = createProcessor(
+                (query, categoryGroupCode) -> List.of()
+        );
+
+        assertThatThrownBy(() -> processor.classify(List.of(input), "CS2"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("categoryGroupCode는 FD6 또는 CE7이어야 합니다.");
     }
 
     /**
      * 테스트용 가맹점 사용 이력과 검색 Client를 연결한 실제 분류 컴포넌트를 만든다.
      *
      * @param searchClient 테스트 시나리오에 맞는 카카오 장소 후보를 반환할 Client
-     * @return 실제 이름 파싱·점수 계산·후보 선정을 사용하는 분류 컴포넌트
+     * @return 실제 이름 정규화·우선순위 판정·후보 선정을 사용하는 분류 컴포넌트
      */
     private MerchantClassificationProcessor createProcessor(
             MerchantPlaceSearchClient searchClient
@@ -168,8 +338,7 @@ class MerchantClassificationProcessorTest {
         MerchantNameParser merchantNameParser = new MerchantNameParser();
         MerchantPlaceMatcher merchantPlaceMatcher = new MerchantPlaceMatcher(
                 searchClient,
-                merchantNameParser,
-                new MerchantMatchScoreCalculator(merchantNameParser)
+                merchantNameParser
         );
         return new MerchantClassificationProcessor(merchantPlaceMatcher);
     }
@@ -178,7 +347,7 @@ class MerchantClassificationProcessorTest {
      * 카카오 검색 전 기본값과 점심 결제 한 건을 가진 테스트용 가맹점 사용 이력을 만든다.
      *
      * @param merchantName 검색 후보와 비교할 원본 가맹점명
-     * @return 미매칭 카카오 결과를 가진 테스트용 사용 이력
+     * @return 분류 전 카카오 결과를 가진 테스트용 사용 이력
      */
     private MerchantUsageData createUnclassifiedUsage(String merchantName) {
         return MerchantUsageData.unclassified(
@@ -189,19 +358,5 @@ class MerchantClassificationProcessorTest {
                         BigDecimal.valueOf(11_000)
                 ))
         );
-    }
-
-    /**
-     * 카카오가 회신할 수 있는 좌표 누락·형식·범위 오류 사례를 묶는 테스트 전용 값이다.
-     *
-     * @param merchantName 각 반복을 구분할 가맹점명
-     * @param longitude 카카오 경도 원본 문자열
-     * @param latitude 카카오 위도 원본 문자열
-     */
-    private record InvalidCoordinateCase(
-            String merchantName,
-            String longitude,
-            String latitude
-    ) {
     }
 }
