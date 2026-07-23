@@ -708,6 +708,12 @@ function ChatRoomPage({ room: providedRoom, currentUser = DEMO_CURRENT_USER }) {
     setRecommendationError('참여 안 하기를 선택했어요. 모임 설정을 다시 시작해주세요.')
   }
 
+  // ===== 새 기능 시작 시각을 만들고 공통 설정·키워드 분석 상태를 새 세션으로 초기화 =====
+  const startMomeokjiSession = () => {
+    setMomeokjiFeatureStartedAt(new Date().toISOString())
+    setIsMomeokjiOpen(true)
+  }
+
   // ===== 모먹지 기능 버튼은 진행 상태에 맞는 화면을 엽니다. =====
   const openCurrentMomeokjiStage = () => {
     if (isCreatingMeetup) return
@@ -719,8 +725,7 @@ function ChatRoomPage({ room: providedRoom, currentUser = DEMO_CURRENT_USER }) {
       if (canViewPreference) setIsParticipantPreferenceOpen(true)
       return
     }
-    setMomeokjiFeatureStartedAt(new Date().toISOString())
-    setIsMomeokjiOpen(true)
+    startMomeokjiSession()
   }
 
   // ===== 종료된 투표를 정리하고 새 모먹지 공통 설정을 1단계부터 시작 =====
@@ -736,7 +741,7 @@ function ChatRoomPage({ room: providedRoom, currentUser = DEMO_CURRENT_USER }) {
     setRecommendationError('')
     setIsParticipantPreferenceOpen(false)
     setIsVotePageOpen(false)
-    setIsMomeokjiOpen(true)
+    startMomeokjiSession()
   }
 
   // ===== 최다 득표 가게 또는 가게 공동 1등 중 무작위 결과로 투표 마감 =====
@@ -968,6 +973,7 @@ function ChatRoomPage({ room: providedRoom, currentUser = DEMO_CURRENT_USER }) {
       </footer>
 
       <MomeokjiPage
+        key={momeokjiFeatureStartedAt ?? 'momeokji-idle'}
         open={isMomeokjiOpen}
         onClose={() => setIsMomeokjiOpen(false)}
         onComplete={requestParticipantPreference}
