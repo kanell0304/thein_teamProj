@@ -14,6 +14,7 @@ import com.anything.momeogji.entity.recommendation.RecommendationRound;
 import com.anything.momeogji.entity.recommendation.Restaurant;
 import com.anything.momeogji.entity.recommendation.RoundCandidate;
 import com.anything.momeogji.exception.recommendation.AiRecommendationException;
+import com.anything.momeogji.mydata.processing.model.MyDataRestaurantData;
 import com.anything.momeogji.repository.ChatRoomMemberRepository;
 import com.anything.momeogji.repository.MeetupRepository;
 import com.anything.momeogji.repository.RecommendationRoundRepository;
@@ -58,6 +59,8 @@ class RecommendationRoundServiceImplTest {
     @Mock
     private RestaurantRecommendationService restaurantRecommendationService;
     @Mock
+    private MeetupMyDataResultStore meetupMyDataResultStore;
+    @Mock
     private RecommendationEventPublisher eventPublisher;
     @Mock
     private RoundResponseAssembler roundResponseAssembler;
@@ -94,6 +97,11 @@ class RecommendationRoundServiceImplTest {
         RoundCandidate prevCandidate = RoundCandidate.builder().id(9L).round(prevRound).restaurant(prevRestaurant).rankNo(1).build();
         given(roundCandidateRepository.findByRound_Meetup_Id(100L)).willReturn(List.of(prevCandidate));
         given(recommendationRoundRepository.countByMeetupId(100L)).willReturn(1L);
+        List<MyDataRestaurantData> myDataRestaurants = List.of(
+                new MyDataRestaurantData("영인성", "중식 > 중화요리")
+        );
+        given(meetupMyDataResultStore.findAll(100L, List.of(1L)))
+                .willReturn(myDataRestaurants);
 
         RecommendationResult aiResult = new RecommendationResult(2, List.of(
                 new RestaurantRecommendation("new-1", 1, "새맛집", "한식", "도로명", "지번", 37.5, 127.0, "이유", "img")
@@ -119,6 +127,8 @@ class RecommendationRoundServiceImplTest {
         ArgumentCaptor<RecommendationRequest> captor = ArgumentCaptor.forClass(RecommendationRequest.class);
         verify(restaurantRecommendationService).recommend(captor.capture());
         assertThat(captor.getValue().excludedRestaurantIds()).containsExactly("prev-1");
+        assertThat(captor.getValue().myDataRestaurants())
+                .containsExactlyElementsOf(myDataRestaurants);
 
         verify(eventPublisher).recommendationStarted(10L);
         verify(eventPublisher).recommendationCompleted(10L, expectedResponse);

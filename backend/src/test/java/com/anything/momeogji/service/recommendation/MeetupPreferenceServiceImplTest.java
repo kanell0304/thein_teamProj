@@ -9,6 +9,7 @@ import com.anything.momeogji.entity.recommendation.MeetupParticipant;
 import com.anything.momeogji.entity.recommendation.ParticipantPreference;
 import com.anything.momeogji.entity.recommendation.SubmissionStatus;
 import com.anything.momeogji.mydata.MyDataService;
+import com.anything.momeogji.mydata.processing.model.MyDataRestaurantData;
 import com.anything.momeogji.repository.MeetupParticipantRepository;
 import com.anything.momeogji.repository.MeetupRepository;
 import com.anything.momeogji.repository.ParticipantPreferenceRepository;
@@ -48,6 +49,9 @@ class MeetupPreferenceServiceImplTest {
     private MyDataService myDataService;
 
     @Mock
+    private MeetupMyDataResultStore meetupMyDataResultStore;
+
+    @Mock
     private RecommendationRoundService recommendationRoundService;
 
     @Mock
@@ -68,6 +72,7 @@ class MeetupPreferenceServiceImplTest {
                 meetupParticipantRepository,
                 participantPreferenceRepository,
                 myDataService,
+                meetupMyDataResultStore,
                 recommendationRoundService,
                 meetupService,
                 eventPublisher
@@ -138,6 +143,12 @@ class MeetupPreferenceServiceImplTest {
         assertThat(result.meetupId()).isEqualTo(meetupId);
         assertThat(result.recommendationTriggered()).isFalse();
         verify(myDataService).process(userId, meetingTime.toLocalTime(), "식사");
+        verify(meetupMyDataResultStore, never())
+                .save(
+                        org.mockito.ArgumentMatchers.any(),
+                        org.mockito.ArgumentMatchers.any(),
+                        org.mockito.ArgumentMatchers.anyList()
+                );
         verify(eventPublisher).preferenceProgress(
                 org.mockito.ArgumentMatchers.eq(chatRoom.getId()),
                 org.mockito.ArgumentMatchers.any()
@@ -147,5 +158,65 @@ class MeetupPreferenceServiceImplTest {
                         org.mockito.ArgumentMatchers.any(),
                         org.mockito.ArgumentMatchers.anyList()
                 );
+    }
+
+    /**
+     * MyData 처리가 성공하면 추천 시작 여부를 판단하기 전에 모임·사용자 키로 결과를 저장하는지 확인한다.
+     */
+    @Test
+    void 마이데이터_성공_결과를_모임과_사용자별로_저장한다() {
+        Long meetupId = 10L;
+        Long userId = 20L;
+        LocalDateTime meetingTime = LocalDateTime.of(2026, 7, 24, 12, 30);
+        ChatRoom chatRoom = ChatRoom.builder()
+                .id(30L)
+                .name("점심 모임")
+                .build();
+        Meetup meetup = Meetup.builder()
+                .id(meetupId)
+                .chatRoom(chatRoom)
+                .meetingTime(meetingTime)
+                .purpose("식사")
+                .build();
+        MeetupParticipant participant = MeetupParticipant.builder()
+                .id(40L)
+                .meetup(meetup)
+                .submissionStatus(SubmissionStatus.PENDING)
+                .build();
+        PreferenceSubmitRequest request = new PreferenceSubmitRequest(
+                10,
+                List.of("한식"),
+                20_000,
+                false,
+                List.of(),
+                null,
+                true
+        );
+        List<MyDataRestaurantData> restaurants = List.of(
+                new MyDataRestaurantData("영인성", "중식 > 중화요리")
+        );
+
+        given(meetupRepository.findById(meetupId)).willReturn(Optional.of(meetup));
+        given(meetupParticipantRepository.findByMeetupIdAndUserId(meetupId, userId))
+                .willReturn(Optional.of(participant));
+        given(participantPreferenceRepository.existsByMeetupParticipantId(40L))
+                .willReturn(false);
+        given(myDataService.process(userId, meetingTime.toLocalTime(), "식사"))
+                .willReturn(restaurants);
+        given(meetupService.listParticipants(meetupId)).willReturn(List.of(
+                new ParticipantSummaryResponse(40L, userId, "참가자", "SUBMITTED", false)
+        ));
+        given(meetupParticipantRepository.countByMeetupIdAndSubmissionStatus(
+                meetupId,
+                SubmissionStatus.PENDING
+        )).willReturn(1L);
+
+        meetupPreferenceService.submitPreference(meetupId, userId, request);
+
+        verify(meetupMyDataResultStore).save(
+                meetupId,
+                userId,
+                restaurants
+        );
     }
 }

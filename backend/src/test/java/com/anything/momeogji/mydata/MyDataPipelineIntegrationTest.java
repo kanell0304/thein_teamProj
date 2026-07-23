@@ -10,7 +10,7 @@ import com.anything.momeogji.mydata.processing.MerchantNameNormalizer;
 import com.anything.momeogji.mydata.processing.MerchantUsageProcessor;
 import com.anything.momeogji.mydata.processing.MyDataPipeline;
 import com.anything.momeogji.mydata.processing.UserMyDataCleaner;
-import com.anything.momeogji.mydata.processing.model.ProcessedUserMyData;
+import com.anything.momeogji.mydata.processing.model.MyDataRestaurantData;
 import com.anything.momeogji.mydata.processing.place.MerchantPlaceClassifier;
 import com.anything.momeogji.mydata.processing.place.MerchantPlaceMatcher;
 import com.anything.momeogji.mydata.processing.place.MerchantPlaceSearchClient;
@@ -126,17 +126,17 @@ class MyDataPipelineIntegrationTest {
         myDataService.collect(1L);
         myDataService.collect(2L);
         CollectedUserMyData collected = myDataService.collect(3L);
-        ProcessedUserMyData morningResult = myDataService.process(
+        List<MyDataRestaurantData> morningResult = myDataService.process(
                 3L,
                 LocalTime.of(9, 0),
                 "식사"
         );
-        ProcessedUserMyData lunchResult = myDataService.process(
+        List<MyDataRestaurantData> lunchResult = myDataService.process(
                 3L,
                 LocalTime.of(12, 0),
                 "식사"
         );
-        ProcessedUserMyData dinnerResult = myDataService.process(
+        List<MyDataRestaurantData> dinnerResult = myDataService.process(
                 3L,
                 LocalTime.of(18, 0),
                 "식사"
@@ -151,8 +151,8 @@ class MyDataPipelineIntegrationTest {
                 .containsExactlyInAnyOrderEntriesOf(
                         Map.of("001", 12L, "002", 12L, "004", 12L)
                 );
-        assertThat(morningResult.merchantUsages()).isEmpty();
-        assertThat(lunchResult.merchantUsages()).isEmpty();
-        assertThat(dinnerResult.merchantUsages()).isEmpty();
+        assertThat(morningResult).isEmpty();
+        assertThat(lunchResult).isEmpty();
+        assertThat(dinnerResult).isEmpty();
     }
 }

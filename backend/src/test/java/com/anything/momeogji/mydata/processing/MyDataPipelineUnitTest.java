@@ -4,7 +4,7 @@ import com.anything.momeogji.mydata.collection.model.CollectedUserMyData;
 import com.anything.momeogji.mydata.processing.model.CleanedApprovalData;
 import com.anything.momeogji.mydata.processing.model.KakaoPlaceMatchData;
 import com.anything.momeogji.mydata.processing.model.MerchantUsageData;
-import com.anything.momeogji.mydata.processing.model.ProcessedUserMyData;
+import com.anything.momeogji.mydata.processing.model.MyDataRestaurantData;
 import com.anything.momeogji.mydata.processing.place.MerchantPlaceClassifier;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -16,7 +16,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
-import java.util.ArrayList;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -55,7 +54,7 @@ class MyDataPipelineUnitTest {
     }
 
     /**
-     * 정제 결과가 집계로, 집계 결과가 분류로 전달되고 사용자 ID가 최종 결과에 보존되는지 확인한다.
+     * 정제 결과가 집계와 분류를 거쳐 음식점명·음식 카테고리 최종 목록으로 변환되는지 확인한다.
      */
     @Test
     void 정제_집계_분류_순서로_가공하고_최종_결과를_조립한다() {
@@ -94,14 +93,21 @@ class MyDataPipelineUnitTest {
         given(merchantPlaceClassifier.classify(merchantUsages, categoryGroupCode))
                 .willReturn(classifiedUsages);
 
-        ProcessedUserMyData result = myDataPipeline.execute(
+        List<MyDataRestaurantData> result = myDataPipeline.execute(
                 collectedMyData,
                 meetingTime,
                 categoryGroupCode
         );
 
-        assertThat(result.userId()).isEqualTo(1L);
-        assertThat(result.merchantUsages()).containsExactly(classifiedUsage);
+        assertThat(result).containsExactly(
+                new MyDataRestaurantData(
+                        "영인성",
+                        "중식 > 중화요리"
+                )
+        );
+        assertThatThrownBy(() -> result.add(
+                new MyDataRestaurantData("상무초밥", "일식 > 초밥")
+        )).isInstanceOf(UnsupportedOperationException.class);
 
         InOrder processingOrder = inOrder(
                 userMyDataCleaner,
@@ -120,7 +126,7 @@ class MyDataPipelineUnitTest {
     }
 
     /**
-     * 각 단계에 처리할 데이터가 없어도 사용자 ID를 포함한 정상 빈 결과를 만드는지 확인한다.
+     * 각 단계에 처리할 데이터가 없어도 정상 빈 음식점 목록을 만드는지 확인한다.
      */
     @Test
     void 처리할_승인내역이_없으면_빈_최종_결과를_반환한다() {
@@ -134,14 +140,13 @@ class MyDataPipelineUnitTest {
         given(merchantPlaceClassifier.classify(List.of(), categoryGroupCode))
                 .willReturn(List.of());
 
-        ProcessedUserMyData result = myDataPipeline.execute(
+        List<MyDataRestaurantData> result = myDataPipeline.execute(
                 collectedMyData,
                 meetingTime,
                 categoryGroupCode
         );
 
-        assertThat(result.userId()).isEqualTo(1L);
-        assertThat(result.merchantUsages()).isEmpty();
+        assertThat(result).isEmpty();
     }
 
     /**
@@ -185,30 +190,69 @@ class MyDataPipelineUnitTest {
     }
 
     /**
-     * 최종 결과 모델이 필수 메타데이터를 검증하고 전달받은 목록을 방어적으로 복사하는지 확인한다.
+     * 최종 음식점 항목이 음식점명과 음식 카테고리의 필수값을 검증하는지 확인한다.
      */
     @Test
-    void 최종_결과는_필수값을_검증하고_분류_목록을_불변으로_보존한다() {
-        List<MerchantUsageData> mutableMerchantUsages = new ArrayList<>();
-        ProcessedUserMyData result = new ProcessedUserMyData(
-                1L,
-                mutableMerchantUsages
-        );
-
-        mutableMerchantUsages.add(null);
-
-        assertThat(result.merchantUsages()).isEmpty();
-        assertThatThrownBy(() -> result.merchantUsages().add(null))
-                .isInstanceOf(UnsupportedOperationException.class);
-        assertThatThrownBy(() -> new ProcessedUserMyData(
-                0L,
-                List.of()
+    void 최종_음식점_항목은_필수값을_검증한다() {
+        assertThatThrownBy(() -> new MyDataRestaurantData(
+                " ",
+                "중식 > 중화요리"
         )).isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("userId는 1 이상이어야 합니다.");
-        assertThatThrownBy(() -> new ProcessedUserMyData(
-                1L,
+                .hasMessage("restaurantName은 필수입니다.");
+        assertThatThrownBy(() -> new MyDataRestaurantData(
+                "영인성",
                 null
         )).isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("merchantUsages는 null일 수 없습니다.");
+                .hasMessage("foodCategory는 필수입니다.");
+    }
+
+    /**
+     * 음식점·카페 대분류만 제거하고 인식할 수 없는 첫 카테고리는 전체 경로를 유지하는지 확인한다.
+     */
+    @Test
+    void 카테고리_대분류만_제거한다() {
+        CollectedUserMyData collectedMyData = new CollectedUserMyData(1L, List.of());
+        LocalTime meetingTime = LocalTime.NOON;
+        List<MerchantUsageData> classifiedUsages = List.of(
+                MerchantUsageData.withoutPlaceMatch(
+                        "카페원본",
+                        "100-00-00001",
+                        List.of(new MerchantUsageData.PaymentLog(
+                                LocalDateTime.of(2026, 7, 18, 13, 0),
+                                BigDecimal.valueOf(5_000)
+                        ))
+                ).withKakaoPlaceMatch(new KakaoPlaceMatchData(
+                        "카페장소",
+                        "카페 > 커피전문점"
+                )),
+                MerchantUsageData.withoutPlaceMatch(
+                        "한식원본",
+                        "100-00-00002",
+                        List.of(new MerchantUsageData.PaymentLog(
+                                LocalDateTime.of(2026, 7, 18, 13, 10),
+                                BigDecimal.valueOf(10_000)
+                        ))
+                ).withKakaoPlaceMatch(new KakaoPlaceMatchData(
+                        "한식장소",
+                        "한식 > 백반"
+                ))
+        );
+
+        given(userMyDataCleaner.clean(collectedMyData)).willReturn(List.of());
+        given(merchantUsageProcessor.process(List.of(), meetingTime))
+                .willReturn(List.of());
+        given(merchantPlaceClassifier.classify(List.of(), "FD6"))
+                .willReturn(classifiedUsages);
+
+        List<MyDataRestaurantData> result = myDataPipeline.execute(
+                collectedMyData,
+                meetingTime,
+                "FD6"
+        );
+
+        assertThat(result).containsExactly(
+                new MyDataRestaurantData("카페장소", "커피전문점"),
+                new MyDataRestaurantData("한식장소", "한식 > 백반")
+        );
     }
 }

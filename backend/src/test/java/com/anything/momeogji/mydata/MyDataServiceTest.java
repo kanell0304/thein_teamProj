@@ -7,7 +7,7 @@ import com.anything.momeogji.mydata.collection.cardlist.ConsentedCardIdSelector;
 import com.anything.momeogji.mydata.collection.cardlist.CardListValidator;
 import com.anything.momeogji.mydata.collection.model.CollectedUserMyData;
 import com.anything.momeogji.mydata.processing.MyDataPipeline;
-import com.anything.momeogji.mydata.processing.model.ProcessedUserMyData;
+import com.anything.momeogji.mydata.processing.model.MyDataRestaurantData;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -79,15 +79,14 @@ class MyDataServiceTest {
     void process는_수집_결과를_한_번만_가공한다() {
         given(myDataProvider.fetchCardListRawJson(1L, "0", null, 500))
                 .willReturn(EMPTY_CARD_LIST_RESPONSE);
-        ProcessedUserMyData processed = new ProcessedUserMyData(
-                1L,
-                List.of()
+        List<MyDataRestaurantData> processed = List.of(
+                new MyDataRestaurantData("영인성", "중식 > 중화요리")
         );
         LocalTime meetingTime = LocalTime.of(12, 0);
         given(myDataPipeline.execute(any(CollectedUserMyData.class), eq(meetingTime), eq("FD6")))
                 .willReturn(processed);
 
-        ProcessedUserMyData result = myDataService.process(
+        List<MyDataRestaurantData> result = myDataService.process(
                 1L,
                 meetingTime,
                 "식사"
@@ -135,12 +134,12 @@ class MyDataServiceTest {
     void 카페와_디저트_목적은_CE7로_변환한다(String purpose) {
         given(myDataProvider.fetchCardListRawJson(1L, "0", null, 500))
                 .willReturn(EMPTY_CARD_LIST_RESPONSE);
-        ProcessedUserMyData processed = new ProcessedUserMyData(1L, List.of());
+        List<MyDataRestaurantData> processed = List.of();
         LocalTime meetingTime = LocalTime.of(15, 0);
         given(myDataPipeline.execute(any(CollectedUserMyData.class), eq(meetingTime), eq("CE7")))
                 .willReturn(processed);
 
-        ProcessedUserMyData result = myDataService.process(
+        List<MyDataRestaurantData> result = myDataService.process(
                 1L,
                 meetingTime,
                 "  " + purpose + "  "
@@ -158,12 +157,12 @@ class MyDataServiceTest {
     void 일반_목적은_FD6로_변환한다(String purpose) {
         given(myDataProvider.fetchCardListRawJson(1L, "0", null, 500))
                 .willReturn(EMPTY_CARD_LIST_RESPONSE);
-        ProcessedUserMyData processed = new ProcessedUserMyData(1L, List.of());
+        List<MyDataRestaurantData> processed = List.of();
         LocalTime meetingTime = LocalTime.of(19, 0);
         given(myDataPipeline.execute(any(CollectedUserMyData.class), eq(meetingTime), eq("FD6")))
                 .willReturn(processed);
 
-        ProcessedUserMyData result = myDataService.process(
+        List<MyDataRestaurantData> result = myDataService.process(
                 1L,
                 meetingTime,
                 purpose
