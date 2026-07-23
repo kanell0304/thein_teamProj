@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import momeokjiIcon from '../assets/icons/momeokji-icon.png'
 import CalendarPicker from '../components/momeokji/CalendarPicker'
 import NextProgressButton from '../components/momeokji/NextProgressButton'
@@ -98,7 +98,8 @@ function MomeokjiPage({
   open,
   onClose,
   onComplete,
-  messages = [],
+  chatRoomId,
+  featureStartedAt,
   participants = [],
   defaultParticipantIds = [],
 }) {
@@ -117,6 +118,8 @@ function MomeokjiPage({
   const [menus, setMenus] = useState([])
   const [menuInput, setMenuInput] = useState('')
   const [isAnalyzing, setIsAnalyzing] = useState(false)
+  const [analysisMessage, setAnalysisMessage] = useState('')
+  const analyzedFeatureStartedAtRef = useRef(null)
 
   useEffect(() => {
     if (!open) return undefined
@@ -128,32 +131,39 @@ function MomeokjiPage({
   }, [open, onClose])
 
   useEffect(() => {
-    if (!open) return undefined
-    let isActive = true
-    Promise.resolve()
-      .then(() => {
-        if (isActive) setIsAnalyzing(true)
-        return analyzeConversationMenus(messages, {
-          themeCode,
-          meetingDate: date,
-          meetingTime: time,
-          timeZone: 'Asia/Seoul',
-          place,
-        })
-      })
+    if (
+      !open
+      || step !== TOTAL_STEPS - 1
+      || !chatRoomId
+      || !featureStartedAt
+      || analyzedFeatureStartedAtRef.current === featureStartedAt
+    ) return
+
+    analyzedFeatureStartedAtRef.current = featureStartedAt
+    setIsAnalyzing(true)
+    setAnalysisMessage('')
+    setMenuOptions([])
+    setMenus([])
+
+    analyzeConversationMenus(chatRoomId, featureStartedAt)
       .then((items) => {
-        if (isActive) setMenuOptions(items)
+        if (analyzedFeatureStartedAtRef.current !== featureStartedAt) return
+        setMenuOptions(items)
+        setAnalysisMessage(items.length > 0
+          ? '대화 내용을 바탕으로 추천한 메뉴예요.'
+          : '대화에서 메뉴를 찾지 못했어요. 메뉴를 직접 추가해주세요.')
       })
       .catch(() => {
-        if (isActive) setMenuOptions([])
+        if (analyzedFeatureStartedAtRef.current !== featureStartedAt) return
+        setMenuOptions([])
+        setAnalysisMessage('대화 추천 메뉴를 불러오지 못했어요. 메뉴를 직접 추가해주세요.')
       })
       .finally(() => {
-        if (isActive) setIsAnalyzing(false)
+        if (analyzedFeatureStartedAtRef.current === featureStartedAt) {
+          setIsAnalyzing(false)
+        }
       })
-    return () => {
-      isActive = false
-    }
-  }, [date, messages, open, place, themeCode, time])
+  }, [chatRoomId, featureStartedAt, open, step])
 
   // ===== 주최자 ID는 UI 상태와 무관하게 최종 참가자 값에 항상 포함 =====
   const effectiveParticipantIds = useMemo(
@@ -168,7 +178,7 @@ function MomeokjiPage({
     [effectiveParticipantIds, participants],
   )
 
-  // ===== AI 추출 메뉴와 직접 추가 메뉴를 중복 없이 하나의 선택 목록으로 구성 =====
+  // ===== 대화 추출 메뉴와 직접 추가 메뉴를 중복 없이 하나의 선택 목록으로 구성 =====
   const selectableMenuOptions = useMemo(
     () => [...new Set([...menuOptions, ...customMenuOptions, MENU_ANY_OPTION])],
     [customMenuOptions, menuOptions],
@@ -320,10 +330,10 @@ function MomeokjiPage({
               <span>필수</span>
             </div>
             <p className="momeokji-description">
-              {isAnalyzing ? '대화에서 메뉴를 찾고 있어요…' : '대화 내용을 분석한 추천 메뉴예요.'}
+              {isAnalyzing ? '대화에서 메뉴를 찾고 있어요…' : analysisMessage}
             </p>
             <ChipGroup
-              label="AI 추천 메뉴"
+              label="대화 추천 메뉴"
               options={selectableMenuOptions}
               selected={menus}
               onToggle={(value) => toggleArrayValue(setMenus, value)}

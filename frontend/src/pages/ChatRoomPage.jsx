@@ -262,6 +262,7 @@ function ChatRoomPage({ room: providedRoom, currentUser = DEMO_CURRENT_USER }) {
   // API 연결 후에는 createInitialMessages 대신 채팅 조회 응답으로 초기화
   const [messages, setMessages] = useState(createInitialMessages)
   const [isMomeokjiOpen, setIsMomeokjiOpen] = useState(false)
+  const [momeokjiFeatureStartedAt, setMomeokjiFeatureStartedAt] = useState(null)
   const [isParticipantPreferenceOpen, setIsParticipantPreferenceOpen] = useState(false)
   const [isVotePageOpen, setIsVotePageOpen] = useState(false)
   const [isCreatingMeetup, setIsCreatingMeetup] = useState(false)
@@ -656,6 +657,7 @@ function ChatRoomPage({ room: providedRoom, currentUser = DEMO_CURRENT_USER }) {
       if (canViewPreference) setIsParticipantPreferenceOpen(true)
       return
     }
+    setMomeokjiFeatureStartedAt(new Date().toISOString())
     setIsMomeokjiOpen(true)
   }
 
@@ -888,7 +890,8 @@ function ChatRoomPage({ room: providedRoom, currentUser = DEMO_CURRENT_USER }) {
         open={isMomeokjiOpen}
         onClose={() => setIsMomeokjiOpen(false)}
         onComplete={requestParticipantPreference}
-        messages={messages}
+        chatRoomId={room.id}
+        featureStartedAt={momeokjiFeatureStartedAt}
         participants={roomParticipants}
         defaultParticipantIds={[currentUser.id]}
       />
