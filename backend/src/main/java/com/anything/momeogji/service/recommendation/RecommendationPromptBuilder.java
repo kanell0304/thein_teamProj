@@ -3,6 +3,7 @@ package com.anything.momeogji.service.recommendation;
 import com.anything.momeogji.dto.recommendation.AggregatedCondition;
 import com.anything.momeogji.dto.recommendation.CommonOptionRequest;
 import com.anything.momeogji.dto.recommendation.RestaurantCandidate;
+import com.anything.momeogji.mydata.processing.model.MyDataRestaurantData;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Component;
@@ -46,12 +47,15 @@ public class RecommendationPromptBuilder {
     }
 
     public String buildUserPrompt(CommonOptionRequest commonOption, AggregatedCondition condition,
-                                   List<RestaurantCandidate> candidates, String preferenceNote) {
+                                   List<RestaurantCandidate> candidates,
+                                   List<MyDataRestaurantData> myDataRestaurants,
+                                   String preferenceNote) {
         try {
             Map<String, Object> payload = new LinkedHashMap<>();
             payload.put("common", commonOption);
             payload.put("condition", condition);
             payload.put("candidates", candidates);
+            payload.put("myDataRestaurants", myDataRestaurants);
             if (preferenceNote != null && !preferenceNote.isBlank()) {
                 payload.put("preferenceNote", preferenceNote);
             }

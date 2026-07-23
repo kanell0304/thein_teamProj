@@ -11,6 +11,7 @@ import com.anything.momeogji.entity.recommendation.MeetupParticipant;
 import com.anything.momeogji.entity.recommendation.ParticipantPreference;
 import com.anything.momeogji.entity.recommendation.SubmissionStatus;
 import com.anything.momeogji.mydata.MyDataService;
+import com.anything.momeogji.mydata.processing.model.MyDataRestaurantData;
 import com.anything.momeogji.repository.MeetupParticipantRepository;
 import com.anything.momeogji.repository.MeetupRepository;
 import com.anything.momeogji.repository.ParticipantPreferenceRepository;
@@ -32,6 +33,7 @@ public class MeetupPreferenceServiceImpl implements MeetupPreferenceService {
     private final MeetupParticipantRepository meetupParticipantRepository;
     private final ParticipantPreferenceRepository participantPreferenceRepository;
     private final MyDataService myDataService;
+    private final MeetupMyDataResultStore meetupMyDataResultStore;
     private final RecommendationRoundService recommendationRoundService;
     private final MeetupService meetupService;
     private final RecommendationEventPublisher eventPublisher;
@@ -62,10 +64,17 @@ public class MeetupPreferenceServiceImpl implements MeetupPreferenceService {
         if (request.mydataConsent()) {
             try {
                 // 모임 시각과 목적을 함께 전달해 시간대·음식점/카페 범위에 맞는 MyData만 처리한다.
-                myDataService.process(
+                List<MyDataRestaurantData> myDataRestaurants = myDataService.process(
                         callerId,
                         meetup.getMeetingTime().toLocalTime(),
                         meetup.getPurpose()
+                );
+
+                // 추천 시작 시 전체 참여자의 결과를 합칠 수 있도록 모임·사용자 키로 임시 보관한다.
+                meetupMyDataResultStore.save(
+                        meetupId,
+                        callerId,
+                        myDataRestaurants
                 );
             } catch (RuntimeException exception) {
                 // 선택 기능인 MyData 실패가 개인 옵션 저장과 전체 추천 진행을 막지 않게 격리한다.

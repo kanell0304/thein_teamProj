@@ -11,6 +11,7 @@ import com.anything.momeogji.entity.recommendation.RecommendationRound;
 import com.anything.momeogji.entity.recommendation.RecommendationRoundStatus;
 import com.anything.momeogji.entity.recommendation.Restaurant;
 import com.anything.momeogji.entity.recommendation.RoundCandidate;
+import com.anything.momeogji.mydata.processing.model.MyDataRestaurantData;
 import com.anything.momeogji.repository.ChatRoomMemberRepository;
 import com.anything.momeogji.repository.MeetupRepository;
 import com.anything.momeogji.repository.RecommendationRoundRepository;
@@ -36,6 +37,7 @@ public class RecommendationRoundServiceImpl implements RecommendationRoundServic
     private final RoundCandidateRepository roundCandidateRepository;
     private final RestaurantRepository restaurantRepository;
     private final RestaurantRecommendationService restaurantRecommendationService;
+    private final MeetupMyDataResultStore meetupMyDataResultStore;
     private final RecommendationEventPublisher eventPublisher;
     private final RoundResponseAssembler roundResponseAssembler;
 
@@ -56,10 +58,19 @@ public class RecommendationRoundServiceImpl implements RecommendationRoundServic
     private RoundResponse executeRecommendation(Meetup meetup, List<PersonalOptionRequest> personalOptions, String preferenceNote) {
         Long chatRoomId = meetup.getChatRoom().getId();
         List<String> excludedRestaurantIds = derivePreviouslyRecommendedRestaurantIds(meetup.getId());
+        List<Long> userIds = personalOptions.stream()
+                .map(PersonalOptionRequest::participantId)
+                .toList();
+
+        // 사용자별로 임시 보관된 MyData 결과를 사용자 식별자 없이 하나의 목록으로 연결한다.
+        List<MyDataRestaurantData> myDataRestaurants =
+                meetupMyDataResultStore.findAll(meetup.getId(), userIds);
+
         RecommendationRequest recommendationRequest = new RecommendationRequest(
                 MeetupCommonOptionMapper.toCommonOption(meetup),
                 personalOptions,
                 excludedRestaurantIds,
+                myDataRestaurants,
                 preferenceNote
         );
 

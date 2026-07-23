@@ -38,6 +38,7 @@ public class MeetupFinalizeServiceImpl implements MeetupFinalizeService {
     private final FinalNoticeRepository finalNoticeRepository;
     private final FinalNoticeChangeLogRepository finalNoticeChangeLogRepository;
     private final RecommendationEventPublisher eventPublisher;
+    private final MeetupMyDataResultStore meetupMyDataResultStore;
     private final Random random;
 
     @Autowired
@@ -49,10 +50,11 @@ public class MeetupFinalizeServiceImpl implements MeetupFinalizeService {
                                       MemberRepository memberRepository,
                                       FinalNoticeRepository finalNoticeRepository,
                                       FinalNoticeChangeLogRepository finalNoticeChangeLogRepository,
-                                      RecommendationEventPublisher eventPublisher) {
+                                      RecommendationEventPublisher eventPublisher,
+                                      MeetupMyDataResultStore meetupMyDataResultStore) {
         this(meetupRepository, recommendationRoundRepository, roundCandidateRepository, voteRepository,
                 meetupParticipantRepository, memberRepository, finalNoticeRepository, finalNoticeChangeLogRepository,
-                eventPublisher, new SecureRandom());
+                eventPublisher, meetupMyDataResultStore, new SecureRandom());
     }
 
     // 테스트에서 결정적인 결과를 검증할 수 있도록 Random을 주입받는 생성자(패키지 전용)
@@ -65,6 +67,7 @@ public class MeetupFinalizeServiceImpl implements MeetupFinalizeService {
                                FinalNoticeRepository finalNoticeRepository,
                                FinalNoticeChangeLogRepository finalNoticeChangeLogRepository,
                                RecommendationEventPublisher eventPublisher,
+                               MeetupMyDataResultStore meetupMyDataResultStore,
                                Random random) {
         this.meetupRepository = meetupRepository;
         this.recommendationRoundRepository = recommendationRoundRepository;
@@ -75,6 +78,7 @@ public class MeetupFinalizeServiceImpl implements MeetupFinalizeService {
         this.finalNoticeRepository = finalNoticeRepository;
         this.finalNoticeChangeLogRepository = finalNoticeChangeLogRepository;
         this.eventPublisher = eventPublisher;
+        this.meetupMyDataResultStore = meetupMyDataResultStore;
         this.random = random;
     }
 
@@ -121,6 +125,9 @@ public class MeetupFinalizeServiceImpl implements MeetupFinalizeService {
 
         FinalNoticeResponse response = toResponse(finalNotice, meetupId);
         eventPublisher.finalNoticePublished(meetup.getChatRoom().getId(), response);
+
+        // 최종 음식점이 확정된 모임은 재추천에 MyData가 더 필요하지 않으므로 임시 결과를 제거한다.
+        meetupMyDataResultStore.clear(meetupId);
         return response;
     }
 
