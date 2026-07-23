@@ -80,8 +80,10 @@ public class KakaoOAuthClientImpl implements KakaoOAuthClient {
                 throw new AuthException("카카오 사용자 정보 응답이 비어 있습니다.");
             }
 
+            // 닉네임 동의를 거부하면 profile 자체가 없거나 nickname이 null로 온다 - 여기서는 그대로 전달하고,
+            // 회원 ID가 필요한 기본값 대체는 AuthServiceImpl이 맡는다.
             KakaoUserResponse.Profile profile = response.kakaoAccount() != null ? response.kakaoAccount().profile() : null;
-            String nickname = profile != null && profile.nickname() != null ? profile.nickname() : "카카오사용자";
+            String nickname = profile != null ? profile.nickname() : null;
             String profileImageUrl = profile != null ? profile.profileImageUrl() : null;
 
             return new KakaoUserProfile(String.valueOf(response.id()), nickname, profileImageUrl);

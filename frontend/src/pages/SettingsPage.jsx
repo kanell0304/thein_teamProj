@@ -18,7 +18,11 @@ function SettingsPage() {
     <MainScreen title="설정">
       {/* ===== 현재 로그인 사용자 요약 ===== */}
       <section className="settings-profile">
-        <span className="settings-avatar" aria-hidden="true">{nickname.slice(0, 1)}</span>
+        {user?.profileImageUrl ? (
+          <img className="settings-avatar settings-avatar--image" src={user.profileImageUrl} alt="" />
+        ) : (
+          <span className="settings-avatar" aria-hidden="true">{nickname.slice(0, 1)}</span>
+        )}
         <div>
           <strong>{nickname}</strong>
           <small>오늘 모 먹지? 계정</small>
