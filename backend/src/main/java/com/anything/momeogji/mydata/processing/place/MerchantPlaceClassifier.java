@@ -7,9 +7,7 @@ import com.anything.momeogji.mydata.processing.model.MerchantUsageData;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
@@ -61,13 +59,12 @@ public class MerchantPlaceClassifier {
             throw new IllegalArgumentException("categoryGroupCode는 FD6 또는 CE7이어야 합니다.");
         }
 
-        Map<String, List<SearchCandidate>> searchCache = new HashMap<>();
         List<MerchantUsageData> classifiedUsages = new ArrayList<>(merchantUsages.size());
 
         // 입력 가맹점 순서대로 목적 그룹 검색과 장소명 매칭을 수행한다.
         for (MerchantUsageData merchantUsage : merchantUsages) {
             // 장소명과 세부 카테고리를 모두 확정한 결과만 최종 목록에 추가한다.
-            classifyMerchant(merchantUsage, categoryGroupCode, searchCache)
+            classifyMerchant(merchantUsage, categoryGroupCode)
                     .ifPresent(classifiedUsages::add);
         }
 
@@ -80,19 +77,16 @@ public class MerchantPlaceClassifier {
      *
      * @param merchantUsage 분류할 한 가맹점의 결제 사용 이력
      * @param categoryGroupCode 현재 모임 목적에 대응하는 카카오 그룹 코드
-     * @param searchCache 현재 처리 호출 안에서 검색어별 결과를 재사용하는 캐시
      * @return 장소명과 세부 카테고리를 모두 확정하면 결과를 포함하고 그렇지 않으면 빈 Optional
      */
     private Optional<MerchantUsageData> classifyMerchant(
             MerchantUsageData merchantUsage,
-            String categoryGroupCode,
-            Map<String, List<SearchCandidate>> searchCache
+            String categoryGroupCode
     ) {
         // 원본명과 비교용 이름 검색을 Matcher에 위임해 동일 우선순위 후보들을 받는다.
         MatchResult matchResult = merchantPlaceMatcher.match(
                 merchantUsage.merchantName(),
-                categoryGroupCode,
-                searchCache
+                categoryGroupCode
         );
 
         // 검색할 이름이 없거나 허용 가능한 이름 매칭 후보가 없으면 최종 목록에서 제외한다.

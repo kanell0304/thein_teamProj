@@ -5,7 +5,6 @@ import com.anything.momeogji.mydata.processing.place.MerchantPlaceSearchClient.S
 import org.springframework.stereotype.Component;
 
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -13,7 +12,7 @@ import java.util.Optional;
  *
  * <p>숫자형 신뢰도는 계산하거나 보존하지 않는다. 원본 문자열 완전일치, 비교용 이름 완전일치,
  * 부분일치 순서로 후보를 확인하고 원본 검색에서 강한 일치를 찾지 못했을 때만 비교용 이름으로
- * 한 번 더 검색한다. 같은 처리 호출에서 동일한 검색어가 반복되면 전달받은 캐시를 사용한다.</p>
+ * 한 번 더 검색한다. 검색 결과 재사용과 외부 API 호출 병합은 검색 Client가 담당한다.</p>
  */
 @Component
 public class MerchantPlaceMatcher {
@@ -46,20 +45,12 @@ public class MerchantPlaceMatcher {
      *
      * @param merchantName 마이데이터의 원본 가맹점명. 미회신이면 null
      * @param categoryGroupCode 음식점 {@code FD6} 또는 카페 {@code CE7} 그룹 코드
-     * @param searchCache 현재 분류 처리 호출 안에서 검색어별 결과를 재사용하는 캐시
      * @return 이름 일치 우선순위가 같은 장소 후보들을 포함한 불변 결과
-     * @throws IllegalArgumentException 검색 캐시가 null인 경우
      */
     public MatchResult match(
             String merchantName,
-            String categoryGroupCode,
-            Map<String, List<SearchCandidate>> searchCache
+            String categoryGroupCode
     ) {
-        // 한 번의 처리 범위에서 검색 결과를 재사용할 캐시가 존재하는지 검증한다.
-        if (searchCache == null) {
-            throw new IllegalArgumentException("searchCache는 null일 수 없습니다.");
-        }
-
         // 가맹점명이 미회신된 경우 외부 검색을 수행하지 않고 미매칭 결과를 반환한다.
         if (merchantName == null) {
             return MatchResult.unmatched();
@@ -69,10 +60,9 @@ public class MerchantPlaceMatcher {
         String merchantNameKey = merchantNameNormalizer.toComparisonKey(merchantName);
 
         // 원본 가맹점명으로 1차 검색을 수행한다.
-        List<SearchCandidate> firstSearchCandidates = searchWithCache(
+        List<SearchCandidate> firstSearchCandidates = merchantPlaceSearchClient.search(
                 merchantName,
-                categoryGroupCode,
-                searchCache
+                categoryGroupCode
         );
 
         // 원본 문자열 또는 비교용 이름이 완전히 일치하면 더 낮은 우선순위 후보를 확인하지 않는다.
@@ -97,10 +87,9 @@ public class MerchantPlaceMatcher {
         }
 
         // 비교용 이름으로 2차 검색을 수행한다.
-        List<SearchCandidate> secondSearchCandidates = searchWithCache(
+        List<SearchCandidate> secondSearchCandidates = merchantPlaceSearchClient.search(
                 merchantNameKey,
-                categoryGroupCode,
-                searchCache
+                categoryGroupCode
         );
 
         // 2차 검색에서 완전일치를 찾으면 1차 부분일치보다 우선한다.
@@ -176,28 +165,6 @@ public class MerchantPlaceMatcher {
             return Optional.empty();
         }
         return Optional.of(mostSimilarCandidate);
-    }
-
-    /**
-     * 같은 처리 호출에서 이미 조회한 검색어는 외부 API를 다시 호출하지 않고 이전 결과를 재사용한다.
-     *
-     * @param query 원본 또는 비교용 가맹점명 검색어
-     * @param categoryGroupCode 현재 처리 호출에서 고정된 음식점 또는 카페 그룹 코드
-     * @param searchCache 검색어별 불변 후보 목록 캐시
-     * @return 외부 제공자 응답 순서를 유지한 검색 후보 목록
-     */
-    private List<SearchCandidate> searchWithCache(
-            String query,
-            String categoryGroupCode,
-            Map<String, List<SearchCandidate>> searchCache
-    ) {
-        // 외부 클라이언트 결과를 방어적으로 복사해 캐시 이후 변경되지 않게 한다.
-        return searchCache.computeIfAbsent(
-                query,
-                ignored -> List.copyOf(
-                        merchantPlaceSearchClient.search(query, categoryGroupCode)
-                )
-        );
     }
 
     /**

@@ -1,6 +1,8 @@
 package com.anything.momeogji.mydata.processing.place;
 
 import com.anything.momeogji.config.KakaoProperties;
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import org.slf4j.Logger;
@@ -22,7 +24,8 @@ import java.util.Set;
  * 카카오 로컬의 키워드 장소 검색 API를 사용하는 {@link MerchantPlaceSearchClient} 구현체다.
  *
  * 가맹점 카테고리를 확인하기 위해 위치·반경 조건 없이 목적별 음식점·카페 그룹으로 정확도 순 첫 페이지를 조회한다.
- * 외부 호출 실패는 전체 마이데이터 가공을 중단시키지 않도록 기록한 뒤 빈 목록으로 대체한다.
+ * 정상 검색 결과는 검색어와 카테고리 그룹별로 JVM 캐시에 보존한다. 외부 호출 실패나 비정상 응답은
+ * 캐시에 남기지 않고 전체 마이데이터 가공을 중단시키지 않도록 기록한 뒤 빈 목록으로 대체한다.
  */
 @Component
 public class KakaoLocalKeywordSearchClient implements MerchantPlaceSearchClient {
@@ -34,16 +37,19 @@ public class KakaoLocalKeywordSearchClient implements MerchantPlaceSearchClient 
     private static final Set<String> ALLOWED_CATEGORY_GROUP_CODES = Set.of("FD6", "CE7");
 
     private final RestClient restClient;
+    private final Cache<SearchCacheKey, List<SearchCandidate>> searchCache;
 
     /**
-     * 프로젝트의 카카오 REST API 설정으로 인증 헤더와 요청 제한시간이 적용된 클라이언트를 생성한다.
+     * 프로젝트의 카카오 REST API 설정과 MyData 전용 검색 캐시 설정으로 Client를 생성한다.
      *
      * @param restClientBuilder Spring이 제공하는 REST 클라이언트 빌더
      * @param properties 카카오 REST API 키와 로컬 API 기본 주소
+     * @param cacheProperties 카카오 장소 후보 캐시의 만료 시간과 최대 항목 수
      */
     public KakaoLocalKeywordSearchClient(
             RestClient.Builder restClientBuilder,
-            KakaoProperties properties
+            KakaoProperties properties,
+            KakaoSearchCacheProperties cacheProperties
     ) {
         this.restClient = restClientBuilder
                 .baseUrl(properties.baseUrl())
@@ -53,10 +59,17 @@ public class KakaoLocalKeywordSearchClient implements MerchantPlaceSearchClient 
                 )
                 .requestFactory(createRequestFactory())
                 .build();
+        this.searchCache = Caffeine.newBuilder()
+                .expireAfterWrite(cacheProperties.ttl())
+                .maximumSize(cacheProperties.maximumSize())
+                .build();
     }
 
     /**
      * 원본 또는 비교용 가맹점명을 카카오 로컬 키워드 검색어로 전달하고 첫 페이지 후보를 반환한다.
+     *
+     * <p>동일한 검색어와 그룹 코드의 정상 결과는 캐시에서 재사용한다. 정상 빈 응답도 캐시하지만
+     * 외부 호출 실패나 응답 구조 누락은 캐시하지 않아 다음 호출에서 다시 조회할 수 있게 한다.</p>
      *
      * @param query 카카오 로컬 API에 전달할 가맹점명 검색어
      * @param categoryGroupCode 음식점 {@code FD6} 또는 카페 {@code CE7} 그룹 코드
@@ -74,39 +87,57 @@ public class KakaoLocalKeywordSearchClient implements MerchantPlaceSearchClient 
             throw new IllegalArgumentException("categoryGroupCode는 FD6 또는 CE7이어야 합니다.");
         }
 
+        SearchCacheKey cacheKey = new SearchCacheKey(query, categoryGroupCode);
         try {
-            // 위치나 카테고리 제한 없이 정확도 순 최대 15개 장소를 조회한다.
-            KakaoKeywordSearchResponse response = restClient.get()
-                    .uri(uriBuilder -> uriBuilder
-                            .path(KEYWORD_SEARCH_PATH)
-                            .queryParam("query", query)
-                            .queryParam("category_group_code", categoryGroupCode)
-                            .queryParam("size", MAX_PAGE_SIZE)
-                            .queryParam("sort", "accuracy")
-                            .build())
-                    .retrieve()
-                    .body(KakaoKeywordSearchResponse.class);
-
-            // 카카오가 본문이나 장소 배열을 회신하지 않으면 검색 결과 없음으로 처리한다.
-            if (response == null || response.documents() == null) {
-                return List.of();
-            }
-
-            // 요청 그룹과 일치하고 장소명·세부 카테고리가 있는 응답만 후보로 변환한다.
-            return response.documents().stream()
-                    .filter(Objects::nonNull)
-                    .filter(document -> hasRequiredPlaceInformation(document, categoryGroupCode))
-                    .map(KakaoLocalKeywordSearchClient::toSearchCandidate)
-                    .toList();
-        } catch (RestClientException exception) {
-            // 한 가맹점의 외부 검색 실패가 참가자 전체 데이터 가공 실패로 번지지 않도록 빈 결과로 대체한다.
+            // 동일 키의 동시 누락 요청은 Caffeine이 한 번만 실행하고 정상 결과만 캐시에 저장한다.
+            return searchCache.get(cacheKey, this::requestCandidates);
+        } catch (RestClientException | IllegalStateException exception) {
+            // 외부 호출·응답 오류는 캐시에 남기지 않고 해당 가맹점만 미매칭 처리한다.
             log.warn(
-                    "카카오 로컬 가맹점 검색에 실패했습니다. query={}, cause={}",
+                    "카카오 로컬 가맹점 검색에 실패했습니다. query={}, categoryGroupCode={}, cause={}",
                     query,
+                    categoryGroupCode,
                     exception.getMessage()
             );
             return List.of();
         }
+    }
+
+    /**
+     * 캐시에 없는 검색 키로 카카오 로컬 API를 호출하고 저장 가능한 불변 후보 목록을 생성한다.
+     *
+     * @param cacheKey 실제 요청 검색어와 음식점·카페 그룹을 포함한 캐시 키
+     * @return 카카오 정확도 순서를 유지한 불변 후보 목록. 정상적인 결과 없음은 빈 목록
+     * @throws RestClientException 외부 호출 또는 응답 역직렬화에 실패한 경우
+     * @throws IllegalStateException 응답 본문이나 장소 배열이 누락된 경우
+     */
+    private List<SearchCandidate> requestCandidates(SearchCacheKey cacheKey) {
+        // 위치나 반경 조건 없이 요청 그룹 안에서 정확도 순 최대 15개 장소를 조회한다.
+        KakaoKeywordSearchResponse response = restClient.get()
+                .uri(uriBuilder -> uriBuilder
+                        .path(KEYWORD_SEARCH_PATH)
+                        .queryParam("query", cacheKey.query())
+                        .queryParam("category_group_code", cacheKey.categoryGroupCode())
+                        .queryParam("size", MAX_PAGE_SIZE)
+                        .queryParam("sort", "accuracy")
+                        .build())
+                .retrieve()
+                .body(KakaoKeywordSearchResponse.class);
+
+        // 정상 빈 배열과 구분할 수 없는 본문·필드 누락은 캐시하지 않도록 예외로 전달한다.
+        if (response == null || response.documents() == null) {
+            throw new IllegalStateException("카카오 로컬 검색 응답의 documents가 누락되었습니다.");
+        }
+
+        // 요청 그룹과 일치하고 장소명·세부 카테고리가 있는 응답만 후보로 변환한다.
+        return response.documents().stream()
+                .filter(Objects::nonNull)
+                .filter(document -> hasRequiredPlaceInformation(
+                        document,
+                        cacheKey.categoryGroupCode()
+                ))
+                .map(KakaoLocalKeywordSearchClient::toSearchCandidate)
+                .toList();
     }
 
     /**
@@ -154,6 +185,15 @@ public class KakaoLocalKeywordSearchClient implements MerchantPlaceSearchClient 
                 new JdkClientHttpRequestFactory(httpClient);
         requestFactory.setReadTimeout(REQUEST_TIMEOUT);
         return requestFactory;
+    }
+
+    /**
+     * 사용자·모임·결제 정보 없이 실제 카카오 검색 요청을 구분하는 JVM 캐시 키다.
+     *
+     * @param query 원본 또는 비교용 가맹점명 검색어
+     * @param categoryGroupCode 음식점 {@code FD6} 또는 카페 {@code CE7} 그룹 코드
+     */
+    private record SearchCacheKey(String query, String categoryGroupCode) {
     }
 
     /**
