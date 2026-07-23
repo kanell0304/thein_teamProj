@@ -3,6 +3,7 @@ package com.anything.momeogji.service.recommendation;
 import com.anything.momeogji.dto.recommendation.AggregatedCondition;
 import com.anything.momeogji.dto.recommendation.CategoryCount;
 import com.anything.momeogji.dto.recommendation.PersonalOptionRequest;
+import com.anything.momeogji.mydata.processing.model.MyDataRestaurantData;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -22,7 +23,7 @@ class RecommendationConditionAggregatorTest {
                 new PersonalOptionRequest(3L, 15, List.of("일식"), null, false, List.of(), null)
         );
 
-        AggregatedCondition condition = aggregator.aggregate(options);
+        AggregatedCondition condition = aggregator.aggregate(options, List.of());
 
         assertThat(condition.participantCount()).isEqualTo(3);
         assertThat(condition.averageWalkMinutes()).isEqualTo(10.0);
@@ -39,7 +40,7 @@ class RecommendationConditionAggregatorTest {
                 new PersonalOptionRequest(3L, 5, List.of("일식"), null, false, List.of(), null)
         );
 
-        AggregatedCondition condition = aggregator.aggregate(options);
+        AggregatedCondition condition = aggregator.aggregate(options, List.of());
 
         assertThat(condition.categoryPriority())
                 .extracting(CategoryCount::category)
@@ -49,7 +50,40 @@ class RecommendationConditionAggregatorTest {
 
     @Test
     void 개인_옵션이_비어있으면_예외() {
-        assertThatThrownBy(() -> aggregator.aggregate(List.of()))
+        assertThatThrownBy(() -> aggregator.aggregate(List.of(), List.of()))
                 .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void MyData_방문_카테고리가_선호_카테고리에_한_표씩_더해진다() {
+        List<PersonalOptionRequest> options = List.of(
+                new PersonalOptionRequest(1L, 5, List.of("한식"), null, false, List.of(), null)
+        );
+        List<MyDataRestaurantData> myDataRestaurants = List.of(
+                new MyDataRestaurantData("영인성", "중식 > 중화요리"),
+                new MyDataRestaurantData("상무초밥", "일식 > 초밥")
+        );
+
+        AggregatedCondition condition = aggregator.aggregate(options, myDataRestaurants);
+
+        assertThat(condition.categoryPriority())
+                .extracting(CategoryCount::category)
+                .containsExactlyInAnyOrder("한식", "중식", "일식");
+    }
+
+    @Test
+    void 매칭되지_않는_MyData_카테고리는_조용히_무시된다() {
+        List<PersonalOptionRequest> options = List.of(
+                new PersonalOptionRequest(1L, 5, List.of("한식"), null, false, List.of(), null)
+        );
+        List<MyDataRestaurantData> myDataRestaurants = List.of(
+                new MyDataRestaurantData("알수없는가게", "편의점 > 즉석식품")
+        );
+
+        AggregatedCondition condition = aggregator.aggregate(options, myDataRestaurants);
+
+        assertThat(condition.categoryPriority())
+                .extracting(CategoryCount::category)
+                .containsExactly("한식");
     }
 }

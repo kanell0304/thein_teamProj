@@ -10,6 +10,8 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.util.Comparator;
@@ -30,6 +32,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class RestaurantRecommendationServiceImpl implements RestaurantRecommendationService {
 
+    private static final Logger log = LoggerFactory.getLogger(RestaurantRecommendationServiceImpl.class);
     private static final int RECOMMENDATION_COUNT = 3;
 
     private final RecommendationConditionAggregator conditionAggregator;
@@ -42,7 +45,10 @@ public class RestaurantRecommendationServiceImpl implements RestaurantRecommenda
 
     @Override
     public RecommendationResult recommend(RecommendationRequest request) {
-        AggregatedCondition condition = conditionAggregator.aggregate(request.personalOptions());
+        AggregatedCondition condition = conditionAggregator.aggregate(request.personalOptions(), request.myDataRestaurants());
+        // MyData 방문 이력이 categoryPriority에 실제로 표를 더했는지 눈으로 확인할 수 있도록 남긴다.
+        log.info("추천 조건 집계 결과: categoryPriority={}, myDataRestaurants={}",
+                condition.categoryPriority(), request.myDataRestaurants());
         Set<String> excludedCandidateIds = Set.copyOf(request.excludedRestaurantIds());
         List<RestaurantCandidate> candidates = candidateSearchService.search(request.commonOption(), condition, excludedCandidateIds);
         Map<String, RestaurantCandidate> candidateById = candidates.stream()
@@ -64,6 +70,11 @@ public class RestaurantRecommendationServiceImpl implements RestaurantRecommenda
                 .map(selection -> toRecommendation(selection, candidateById))
                 .sorted(Comparator.comparingInt(RestaurantRecommendation::rank))
                 .toList();
+
+        // AI가 각 후보를 왜 골랐는지 서버 콘솔에서 바로 확인할 수 있도록 남긴다.
+        recommendations.forEach(recommendation -> log.info(
+                "AI 추천 이유: rank={}, name={}, reason={}",
+                recommendation.rank(), recommendation.name(), recommendation.reason()));
 
         return new RecommendationResult(condition.participantCount(), attachImages(recommendations));
     }

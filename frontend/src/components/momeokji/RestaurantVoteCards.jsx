@@ -125,6 +125,9 @@ function RestaurantVoteCards({
             <span className="restaurant-vote-card__copy">
               <strong>{restaurant.name}</strong>
               <small>{restaurant.priceRange || restaurant.distanceLabel}</small>
+              {restaurant.reason && (
+                <p className="restaurant-vote-card__reason">{restaurant.reason}</p>
+              )}
             </span>
           </button>
         )

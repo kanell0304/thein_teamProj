@@ -90,3 +90,13 @@
 .restaurant-vote-card__copy { width: 100%; display: grid; gap: 2px; }
 .restaurant-vote-card__copy strong { overflow: hidden; font-size: 14px; font-weight: 600; line-height: 18px; text-overflow: ellipsis; white-space: nowrap; }
 .restaurant-vote-card__copy small { overflow: hidden; color: #fff; font-size: 12px; line-height: 16px; text-overflow: ellipsis; white-space: nowrap; }
+.restaurant-vote-card__reason {
+  margin: 0;
+  overflow: hidden;
+  color: rgba(255, 255, 255, .85);
+  font-size: 10px;
+  line-height: 13px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
