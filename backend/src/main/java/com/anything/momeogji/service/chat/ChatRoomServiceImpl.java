@@ -14,7 +14,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -27,17 +29,22 @@ public class ChatRoomServiceImpl implements ChatRoomService {
 
     @Override
     @Transactional
-    public ChatRoomResponse createRoom(String name, Long hostMemberId) {
-        Member host = findMember(hostMemberId);
+    public ChatRoomResponse createRoom(String name, Long hostMemberId, List<Long> participantIds) {
+        // 참가자가 실존하는지 먼저 전부 확인한 뒤에 방을 만든다(일부만 저장되는 상태 방지).
+        Set<Long> memberIds = new LinkedHashSet<>(participantIds);
+        memberIds.add(hostMemberId);
+        List<Member> members = memberIds.stream().map(this::findMember).toList();
 
         ChatRoom chatRoom = chatRoomRepository.save(ChatRoom.builder()
                 .name(name)
                 .build());
 
-        chatRoomMemberRepository.save(ChatRoomMember.builder()
-                .chatRoom(chatRoom)
-                .user(host)
-                .build());
+        for (Member member : members) {
+            chatRoomMemberRepository.save(ChatRoomMember.builder()
+                    .chatRoom(chatRoom)
+                    .user(member)
+                    .build());
+        }
 
         return new ChatRoomResponse(chatRoom.getId(), chatRoom.getName());
     }
@@ -67,8 +74,40 @@ public class ChatRoomServiceImpl implements ChatRoomService {
 
     @Override
     @Transactional(readOnly = true)
+    public ChatRoomResponse getRoom(Long chatRoomId) {
+        ChatRoom chatRoom = findChatRoom(chatRoomId);
+        return new ChatRoomResponse(chatRoom.getId(), chatRoom.getName());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public List<MemberDTO> listMembers(Long chatRoomId) {
         findChatRoom(chatRoomId);
+        return toMemberDtos(chatRoomId);
+    }
+
+    @Override
+    @Transactional
+    public List<MemberDTO> inviteMembers(Long chatRoomId, Long inviterId, List<Long> memberIds) {
+        ChatRoom chatRoom = findChatRoom(chatRoomId);
+        if (!chatRoomMemberRepository.existsByChatRoomIdAndUserId(chatRoomId, inviterId)) {
+            throw new IllegalArgumentException("채팅방 참여자만 다른 사람을 초대할 수 있습니다.");
+        }
+
+        for (Long memberId : new LinkedHashSet<>(memberIds)) {
+            Member member = findMember(memberId);
+            if (!chatRoomMemberRepository.existsByChatRoomAndUser(chatRoom, member)) {
+                chatRoomMemberRepository.save(ChatRoomMember.builder()
+                        .chatRoom(chatRoom)
+                        .user(member)
+                        .build());
+            }
+        }
+
+        return toMemberDtos(chatRoomId);
+    }
+
+    private List<MemberDTO> toMemberDtos(Long chatRoomId) {
         return chatRoomMemberRepository.findByChatRoomId(chatRoomId).stream()
                 .map(chatRoomMember -> {
                     Member member = chatRoomMember.getUser();

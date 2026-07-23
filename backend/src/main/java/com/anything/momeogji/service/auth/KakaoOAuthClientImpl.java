@@ -45,6 +45,10 @@ public class KakaoOAuthClientImpl implements KakaoOAuthClient {
         form.add("client_id", properties.restApiKey());
         form.add("redirect_uri", properties.loginRedirectUri());
         form.add("code", code);
+        // 카카오 콘솔에서 Client Secret을 사용 설정한 경우에만 필요 - 꺼져 있으면 값이 없어 보내지 않는다.
+        if (properties.clientSecret() != null && !properties.clientSecret().isBlank()) {
+            form.add("client_secret", properties.clientSecret());
+        }
 
         try {
             KakaoTokenResponse response = authClient.post()

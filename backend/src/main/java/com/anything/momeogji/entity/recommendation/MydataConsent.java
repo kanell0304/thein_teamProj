@@ -48,4 +48,11 @@ public class MydataConsent {
     /** 그룹 단위 추천 조건으로만 쓰이는 가공 결과. 개인 원본은 노출하지 않는다. */
     @Column(name = "processed_result", columnDefinition = "text")
     private String processedResult;
+
+    /** 같은 참여자가 개인 선호를 다시 제출했을 때 동의·처리 상태를 최신값으로 덮어쓴다. */
+    public void update(ConsentStatus consentStatus, ProcessingStatus processingStatus, String processedResult) {
+        this.consentStatus = consentStatus;
+        this.processingStatus = processingStatus;
+        this.processedResult = processedResult;
+    }
 }

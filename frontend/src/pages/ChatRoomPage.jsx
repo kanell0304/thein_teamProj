@@ -10,6 +10,7 @@ import MomeokjiPreferenceNotice from '../components/momeokji/MomeokjiPreferenceN
 import MomeokjiVoteNotice from '../components/momeokji/MomeokjiVoteNotice'
 import MomeokjiVotePage from '../components/momeokji/MomeokjiVotePage'
 import { getChatRoomMembers, getRecentMessages, seedDevChat } from '../services/chatApi'
+import { fetchChatRoom } from '../api/chatRoomApi'
 import { connectChatSocket, disconnectChatSocket, sendChatMessage } from '../services/chatSocket'
 import { createMeetup } from '../services/meetupService'
 import {
@@ -189,6 +190,7 @@ function toPreferenceRequest(preference, settings) {
     atmosphere: (preference.moodPreferences ?? [])
       .filter((mood) => mood !== '상관없어요')
       .join(', ') || null,
+    myDataConsent: preference.myDataConsent === true,
   }
 }
 
@@ -263,6 +265,7 @@ function ChatRoomPage({ room: providedRoom, currentUser = DEMO_CURRENT_USER }) {
 
   const useMockApi = String(import.meta.env.VITE_USE_MOCK ?? 'false').toLowerCase() === 'true'
   const [chatMembers, setChatMembers] = useState([])
+  const [roomInfo, setRoomInfo] = useState(null)
   const [, setChatConnectionError] = useState('')
   const chatSocketRef = useRef(null)
   const pendingMeetingSettingsRef = useRef(null)
@@ -325,11 +328,13 @@ function ChatRoomPage({ room: providedRoom, currentUser = DEMO_CURRENT_USER }) {
     let cancelled = false
     const connectChat = async () => {
       try {
-        let [history, members] = await Promise.all([
+        let [history, members, fetchedRoom] = await Promise.all([
           getRecentMessages(room.id),
           getChatRoomMembers(room.id),
+          fetchChatRoom(room.id),
         ])
         if (cancelled) return
+        setRoomInfo(fetchedRoom)
 
         // 개발 환경의 빈 방만 실제 백엔드에 예시 대화를 저장해 모먹지 흐름을 바로 시험합니다.
         if (import.meta.env.DEV && history.length === 0) {
@@ -876,9 +881,9 @@ function ChatRoomPage({ room: providedRoom, currentUser = DEMO_CURRENT_USER }) {
   return (
     <div className="chat-room">
       {/* 필요 없는 영역은 이 조립부에서 컴포넌트 한 줄만 제거. */}
-      {/* ===== 채팅방 참가자 수: 이후 room.members API 데이터와 자동 연동 ===== */}
+      {/* ===== 채팅방 이름과 참가자 수: 실제 채팅방 조회 API 데이터와 연동 ===== */}
       <ChatHeader
-        roomName="진원버스 가즈아"
+        roomName={roomInfo?.name ?? '채팅방'}
         memberCount={roomParticipants.length}
         onBack={() => navigate('/chats')}
       />
