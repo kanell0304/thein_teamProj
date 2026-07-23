@@ -207,7 +207,7 @@ public class KakaoLocalKeywordSearchClient implements MerchantPlaceSearchClient 
                         document,
                         cacheKey.categoryGroupCode()
                 ))
-                .map(KakaoLocalKeywordSearchClient::toSearchCandidate)
+                .map((KakaoKeywordSearchResponse.Document document) -> toSearchCandidate(document))
                 .toList();
     }
 
