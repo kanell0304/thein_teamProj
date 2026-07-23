@@ -10,7 +10,7 @@ import com.anything.momeogji.mydata.collection.cardlist.CardListValidator;
 import com.anything.momeogji.mydata.collection.model.CardApprovalData;
 import com.anything.momeogji.mydata.collection.model.CollectedUserMyData;
 import com.anything.momeogji.mydata.processing.MyDataPipeline;
-import com.anything.momeogji.mydata.processing.model.ProcessedUserMyData;
+import com.anything.momeogji.mydata.processing.model.MyDataRestaurantData;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Service;
@@ -122,18 +122,18 @@ public class MyDataService {
      * <p>마이데이터 제공에 동의한 참가자에 대해서만 상위 계층이 이 메서드를 호출해야 한다.
      * 선택 시각이 잘못된 경우 카드 목록이나 외부 장소 API를 호출하기 전에 즉시 실패한다.</p>
      *
-     * <p>카드나 승인내역이 없거나 선택 시각이 속한 시간대에 해당하는 결제가 없으면 사용자 ID와
-     * 빈 분류 목록을 정상 반환한다. 수집·정제·집계 중 발생한 데이터 오류는
+     * <p>카드나 승인내역이 없거나 선택 시각이 속한 시간대에 해당하는 결제가 없으면
+     * 빈 음식점 목록을 정상 반환한다. 수집·정제·집계 중 발생한 데이터 오류는
      * 부분 결과로 바꾸지 않고 호출자에게 전달한다.</p>
      *
      * @param userId 마이데이터를 제공한 사용자를 식별하는 내부 ID
      * @param meetingTime 옵션 계층에서 검증한 마이데이터 필터 기준 시각
      * @param purpose 모임에서 선택한 목적. 카페·디저트는 카페, 나머지는 음식점 검색에 사용
-     * @return 사용자 ID와 최종 가맹점 분류 결과를 포함한 불변 데이터
+     * @return 카카오 장소명과 음식 카테고리만 포함한 불변 음식점 목록
      * @throws IllegalArgumentException 선택 시각이 없거나 사용자 ID가 올바르지 않은 경우
      * @throws IllegalStateException 마이데이터 수집·역직렬화·페이지 처리에 실패한 경우
      */
-    public ProcessedUserMyData process(
+    public List<MyDataRestaurantData> process(
             Long userId,
             LocalTime meetingTime,
             String purpose

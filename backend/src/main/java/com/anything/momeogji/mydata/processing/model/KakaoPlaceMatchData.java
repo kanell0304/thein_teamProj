@@ -1,11 +1,11 @@
 package com.anything.momeogji.mydata.processing.model;
 
 /**
- * 카카오 로컬의 장소명과 전체 세부 카테고리를 묶은 MyData 최종 장소 매칭 값이다.
+ * 카카오 로컬의 장소명과 전체 세부 카테고리를 묶은 MyData 중간 장소 매칭 값이다.
  *
  * <p>가맹점 집계 직후에는 {@link #empty()}로 아직 장소를 찾지 않은 상태를 표현한다.
  * 장소 분류 단계는 이름 매칭과 목적별 카테고리 필터를 통과한 경우에만 두 값을 함께 채우며,
- * 미매칭 결과는 최종 {@code ProcessedUserMyData} 목록에서 제외한다.</p>
+ * 미매칭 결과는 최종 음식점 목록으로 변환되기 전에 제외한다.</p>
  *
  * @param placeName 카카오에 등록된 장소명. 분류 전이면 {@code null}
  * @param categoryName {@code 음식점 > 중식 > 중화요리} 형태의 전체 카테고리 경로. 분류 전이면 {@code null}
