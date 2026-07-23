@@ -30,7 +30,7 @@ import java.util.Set;
  *
  * 카드 목록과 승인내역의 모든 페이지를 순서대로 처리한다.
  * 처리 중 한 단계라도 실패하면 부분 결과를 반환하지 않고 예외를 전달한다.
- * {@link #process(Long, LocalTime)}를 호출하면 수집 결과와 옵션 계층에서 받은 선택 시각을
+ * {@link #process(Long, LocalTime, String)}를 호출하면 수집 결과와 옵션 계층에서 받은 선택 시각·목적을
  * {@link MyDataTransformer}에 전달한다.
  * 참가자 단위 비동기 실행, 동의 여부 판단과 실패 상태 기록은 이후 이 서비스를 호출하는 상위 계층이 담당한다.
  */
@@ -39,6 +39,9 @@ public class MyDataService {
 
     private static final String FIRST_SEARCH_TIMESTAMP = "0";
     private static final int PAGE_LIMIT = 500;
+    private static final String RESTAURANT_CATEGORY_GROUP_CODE = "FD6";
+    private static final String CAFE_CATEGORY_GROUP_CODE = "CE7";
+    private static final Set<String> CAFE_PURPOSES = Set.of("카페", "디저트");
 
     private final ObjectMapper objectMapper;
     private final MyDataProvider myDataProvider;
@@ -124,24 +127,53 @@ public class MyDataService {
      *
      * @param userId 마이데이터를 제공한 사용자를 식별하는 내부 ID
      * @param meetingTime 옵션 계층에서 검증한 마이데이터 필터 기준 시각
+     * @param purpose 모임에서 선택한 목적. 카페·디저트는 카페, 나머지는 음식점 검색에 사용
      * @return 사용자 ID와 최종 가맹점 분류 결과를 포함한 불변 데이터
      * @throws IllegalArgumentException 선택 시각이 없거나 사용자 ID가 올바르지 않은 경우
      * @throws IllegalStateException 마이데이터 수집·역직렬화·페이지 처리에 실패한 경우
      */
     public TransformedUserMyData process(
             Long userId,
-            LocalTime meetingTime
+            LocalTime meetingTime,
+            String purpose
     ) {
         // 잘못된 요청에서 카드 목록 수집 비용이 발생하지 않도록 선택 시각을 먼저 검증한다.
         if (meetingTime == null) {
             throw new IllegalArgumentException("meetingTime은 필수입니다.");
         }
 
+        // 잘못된 목적에서 카드 수집 비용이 발생하지 않도록 목적을 먼저 그룹 코드로 변환한다.
+        String categoryGroupCode = getCategoryGroupCode(purpose);
+
         // 기존 수집 흐름을 한 번만 호출해 사용자의 모든 동의 카드 승인내역을 가져온다.
         UserMyData userMyData = collect(userId);
 
-        // 수집 결과와 일회성 필터 시각을 정제·집계·가맹점 분류 파이프라인에 전달한다.
-        return myDataTransformer.transform(userMyData, meetingTime);
+        // 수집 결과와 일회성 필터 시각·목적 그룹을 정제·집계·가맹점 분류 파이프라인에 전달한다.
+        return myDataTransformer.transform(
+                userMyData,
+                meetingTime,
+                categoryGroupCode
+        );
+    }
+
+    /**
+     * 모임 목적을 카카오 키워드 검색에서 사용할 음식점 또는 카페 그룹 코드로 변환한다.
+     *
+     * @param purpose Meetup에 저장된 모임 목적 문자열
+     * @return 카페·디저트면 {@code CE7}, 그 외 유효한 목적이면 {@code FD6}
+     * @throws IllegalArgumentException 목적이 null 또는 공백인 경우
+     */
+    private String getCategoryGroupCode(String purpose) {
+        // 목적은 카드 수집과 외부 장소 검색의 필수 조건이므로 미입력 값을 거부한다.
+        if (purpose == null || purpose.isBlank()) {
+            throw new IllegalArgumentException("purpose는 필수입니다.");
+        }
+
+        // UI에서 선택한 목적의 앞뒤 공백을 제거해 고정된 카페 관련 옵션과 비교한다.
+        String normalizedPurpose = purpose.strip();
+        return CAFE_PURPOSES.contains(normalizedPurpose)
+                ? CAFE_CATEGORY_GROUP_CODE
+                : RESTAURANT_CATEGORY_GROUP_CODE;
     }
 
     /**

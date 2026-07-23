@@ -11,14 +11,14 @@ import java.util.List;
  * 승인번호는 정확한 중복 제거가 끝난 1차 정제 이후 폐기하고, 승인시각과 승인금액은
  * 서로의 대응 관계가 어긋나지 않도록 {@link PaymentLog} 목록으로 함께 보존한다.</p>
  *
- * <p>가맹점 집계 직후 생성하는 데이터는 {@link KakaoPlaceMatchData#unmatched()}를 사용한다.
+ * <p>가맹점 집계 직후 생성하는 데이터는 {@link KakaoPlaceMatchData#unclassified()}를 사용한다.
  * 이후 장소 분류 단계는
  * {@link #withKakaoPlaceMatch(KakaoPlaceMatchData)}로 카카오 결과만 교체한 새 값을 만든다.</p>
  *
  * @param merchantName 최초 결제에서 보존한 원본 가맹점명. 미회신이면 {@code null}
  * @param merchantCode 가맹점을 구분하는 사업자등록번호 기반 코드. 미회신이면 {@code null}
  * @param payments 원본 등장 순서를 유지한 승인시각·승인금액 쌍의 불변 목록
- * @param kakaoPlaceMatch 카카오 장소 검색의 매칭 결과. 미매칭 상태도 null 대신 전용 값으로 표현
+ * @param kakaoPlaceMatch 카카오 장소 검색의 매칭 결과. 분류 전 상태도 null 대신 전용 값으로 표현
  */
 public record MerchantUsageData(
         String merchantName,
@@ -76,7 +76,7 @@ public record MerchantUsageData(
      * @param merchantName 최초 결제의 원본 가맹점명
      * @param merchantCode 사업자등록번호 기반 가맹점 코드
      * @param payments 승인시각·승인금액 결제 로그 목록
-     * @return 미매칭 카카오 결과를 포함한 가맹점 사용 이력
+     * @return 분류 전 카카오 결과를 포함한 가맹점 사용 이력
      */
     public static MerchantUsageData unclassified(
             String merchantName,
@@ -88,7 +88,7 @@ public record MerchantUsageData(
                 merchantName,
                 merchantCode,
                 payments,
-                KakaoPlaceMatchData.unmatched()
+                KakaoPlaceMatchData.unclassified()
         );
     }
 

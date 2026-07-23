@@ -16,11 +16,12 @@ import java.net.http.HttpClient;
 import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 
 /**
  * 카카오 로컬의 키워드 장소 검색 API를 사용하는 {@link MerchantPlaceSearchClient} 구현체다.
  *
- * 가맹점 카테고리를 확인하기 위해 위치·반경·카테고리 필터 없이 정확도 순 첫 페이지를 조회한다.
+ * 가맹점 카테고리를 확인하기 위해 위치·반경 조건 없이 목적별 음식점·카페 그룹으로 정확도 순 첫 페이지를 조회한다.
  * 외부 호출 실패는 전체 마이데이터 가공을 중단시키지 않도록 기록한 뒤 빈 목록으로 대체한다.
  */
 @Component
@@ -30,6 +31,7 @@ public class KakaoLocalKeywordSearchClient implements MerchantPlaceSearchClient 
     private static final String KEYWORD_SEARCH_PATH = "/v2/local/search/keyword.json";
     private static final int MAX_PAGE_SIZE = 15;
     private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(5);
+    private static final Set<String> ALLOWED_CATEGORY_GROUP_CODES = Set.of("FD6", "CE7");
 
     private final RestClient restClient;
 
@@ -57,14 +59,19 @@ public class KakaoLocalKeywordSearchClient implements MerchantPlaceSearchClient 
      * 원본 또는 비교용 가맹점명을 카카오 로컬 키워드 검색어로 전달하고 첫 페이지 후보를 반환한다.
      *
      * @param query 카카오 로컬 API에 전달할 가맹점명 검색어
+     * @param categoryGroupCode 음식점 {@code FD6} 또는 카페 {@code CE7} 그룹 코드
      * @return 카카오 정확도 순서를 유지한 불변 후보 목록. 결과가 없거나 호출에 실패하면 빈 목록
-     * @throws IllegalArgumentException 검색어가 null 또는 공백인 경우
+     * @throws IllegalArgumentException 검색어가 null 또는 공백이거나 그룹 코드가 허용값이 아닌 경우
      */
     @Override
-    public List<SearchCandidate> search(String query) {
+    public List<SearchCandidate> search(String query, String categoryGroupCode) {
         // 외부 API에 의미 없는 검색어를 전송하지 않도록 공개 경계에서 검증한다.
         if (query == null || query.isBlank()) {
             throw new IllegalArgumentException("query는 필수입니다.");
+        }
+        // MyData 목적 필터에서 지원하는 음식점·카페 그룹만 카카오 요청에 사용한다.
+        if (!ALLOWED_CATEGORY_GROUP_CODES.contains(categoryGroupCode)) {
+            throw new IllegalArgumentException("categoryGroupCode는 FD6 또는 CE7이어야 합니다.");
         }
 
         try {
@@ -73,6 +80,7 @@ public class KakaoLocalKeywordSearchClient implements MerchantPlaceSearchClient 
                     .uri(uriBuilder -> uriBuilder
                             .path(KEYWORD_SEARCH_PATH)
                             .queryParam("query", query)
+                            .queryParam("category_group_code", categoryGroupCode)
                             .queryParam("size", MAX_PAGE_SIZE)
                             .queryParam("sort", "accuracy")
                             .build())
@@ -84,10 +92,10 @@ public class KakaoLocalKeywordSearchClient implements MerchantPlaceSearchClient 
                 return List.of();
             }
 
-            // 장소 ID와 이름이 있는 응답만 중립 검색 후보로 변환하고 원본 응답 순서를 유지한다.
+            // 요청 그룹과 일치하고 장소명·세부 카테고리가 있는 응답만 후보로 변환한다.
             return response.documents().stream()
                     .filter(Objects::nonNull)
-                    .filter(KakaoLocalKeywordSearchClient::hasRequiredPlaceInformation)
+                    .filter(document -> hasRequiredPlaceInformation(document, categoryGroupCode))
                     .map(KakaoLocalKeywordSearchClient::toSearchCandidate)
                     .toList();
         } catch (RestClientException exception) {
@@ -102,31 +110,34 @@ public class KakaoLocalKeywordSearchClient implements MerchantPlaceSearchClient 
     }
 
     /**
-     * 카카오 응답 항목에 후속 매칭에 필요한 장소 ID와 장소명이 있는지 확인한다.
+     * 카카오 응답 항목이 요청한 그룹과 일치하며 후속 매칭에 필요한 장소명·세부 카테고리를 갖는지 확인한다.
      *
      * @param document 카카오 키워드 검색의 개별 장소 응답
-     * @return 장소 ID와 장소명이 모두 존재하고 공백이 아니면 true
+     * @param requestedCategoryGroupCode 요청에 사용한 음식점 또는 카페 그룹 코드
+     * @return 요청 그룹·장소명·세부 카테고리 조건을 모두 충족하면 true
      */
-    private static boolean hasRequiredPlaceInformation(KakaoKeywordSearchResponse.Document document) {
-        return document.id() != null
-                && !document.id().isBlank()
+    private static boolean hasRequiredPlaceInformation(
+            KakaoKeywordSearchResponse.Document document,
+            String requestedCategoryGroupCode
+    ) {
+        return requestedCategoryGroupCode.equals(document.categoryGroupCode())
                 && document.placeName() != null
-                && !document.placeName().isBlank();
+                && !document.placeName().isBlank()
+                && document.categoryName() != null
+                && !document.categoryName().isBlank();
     }
 
     /**
      * 카카오 장소 응답을 분류 계층이 외부 제공자와 무관하게 사용할 검색 후보로 변환한다.
      *
      * @param document 필수 장소 정보가 확인된 카카오 장소 응답
-     * @return 장소 ID·이름·카테고리·좌표 원본 문자열을 담은 검색 후보
+     * @return 장소명·카테고리 그룹 코드·전체 세부 카테고리를 담은 검색 후보
      */
     private static SearchCandidate toSearchCandidate(KakaoKeywordSearchResponse.Document document) {
         return new SearchCandidate(
-                document.id(),
                 document.placeName(),
                 document.categoryGroupCode(),
-                document.x(),
-                document.y()
+                document.categoryName()
         );
     }
 
@@ -154,21 +165,17 @@ public class KakaoLocalKeywordSearchClient implements MerchantPlaceSearchClient 
     private record KakaoKeywordSearchResponse(List<Document> documents) {
 
         /**
-         * 카카오 장소 응답 중 가맹점 분류와 위치 보강에 필요한 필드만 받는 내부 DTO다.
+         * 카카오 장소 응답 중 장소명 매칭과 세부 음식 카테고리 보존에 필요한 필드만 받는 내부 DTO다.
          *
-         * @param id 카카오 장소 ID
          * @param placeName 카카오에 등록된 장소명
          * @param categoryGroupCode 카카오 중요 카테고리 그룹 코드
-         * @param x 경도 원본 문자열
-         * @param y 위도 원본 문자열
+         * @param categoryName 카카오 전체 세부 카테고리 경로
          */
         @JsonIgnoreProperties(ignoreUnknown = true)
         private record Document(
-                String id,
                 @JsonProperty("place_name") String placeName,
                 @JsonProperty("category_group_code") String categoryGroupCode,
-                String x,
-                String y
+                @JsonProperty("category_name") String categoryName
         ) {
         }
     }

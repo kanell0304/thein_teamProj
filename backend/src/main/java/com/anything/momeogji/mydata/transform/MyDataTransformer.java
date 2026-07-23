@@ -17,7 +17,7 @@ import java.util.List;
  * 각 단계의 상태 필터, 중복 제거, 시간대 집계와 장소 매칭 규칙은 기존 컴포넌트에 위임한다.</p>
  *
  * <p>중간 단계에서 데이터 계약 오류가 발생하면 예외를 감추지 않는다. 외부 장소 검색 실패는
- * 검색 Client의 기존 계약에 따라 빈 후보로 바뀌고 최종적으로 미분류 결과로 보존된다.</p>
+ * 검색 Client의 기존 계약에 따라 빈 후보로 바뀌고 최종 목록에서는 제외된다.</p>
  */
 @Component
 public class MyDataTransformer {
@@ -51,12 +51,14 @@ public class MyDataTransformer {
      *
      * @param userMyData 수집·검증·파싱이 끝난 참가자 마이데이터
      * @param meetingTime 옵션 계층에서 검증한 마이데이터 필터 기준 시각
+     * @param categoryGroupCode 모임 목적에 맞춰 선택한 음식점 {@code FD6} 또는 카페 {@code CE7} 코드
      * @return 사용자 ID와 최종 가맹점 분류 목록을 포함한 불변 결과
      * @throws IllegalArgumentException 입력 마이데이터 또는 선택 시각이 없는 경우
      */
     public TransformedUserMyData transform(
             UserMyData userMyData,
-            LocalTime meetingTime
+            LocalTime meetingTime,
+            String categoryGroupCode
     ) {
         // 공개 조립 경계에서 참가자 마이데이터가 존재하는지 먼저 검증한다.
         if (userMyData == null) {
@@ -79,7 +81,10 @@ public class MyDataTransformer {
 
         // 가맹점명을 외부 장소 후보와 비교해 기존 사용 이력에 카카오 장소 결과를 보강한다.
         List<MerchantUsageData> classifiedMerchantUsages =
-                merchantClassificationProcessor.classify(merchantUsages);
+                merchantClassificationProcessor.classify(
+                        merchantUsages,
+                        categoryGroupCode
+                );
 
         // 내부 시간대 정보는 폐기하고 사용자 식별자와 최종 가맹점 사용 이력만 반환한다.
         return new TransformedUserMyData(
