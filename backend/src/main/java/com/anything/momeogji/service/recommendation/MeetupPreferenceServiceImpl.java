@@ -15,6 +15,8 @@ import com.anything.momeogji.repository.MeetupParticipantRepository;
 import com.anything.momeogji.repository.MeetupRepository;
 import com.anything.momeogji.repository.ParticipantPreferenceRepository;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,6 +25,8 @@ import java.util.List;
 @Service
 @RequiredArgsConstructor
 public class MeetupPreferenceServiceImpl implements MeetupPreferenceService {
+
+    private static final Logger log = LoggerFactory.getLogger(MeetupPreferenceServiceImpl.class);
 
     private final MeetupRepository meetupRepository;
     private final MeetupParticipantRepository meetupParticipantRepository;
@@ -56,7 +60,22 @@ public class MeetupPreferenceServiceImpl implements MeetupPreferenceService {
         participant.markSubmitted();
 
         if (request.mydataConsent()) {
-            myDataService.process(callerId, meetup.getMeetingTime().toLocalTime());
+            try {
+                // 모임 시각과 목적을 함께 전달해 시간대·음식점/카페 범위에 맞는 MyData만 처리한다.
+                myDataService.process(
+                        callerId,
+                        meetup.getMeetingTime().toLocalTime(),
+                        meetup.getPurpose()
+                );
+            } catch (RuntimeException exception) {
+                // 선택 기능인 MyData 실패가 개인 옵션 저장과 전체 추천 진행을 막지 않게 격리한다.
+                log.warn(
+                        "개인 옵션 제출 중 MyData 처리를 생략했습니다. meetupId={}, userId={}",
+                        meetupId,
+                        callerId,
+                        exception
+                );
+            }
         }
 
         List<ParticipantSummaryResponse> participants = meetupService.listParticipants(meetupId);
