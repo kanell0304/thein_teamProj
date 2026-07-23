@@ -83,6 +83,7 @@ class MyDataPipelineIntegrationTest {
      */
     @Test
     void user02는_세_페이지의_승인내역_68건을_수집한다() {
+        myDataService.collect(1L);
         CollectedUserMyData result = myDataService.collect(2L);
 
         assertThat(result.approvals()).hasSize(68);
@@ -101,6 +102,7 @@ class MyDataPipelineIntegrationTest {
      */
     @Test
     void user02의_취소와_정정은_정제에서_제외된다() {
+        myDataService.collect(1L);
         CollectedUserMyData collected = myDataService.collect(2L);
         var cleaned = new UserMyDataCleaner().clean(collected);
 
@@ -121,6 +123,8 @@ class MyDataPipelineIntegrationTest {
      */
     @Test
     void user03은_빈_카드를_포함해_36건을_수집하고_시간대별로_가공한다() {
+        myDataService.collect(1L);
+        myDataService.collect(2L);
         CollectedUserMyData collected = myDataService.collect(3L);
         ProcessedUserMyData morningResult = myDataService.process(
                 3L,

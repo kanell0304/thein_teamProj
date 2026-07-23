@@ -72,6 +72,29 @@ class DummyMyDataFixtureTest {
     private final CardApprovalValidator approvalValidator = new CardApprovalValidator();
 
     /**
+     * 실제 사용자 ID가 처음 조회된 순서대로 세 개의 Dummy 사용자 슬롯에 연결된다.
+     */
+    @Test
+    void 고유_사용자_ID는_최초_조회_순서대로_세_개의_Dummy에_연결된다() {
+        DummyMyDataProvider orderedProvider = new DummyMyDataProvider();
+
+        String firstUser = orderedProvider.fetchCardListRawJson(42L, "0", null, 500);
+        String secondUser = orderedProvider.fetchCardListRawJson(7L, "0", null, 500);
+        String repeatedFirstUser = orderedProvider.fetchCardListRawJson(42L, "0", null, 500);
+        String thirdUser = orderedProvider.fetchCardListRawJson(105L, "0", null, 500);
+
+        assertThat(firstUser).isEqualTo(repeatedFirstUser);
+        assertThat(readCardList(firstUser).cards()).hasSize(3);
+        assertThat(readCardList(secondUser).cards()).hasSize(1);
+        assertThat(readCardList(thirdUser).cards()).hasSize(4);
+        assertThatThrownBy(() ->
+                orderedProvider.fetchCardListRawJson(13L, "0", null, 500)
+        ).isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("최대 3명")
+                .hasMessageContaining("userId=13");
+    }
+
+    /**
      * 세 사용자의 카드 목록이 검증을 통과하고 카드 유형·동의 상태가 계획과 일치한다.
      */
     @Test
@@ -247,19 +270,12 @@ class DummyMyDataFixtureTest {
     }
 
     private CardListResponse cardList(Long userId) {
-        try {
-            CardListResponse response = objectMapper.readValue(
-                    provider.fetchCardListRawJson(userId, "0", null, 500),
-                    CardListResponse.class
-            );
-            cardListValidator.validate(response);
-            return response;
-        } catch (JsonProcessingException exception) {
-            throw new AssertionError("카드 목록 fixture 역직렬화 실패", exception);
-        }
+        reserveDummySlotsThrough(userId);
+        return readCardList(provider.fetchCardListRawJson(userId, "0", null, 500));
     }
 
     private CardApprovalResponse approvalPage(Long userId, String cardId, String nextPage) {
+        reserveDummySlotsThrough(userId);
         try {
             CardApprovalResponse response = objectMapper.readValue(
                     provider.fetchApprovalDomesticRawJson(
@@ -271,6 +287,27 @@ class DummyMyDataFixtureTest {
             return response;
         } catch (JsonProcessingException exception) {
             throw new AssertionError("승인내역 fixture 역직렬화 실패", exception);
+        }
+    }
+
+    private CardListResponse readCardList(String rawJson) {
+        try {
+            CardListResponse response = objectMapper.readValue(rawJson, CardListResponse.class);
+            cardListValidator.validate(response);
+            return response;
+        } catch (JsonProcessingException exception) {
+            throw new AssertionError("카드 목록 fixture 역직렬화 실패", exception);
+        }
+    }
+
+    /**
+     * 번호별 fixture 검증에서는 해당 번호까지의 Dummy 슬롯을 순서대로 먼저 확보한다.
+     *
+     * @param fixtureNumber 검증할 {@code user-NN}의 번호
+     */
+    private void reserveDummySlotsThrough(Long fixtureNumber) {
+        for (long userId = 1L; userId <= fixtureNumber; userId++) {
+            provider.fetchCardListRawJson(userId, "0", null, 500);
         }
     }
 

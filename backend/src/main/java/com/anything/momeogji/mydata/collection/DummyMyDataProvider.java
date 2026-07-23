@@ -6,6 +6,8 @@ import org.springframework.stereotype.Component;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.regex.Pattern;
 
 /**
@@ -13,14 +15,22 @@ import java.util.regex.Pattern;
  *
  * <p>공개 메서드의 상세 호출 조건과 반환 계약은 {@link MyDataProvider}를 참조한다.
  * 이 클래스에는 classpath 파일 조회와 Dummy 요청값 처리 같은 구현 세부사항만 둔다.</p>
+ *
+ * <p>서버 프로세스에서 처음 조회된 서로 다른 사용자 세 명을 조회 순서대로
+ * {@code user-01}, {@code user-02}, {@code user-03}에 연결한다. 같은 사용자 ID는
+ * 기존 연결을 재사용하며 네 번째 고유 사용자부터는 Dummy 데이터 부족으로 실패한다.
+ * 이 메모리 매핑은 애플리케이션을 재시작하면 초기화된다.</p>
  */
 @Component
 public class DummyMyDataProvider implements MyDataProvider {
 
     private static final String DUMMY_BASE_PATH = "mydata/dummy";
+    private static final int MAX_DUMMY_USER_SLOTS = 3;
     private static final Pattern SAFE_CARD_ID = Pattern.compile("[A-Za-z0-9_-]{1,64}");
     private static final Pattern SAFE_PAGE_TOKEN = Pattern.compile("page-\\d{3}");
     private static final String FIRST_PAGE_TOKEN = "page-001";
+
+    private final Map<Long, Integer> dummyUserSlots = new LinkedHashMap<>();
 
     /**
      * 상세 호출 계약은 {@link MyDataProvider#fetchCardListRawJson(Long, String, String, int)}를 참조한다.
@@ -51,13 +61,34 @@ public class DummyMyDataProvider implements MyDataProvider {
     }
 
     /**
-     * 사용자 ID를 classpath의 {@code user-숫자} 형식 Dummy 디렉터리 경로로 변환한다.
+     * 처음 조회된 사용자 순서에 따라 최대 세 개의 Dummy 사용자 슬롯을 할당한다.
+     *
+     * <p>카드 목록과 국내 승인내역 조회가 동시에 실행돼도 같은 사용자에게 서로 다른
+     * 슬롯이 배정되지 않도록 할당과 조회 전체를 동기화한다.</p>
      *
      * @param userId 검증이 끝난 사용자 내부 ID
      * @return {@code mydata/dummy/user-01} 형식의 classpath 상대 경로
+     * @throws IllegalStateException 세 개의 Dummy 슬롯이 모두 할당된 후 새로운 사용자가 요청한 경우
      */
-    private String resolveDummyUserDirectory(Long userId) {
-        return DUMMY_BASE_PATH + "/user-%02d".formatted(userId);
+    private synchronized String resolveDummyUserDirectory(Long userId) {
+        // 이미 등록된 사용자는 카드 목록과 승인내역에서 동일한 Dummy 슬롯을 재사용한다.
+        Integer assignedSlot = dummyUserSlots.get(userId);
+        if (assignedSlot != null) {
+            return DUMMY_BASE_PATH + "/user-%02d".formatted(assignedSlot);
+        }
+
+        // 준비된 세 사용자보다 많은 고유 사용자가 요청하면 실제 동의값을 바꾸지 않고 조회만 실패시킨다.
+        if (dummyUserSlots.size() >= MAX_DUMMY_USER_SLOTS) {
+            throw new IllegalStateException(
+                    "사용 가능한 Dummy 마이데이터 사용자는 최대 "
+                            + MAX_DUMMY_USER_SLOTS + "명입니다. userId=" + userId
+            );
+        }
+
+        // 새로운 사용자는 최초 조회 순서에 해당하는 다음 Dummy 슬롯에 연결한다.
+        int newSlot = dummyUserSlots.size() + 1;
+        dummyUserSlots.put(userId, newSlot);
+        return DUMMY_BASE_PATH + "/user-%02d".formatted(newSlot);
     }
 
     /**

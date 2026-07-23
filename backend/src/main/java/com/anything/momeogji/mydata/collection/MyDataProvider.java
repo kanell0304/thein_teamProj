@@ -29,9 +29,9 @@ public interface MyDataProvider {
      * {@code nextPage}를 비운다. 다음 페이지 호출에서는 직전 응답의
      * {@code next_page} 값을 그대로 전달한다.</p>
      *
-     * <p>현재 {@code DummyMyDataProvider}는 {@code userId}를
-     * {@code classpath:mydata/dummy/user-숫자/card-list.json} 경로에 대응시킨다.
-     * 사용자 ID는 검증하지만, Dummy 데이터가 단일 페이지이므로
+     * <p>현재 {@code DummyMyDataProvider}는 처음 조회된 서로 다른 사용자 세 명을
+     * 조회 순서대로 {@code classpath:mydata/dummy/user-01~03}에 대응시킨다.
+     * 같은 사용자 ID는 기존 대응 관계를 재사용한다. Dummy 데이터가 단일 페이지이므로
      * {@code nextPage}와 {@code limit}은 파일 선택에 사용하지 않는다.</p>
      *
      * @param userId 사용자별 Dummy 응답 또는 실제 API 인증 문맥을 찾기 위한 내부 ID
@@ -40,7 +40,7 @@ public interface MyDataProvider {
      * @param limit 페이지당 최대 조회 개수. 호출 계층에서 {@code 500}을 고정 전달하며 현재 Dummy에서는 사용하지 않음
      * @return 가공하거나 파싱하지 않은 UTF-8 카드 목록 JSON 문자열
      * @throws IllegalArgumentException 사용자 ID 또는 조회 타임스탬프 형식이 올바르지 않은 경우
-     * @throws IllegalStateException 대응하는 Dummy 파일이 없거나 비어 있거나 읽을 수 없는 경우
+     * @throws IllegalStateException Dummy 사용자 슬롯이 부족하거나 대응 파일을 읽을 수 없는 경우
      */
     String fetchCardListRawJson(Long userId, String searchTimestamp, String nextPage, int limit);
 
@@ -72,7 +72,7 @@ public interface MyDataProvider {
      * @param limit 페이지당 최대 조회 개수. 호출 계층에서 {@code 500}을 고정 전달하며 현재 Dummy에서는 사용하지 않음
      * @return 가공하거나 파싱하지 않은 UTF-8 국내 승인내역 JSON 문자열
      * @throws IllegalArgumentException 사용자 ID 또는 카드 ID 형식이 올바르지 않은 경우
-     * @throws IllegalStateException 대응하는 Dummy 파일이 없거나 비어 있거나 읽을 수 없는 경우
+     * @throws IllegalStateException Dummy 사용자 슬롯이 부족하거나 대응 파일을 읽을 수 없는 경우
      */
     String fetchApprovalDomesticRawJson(Long userId, String cardId, LocalDate fromDate,
             LocalDate toDate, String nextPage, int limit);
