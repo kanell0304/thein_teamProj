@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import MainScreen from '../components/layout/MainScreen'
+import { FriendAddIcon } from '../components/layout/HeaderActionIcons'
 import useAuth from '../hooks/useAuth'
 import { getMembers } from '../services/memberService'
 import './FriendListPage.css'
@@ -74,14 +75,25 @@ function FriendListPage() {
     <MainScreen
       title="친구"
       headerActions={(
-        <button
-          className="main-screen-action"
-          type="button"
-          aria-label="친구 검색"
-          onClick={() => searchInputRef.current?.focus()}
-        >
-          <span className="material-symbols-outlined" aria-hidden="true">search</span>
-        </button>
+        <>
+          <button
+            className="main-screen-action"
+            type="button"
+            aria-label="친구 검색"
+            onClick={() => searchInputRef.current?.focus()}
+          >
+            <span className="material-symbols-outlined" aria-hidden="true">search</span>
+          </button>
+          {/* ===== 친구 추가 아이콘은 현재 회원 검색창으로 연결 ===== */}
+          <button
+            className="main-screen-action"
+            type="button"
+            aria-label="친구 추가"
+            onClick={() => searchInputRef.current?.focus()}
+          >
+            <FriendAddIcon />
+          </button>
+        </>
       )}
     >
       {/* ===== 사용자 닉네임 검색 ===== */}

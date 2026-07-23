@@ -721,6 +721,22 @@ function ChatRoomPage({ room: providedRoom, currentUser = DEMO_CURRENT_USER }) {
     setIsMomeokjiOpen(true)
   }
 
+  // ===== 종료된 투표를 정리하고 새 모먹지 공통 설정을 1단계부터 시작 =====
+  const restartMomeokji = () => {
+    pendingMeetingSettingsRef.current = null
+    voteSessionRef.current = null
+    voteSubmissionLockRef.current = false
+    setPendingMeetingSettings(null)
+    setPreferenceSession(null)
+    setVoteSession(null)
+    setMomeokjiResult(null)
+    setMeetupCreationError('')
+    setRecommendationError('')
+    setIsParticipantPreferenceOpen(false)
+    setIsVotePageOpen(false)
+    setIsMomeokjiOpen(true)
+  }
+
   // ===== 최다 득표 가게 또는 가게 공동 1등 중 무작위 결과로 투표 마감 =====
   const closeVoteWithWinner = (winner, updatedVotes, decisionMethod) => {
     if (!winner || !voteSession) return
@@ -980,6 +996,7 @@ function ChatRoomPage({ room: providedRoom, currentUser = DEMO_CURRENT_USER }) {
         currentUserId={currentUser.id}
         participants={roomParticipants}
         onClose={() => setIsVotePageOpen(false)}
+        onRestart={restartMomeokji}
         onSubmit={submitVote}
         isResolvingVote={isResolvingVote}
         result={canViewMomeokjiResult ? momeokjiResult : null}
