@@ -57,11 +57,11 @@ public class MeetupPreferenceServiceImpl implements MeetupPreferenceService {
                 .parkingNeeded(request.parkingNeeded())
                 .excludedFoods(request.excludedFoods())
                 .atmosphere(request.atmosphere())
-                .mydataConsent(request.mydataConsent())
+                .myDataConsent(request.myDataConsent())
                 .build());
         participant.markSubmitted();
 
-        if (request.mydataConsent()) {
+        if (request.myDataConsent()) {
             try {
                 // 모임 시각과 목적을 함께 전달해 시간대·음식점/카페 범위에 맞는 MyData만 처리한다.
                 List<MyDataRestaurantData> myDataRestaurants = myDataService.process(

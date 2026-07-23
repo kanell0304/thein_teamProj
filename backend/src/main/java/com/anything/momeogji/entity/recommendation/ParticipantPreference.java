@@ -61,6 +61,6 @@ public class ParticipantPreference {
     /** 해당 모임에서 본인이 카드 마이데이터 활용에 동의했는지 여부. */
     @Builder.Default
     @Column(name = "mydata_consent", nullable = false, columnDefinition = "boolean default false")
-    private boolean mydataConsent = false;
+    private boolean myDataConsent = false;
 
 }

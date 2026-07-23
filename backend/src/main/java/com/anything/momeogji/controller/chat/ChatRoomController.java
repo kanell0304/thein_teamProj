@@ -2,6 +2,7 @@ package com.anything.momeogji.controller.chat;
 
 import com.anything.momeogji.dto.MemberDTO;
 import com.anything.momeogji.dto.chat.ChatRoomCreateRequest;
+import com.anything.momeogji.dto.chat.ChatRoomInviteRequest;
 import com.anything.momeogji.dto.chat.ChatRoomResponse;
 import com.anything.momeogji.dto.chat.ChatRoomListItemResponse;
 import com.anything.momeogji.service.chat.ChatRoomService;
@@ -37,10 +38,16 @@ public class ChatRoomController {
         return chatRoomService.getMyRooms(memberId(authentication));
     }
 
-    @Operation(summary = "채팅방 생성")
+    @Operation(summary = "채팅방 생성", description = "만든 사람과 선택된 참가자 전원을 바로 참여자로 등록합니다.")
     @PostMapping
     public ChatRoomResponse createRoom(@Valid @RequestBody ChatRoomCreateRequest request, Authentication authentication) {
-        return chatRoomService.createRoom(request.name(), memberId(authentication));
+        return chatRoomService.createRoom(request.name(), memberId(authentication), request.participantIds());
+    }
+
+    @Operation(summary = "채팅방 상세 조회")
+    @GetMapping("/{chatRoomId}")
+    public ChatRoomResponse getRoom(@PathVariable Long chatRoomId) {
+        return chatRoomService.getRoom(chatRoomId);
     }
 
     @Operation(summary = "채팅방 참여")
@@ -62,6 +69,14 @@ public class ChatRoomController {
     @Operation(summary = "채팅방 참가자 목록")
     public List<MemberDTO> listMembers(@PathVariable Long chatRoomId) {
         return chatRoomService.listMembers(chatRoomId);
+    }
+
+    @Operation(summary = "채팅방 참가자 초대", description = "이미 참여 중인 회원만 다른 회원을 초대할 수 있습니다.")
+    @PostMapping("/{chatRoomId}/invite")
+    public List<MemberDTO> inviteMembers(@PathVariable Long chatRoomId,
+                                          @Valid @RequestBody ChatRoomInviteRequest request,
+                                          Authentication authentication) {
+        return chatRoomService.inviteMembers(chatRoomId, memberId(authentication), request.memberIds());
     }
 
     // JwtAuthenticationFilter가 principal 자리에 memberId(Long)를 그대로 넣어둔다.

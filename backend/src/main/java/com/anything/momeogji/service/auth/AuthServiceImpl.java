@@ -46,6 +46,6 @@ public class AuthServiceImpl implements AuthService {
 
     private TokenResponse issueToken(Member member) {
         String accessToken = jwtTokenProvider.createAccessToken(member.getId(), member.getRole());
-        return new TokenResponse(accessToken, member.getId(), member.getNickname());
+        return new TokenResponse(accessToken, member.getId(), member.getNickname(), member.getProfileImageUrl());
     }
 }

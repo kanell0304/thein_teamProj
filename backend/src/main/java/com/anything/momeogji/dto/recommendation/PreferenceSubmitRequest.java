@@ -17,7 +17,7 @@ public record PreferenceSubmitRequest(
         boolean parkingNeeded,
         List<String> excludedFoods,
         String atmosphere,
-        boolean mydataConsent
+        boolean myDataConsent
 ) {
     public PreferenceSubmitRequest {
         excludedFoods = excludedFoods == null ? List.of() : List.copyOf(excludedFoods);

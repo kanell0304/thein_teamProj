@@ -1,5 +1,4 @@
-import { fetchChatRooms } from '../api/chatRoomApi'
-import { createChatRoom, seedDevChat } from './chatApi'
+import { fetchChatRooms, postChatRoom } from '../api/chatRoomApi'
 
 const USE_MOCK_API = String(import.meta.env.VITE_USE_MOCK ?? 'false').toLowerCase() === 'true'
 
@@ -20,17 +19,17 @@ export async function getChatRooms({ signal } = {}) {
   if (USE_MOCK_API) return MOCK_CHAT_ROOMS
 
   try {
-    let rooms = await fetchChatRooms({ signal })
-
-    // 개발 환경에서 참여 중인 방이 없으면 실제 DB 방과 예시 대화를 한 번만 준비합니다.
-    if (import.meta.env.DEV && rooms.length === 0) {
-      const room = await createChatRoom('진원버스 가즈아')
-      await seedDevChat(room.id)
-      rooms = await fetchChatRooms({ signal })
-    }
-
-    return rooms
+    return await fetchChatRooms({ signal })
   } catch (error) {
     throw new Error(error.userMessage || '채팅방 목록을 불러오지 못했습니다.', { cause: error })
+  }
+}
+
+// ===== 선택한 친구들과 함께 새 채팅방을 만들고 바로 입장할 수 있게 방 정보를 돌려줌 =====
+export async function createNewChatRoom({ name, participantIds }) {
+  try {
+    return await postChatRoom({ name, participantIds })
+  } catch (error) {
+    throw new Error(error.userMessage || '채팅방을 만들지 못했습니다.', { cause: error })
   }
 }

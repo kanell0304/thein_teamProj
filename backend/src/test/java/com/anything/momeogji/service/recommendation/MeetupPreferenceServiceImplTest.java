@@ -138,7 +138,7 @@ class MeetupPreferenceServiceImplTest {
         ArgumentCaptor<ParticipantPreference> preferenceCaptor =
                 ArgumentCaptor.forClass(ParticipantPreference.class);
         verify(participantPreferenceRepository).save(preferenceCaptor.capture());
-        assertThat(preferenceCaptor.getValue().isMydataConsent()).isTrue();
+        assertThat(preferenceCaptor.getValue().isMyDataConsent()).isTrue();
         assertThat(participant.getSubmissionStatus()).isEqualTo(SubmissionStatus.SUBMITTED);
         assertThat(result.meetupId()).isEqualTo(meetupId);
         assertThat(result.recommendationTriggered()).isFalse();

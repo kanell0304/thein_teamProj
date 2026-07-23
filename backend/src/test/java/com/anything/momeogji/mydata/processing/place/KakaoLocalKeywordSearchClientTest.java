@@ -307,7 +307,8 @@ class KakaoLocalKeywordSearchClientTest {
         KakaoProperties kakaoProperties = new KakaoProperties(
                 "test-rest-api-key",
                 baseUrl,
-                "http://localhost/callback"
+                "http://localhost/callback",
+                "test-client-secret"
         );
         MyDataRecoveryProperties recoveryProperties = new MyDataRecoveryProperties(
                 Duration.ofMillis(1),
