@@ -8,6 +8,9 @@ import com.anything.momeogji.mydata.collection.cardlist.CardListValidator;
 import com.anything.momeogji.mydata.collection.model.CollectedUserMyData;
 import com.anything.momeogji.mydata.processing.MyDataPipeline;
 import com.anything.momeogji.mydata.processing.model.MyDataRestaurantData;
+import com.anything.momeogji.mydata.retry.MyDataExternalCallRetryExecutor;
+import com.anything.momeogji.mydata.retry.MyDataRecoveryProperties;
+import com.anything.momeogji.mydata.retry.RetryableMyDataExternalCallException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -20,6 +23,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.time.Duration;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -48,6 +52,36 @@ class MyDataServiceTest {
             }
             """;
 
+    private static final String ONE_CONSENTED_CARD_RESPONSE = """
+            {
+              "rsp_code": "00000",
+              "rsp_msg": "정상",
+              "search_timestamp": "0",
+              "next_page": null,
+              "card_cnt": 1,
+              "card_list": [
+                {
+                  "card_id": "001",
+                  "card_num": "1234-****-****-5678",
+                  "is_consent": true,
+                  "card_name": "테스트 카드",
+                  "card_member": "1",
+                  "card_type": "01"
+                }
+              ]
+            }
+            """;
+
+    private static final String EMPTY_APPROVAL_RESPONSE = """
+            {
+              "rsp_code": "00000",
+              "rsp_msg": "정상",
+              "next_page": null,
+              "approved_cnt": 0,
+              "approved_list": []
+            }
+            """;
+
     @Mock
     private MyDataProvider myDataProvider;
 
@@ -68,7 +102,12 @@ class MyDataServiceTest {
                 new ConsentedCardIdSelector(),
                 new CardApprovalValidator(),
                 new CardApprovalParser(),
-                myDataPipeline
+                myDataPipeline,
+                new MyDataExternalCallRetryExecutor(new MyDataRecoveryProperties(
+                        Duration.ofMillis(1),
+                        3,
+                        Duration.ofSeconds(1)
+                ))
         );
     }
 
@@ -197,5 +236,83 @@ class MyDataServiceTest {
         assertThat(result.userId()).isEqualTo(1L);
         assertThat(result.approvals()).isEmpty();
         verifyNoInteractions(myDataPipeline);
+    }
+
+    /**
+     * 카드 목록 Provider가 일시적으로 실패하면 같은 페이지 조건으로 한 번 재시도하는지 확인한다.
+     */
+    @Test
+    void 카드목록의_일시적_외부실패는_같은_요청으로_한번_재시도한다() {
+        given(myDataProvider.fetchCardListRawJson(1L, "0", null, 500))
+                .willThrow(new RetryableMyDataExternalCallException(
+                        "일시적 카드 목록 실패",
+                        new IllegalStateException("외부 장애")
+                ))
+                .willReturn(EMPTY_CARD_LIST_RESPONSE);
+
+        CollectedUserMyData result = myDataService.collect(1L);
+
+        assertThat(result.approvals()).isEmpty();
+        verify(myDataProvider, org.mockito.Mockito.times(2))
+                .fetchCardListRawJson(1L, "0", null, 500);
+    }
+
+    /**
+     * 국내 승인내역 외부 요청의 기간·카드·페이지 조건이 재시도에서도 바뀌지 않는지 확인한다.
+     */
+    @Test
+    void 승인내역의_일시적_외부실패는_같은_요청조건으로_한번_재시도한다() {
+        given(myDataProvider.fetchCardListRawJson(1L, "0", null, 500))
+                .willReturn(ONE_CONSENTED_CARD_RESPONSE);
+        given(myDataProvider.fetchApprovalDomesticRawJson(
+                eq(1L),
+                eq("001"),
+                any(LocalDate.class),
+                any(LocalDate.class),
+                org.mockito.ArgumentMatchers.isNull(),
+                eq(500)
+        ))
+                .willThrow(new RetryableMyDataExternalCallException(
+                        "일시적 승인내역 실패",
+                        new IllegalStateException("외부 장애")
+                ))
+                .willReturn(EMPTY_APPROVAL_RESPONSE);
+
+        CollectedUserMyData result = myDataService.collect(1L);
+
+        ArgumentCaptor<LocalDate> fromDateCaptor = ArgumentCaptor.forClass(LocalDate.class);
+        ArgumentCaptor<LocalDate> toDateCaptor = ArgumentCaptor.forClass(LocalDate.class);
+        verify(myDataProvider, org.mockito.Mockito.times(2))
+                .fetchApprovalDomesticRawJson(
+                        eq(1L),
+                        eq("001"),
+                        fromDateCaptor.capture(),
+                        toDateCaptor.capture(),
+                        org.mockito.ArgumentMatchers.isNull(),
+                        eq(500)
+                );
+
+        assertThat(result.approvals()).isEmpty();
+        assertThat(fromDateCaptor.getAllValues()).hasSize(2).allMatch(
+                fromDate -> fromDate.equals(fromDateCaptor.getAllValues().getFirst())
+        );
+        assertThat(toDateCaptor.getAllValues()).hasSize(2).allMatch(
+                toDate -> toDate.equals(toDateCaptor.getAllValues().getFirst())
+        );
+    }
+
+    /**
+     * 결정적인 Provider 오류는 재시도하지 않고 최초 예외를 즉시 전달하는지 확인한다.
+     */
+    @Test
+    void 재시도대상이_아닌_Provider오류는_즉시_실패한다() {
+        given(myDataProvider.fetchCardListRawJson(1L, "0", null, 500))
+                .willThrow(new IllegalStateException("Dummy 파일 누락"));
+
+        assertThatThrownBy(() -> myDataService.collect(1L))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("Dummy 파일 누락");
+
+        verify(myDataProvider).fetchCardListRawJson(1L, "0", null, 500);
     }
 }

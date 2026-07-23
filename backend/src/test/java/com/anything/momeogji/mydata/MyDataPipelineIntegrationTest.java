@@ -14,10 +14,13 @@ import com.anything.momeogji.mydata.processing.model.MyDataRestaurantData;
 import com.anything.momeogji.mydata.processing.place.MerchantPlaceClassifier;
 import com.anything.momeogji.mydata.processing.place.MerchantPlaceMatcher;
 import com.anything.momeogji.mydata.processing.place.MerchantPlaceSearchClient;
+import com.anything.momeogji.mydata.retry.MyDataExternalCallRetryExecutor;
+import com.anything.momeogji.mydata.retry.MyDataRecoveryProperties;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.time.Duration;
 import java.time.LocalTime;
 import java.util.List;
 import java.util.Map;
@@ -57,7 +60,12 @@ class MyDataPipelineIntegrationTest {
                 new ConsentedCardIdSelector(),
                 new CardApprovalValidator(),
                 new CardApprovalParser(),
-                myDataPipeline
+                myDataPipeline,
+                new MyDataExternalCallRetryExecutor(new MyDataRecoveryProperties(
+                        Duration.ofMillis(1),
+                        3,
+                        Duration.ofSeconds(1)
+                ))
         );
     }
 

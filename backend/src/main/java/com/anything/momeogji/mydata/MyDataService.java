@@ -11,6 +11,7 @@ import com.anything.momeogji.mydata.collection.model.CardApprovalData;
 import com.anything.momeogji.mydata.collection.model.CollectedUserMyData;
 import com.anything.momeogji.mydata.processing.MyDataPipeline;
 import com.anything.momeogji.mydata.processing.model.MyDataRestaurantData;
+import com.anything.momeogji.mydata.retry.MyDataExternalCallRetryExecutor;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Service;
@@ -51,6 +52,7 @@ public class MyDataService {
     private final CardApprovalValidator cardApprovalValidator;
     private final CardApprovalParser cardApprovalParser;
     private final MyDataPipeline myDataPipeline;
+    private final MyDataExternalCallRetryExecutor externalCallRetryExecutor;
 
     /**
      * 마이데이터 수집과 최종 가공에 필요한 Provider와 단계별 처리 구성요소를 주입받는다.
@@ -62,6 +64,7 @@ public class MyDataService {
      * @param cardApprovalValidator 국내 승인내역 응답 검증기
      * @param cardApprovalParser 국내 승인내역 내부 모델 변환기
      * @param myDataPipeline 수집된 참가자 마이데이터를 최종 가맹점 분류 결과로 가공하는 컴포넌트
+     * @param externalCallRetryExecutor 일시적인 외부 Provider 실패를 요청 단위로 한 번 재시도하는 실행기
      */
     public MyDataService(
             ObjectMapper objectMapper,
@@ -70,7 +73,8 @@ public class MyDataService {
             ConsentedCardIdSelector consentedCardIdSelector,
             CardApprovalValidator cardApprovalValidator,
             CardApprovalParser cardApprovalParser,
-            MyDataPipeline myDataPipeline
+            MyDataPipeline myDataPipeline,
+            MyDataExternalCallRetryExecutor externalCallRetryExecutor
     ) {
         this.objectMapper = objectMapper;
         this.myDataProvider = myDataProvider;
@@ -79,6 +83,7 @@ public class MyDataService {
         this.cardApprovalValidator = cardApprovalValidator;
         this.cardApprovalParser = cardApprovalParser;
         this.myDataPipeline = myDataPipeline;
+        this.externalCallRetryExecutor = externalCallRetryExecutor;
     }
 
     /**
@@ -195,19 +200,23 @@ public class MyDataService {
         while (true) {
             // 최초 페이지에는 0을 전달하고 다음 페이지 요청에서는 search_timestamp를 제외한다.
             String searchTimestamp = nextPage == null ? FIRST_SEARCH_TIMESTAMP : null;
+            String requestNextPage = nextPage;
 
-            // 현재 페이지 조건으로 카드 목록 Raw JSON을 Provider에 요청한다.
-            String rawJson = myDataProvider.fetchCardListRawJson(
-                    userId,
-                    searchTimestamp,
-                    nextPage,
-                    PAGE_LIMIT
+            // 현재 페이지 조건의 외부 Provider 요청만 일시적 실패 시 한 번 재시도한다.
+            String rawJson = externalCallRetryExecutor.execute(
+                    "카드 목록 조회",
+                    () -> myDataProvider.fetchCardListRawJson(
+                            userId,
+                            searchTimestamp,
+                            requestNextPage,
+                            PAGE_LIMIT
+                    )
             );
 
             // 카드 목록 Raw JSON을 응답 DTO로 역직렬화한다.
             CardListResponse response = deserialize(rawJson, CardListResponse.class,
                     "카드 목록 응답(userId=" + userId  + ", nextPage=" +
-                            (nextPage == null ? "FIRST" : nextPage) + ")");
+                            (requestNextPage == null ? "FIRST" : requestNextPage) + ")");
 
             // 동의 카드 추출 전에 현재 페이지의 응답 상태와 필드 규칙을 검증한다.
             cardListValidator.validate(response);
@@ -264,14 +273,25 @@ public class MyDataService {
         String nextPage = null;
 
         while (true) {
-            // 수집 시작 시 계산한 동일 기간과 현재 페이지 토큰으로 카드 승인내역을 요청한다.
-            String rawJson = myDataProvider.fetchApprovalDomesticRawJson(userId, cardId, fromDate, toDate,
-                    nextPage, PAGE_LIMIT);
+            String requestNextPage = nextPage;
+
+            // 동일 기간·페이지 조건의 외부 Provider 요청만 일시적 실패 시 한 번 재시도한다.
+            String rawJson = externalCallRetryExecutor.execute(
+                    "국내 승인내역 조회",
+                    () -> myDataProvider.fetchApprovalDomesticRawJson(
+                            userId,
+                            cardId,
+                            fromDate,
+                            toDate,
+                            requestNextPage,
+                            PAGE_LIMIT
+                    )
+            );
 
             // 국내 승인내역 Raw JSON을 응답 DTO로 역직렬화한다.
             CardApprovalResponse response = deserialize(rawJson, CardApprovalResponse.class,
                     "국내 승인내역 응답(userId=" + userId + ", cardId=" + cardId + ", nextPage=" +
-                            (nextPage == null ? "FIRST" : nextPage) + ")");
+                            (requestNextPage == null ? "FIRST" : requestNextPage) + ")");
 
             // 내부 승인 데이터로 변환하기 전에 현재 페이지의 상태와 필드 규칙을 검증한다.
             cardApprovalValidator.validate(response);

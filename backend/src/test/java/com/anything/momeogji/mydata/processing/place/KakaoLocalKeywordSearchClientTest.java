@@ -2,6 +2,8 @@ package com.anything.momeogji.mydata.processing.place;
 
 import com.anything.momeogji.config.KakaoProperties;
 import com.anything.momeogji.mydata.processing.place.MerchantPlaceSearchClient.SearchCandidate;
+import com.anything.momeogji.mydata.retry.MyDataExternalCallRetryExecutor;
+import com.anything.momeogji.mydata.retry.MyDataRecoveryProperties;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.AfterEach;
@@ -136,10 +138,44 @@ class KakaoLocalKeywordSearchClientTest {
     }
 
     /**
-     * HTTP 실패 결과를 캐시하지 않아 다음 동일 검색에서 카카오 API를 다시 호출하는지 확인한다.
+     * 일시적인 HTTP 서버 오류는 같은 검색을 한 번 재시도하고 성공 결과를 캐시하는지 확인한다.
      */
     @Test
-    void 외부호출_실패는_캐시하지_않는다() {
+    void 일시적_HTTP오류는_한번_재시도하고_성공결과를_캐시한다() {
+        responses.add(new MockResponse(500, "{\"message\":\"temporary error\"}"));
+        responses.add(successResponse("FD6", "영인성", "음식점 > 중식 > 중화요리"));
+        KakaoLocalKeywordSearchClient client = createClient(Duration.ofMinutes(10), 1000);
+
+        assertThat(client.search("영인성", "FD6"))
+                .extracting(SearchCandidate::placeName)
+                .containsExactly("영인성");
+
+        // 재시도 성공 결과가 캐시되므로 두 번째 검색에서는 HTTP 호출이 늘지 않는다.
+        client.search("영인성", "FD6");
+        assertThat(requestCount).hasValue(2);
+    }
+
+    /**
+     * HTTP 429 호출량 제한도 서버 오류와 동일하게 한 번 재시도하는지 확인한다.
+     */
+    @Test
+    void HTTP_429응답은_한번_재시도한다() {
+        responses.add(new MockResponse(429, "{\"message\":\"too many requests\"}"));
+        responses.add(successResponse("CE7", "테스트 카페", "카페 > 커피전문점"));
+        KakaoLocalKeywordSearchClient client = createClient(Duration.ofMinutes(10), 1000);
+
+        assertThat(client.search("테스트 카페", "CE7"))
+                .extracting(SearchCandidate::placeName)
+                .containsExactly("테스트 카페");
+        assertThat(requestCount).hasValue(2);
+    }
+
+    /**
+     * 한 번의 재시도까지 실패한 결과를 캐시하지 않아 다음 검색에서 새 호출을 수행하는지 확인한다.
+     */
+    @Test
+    void 재시도까지_실패한_결과는_캐시하지_않는다() {
+        responses.add(new MockResponse(500, "{\"message\":\"temporary error\"}"));
         responses.add(new MockResponse(500, "{\"message\":\"temporary error\"}"));
         responses.add(successResponse("FD6", "영인성", "음식점 > 중식 > 중화요리"));
         KakaoLocalKeywordSearchClient client = createClient(Duration.ofMinutes(10), 1000);
@@ -149,8 +185,22 @@ class KakaoLocalKeywordSearchClientTest {
                 .extracting(SearchCandidate::placeName)
                 .containsExactly("영인성");
 
-        // 두 번째 성공 결과는 캐시되므로 세 번째 검색에서는 HTTP 호출이 늘지 않는다.
-        client.search("영인성", "FD6");
+        assertThat(requestCount).hasValue(3);
+    }
+
+    /**
+     * 재시도 대상이 아닌 일반 4xx 응답은 추가 호출 없이 즉시 해당 검색만 제외하는지 확인한다.
+     */
+    @Test
+    void 일반_4xx응답은_재시도하지_않는다() {
+        responses.add(new MockResponse(400, "{\"message\":\"bad request\"}"));
+        responses.add(successResponse("FD6", "영인성", "음식점 > 중식 > 중화요리"));
+        KakaoLocalKeywordSearchClient client = createClient(Duration.ofMinutes(10), 1000);
+
+        assertThat(client.search("영인성", "FD6")).isEmpty();
+        assertThat(requestCount).hasValue(1);
+
+        assertThat(client.search("영인성", "FD6")).hasSize(1);
         assertThat(requestCount).hasValue(2);
     }
 
@@ -183,6 +233,43 @@ class KakaoLocalKeywordSearchClientTest {
     }
 
     /**
+     * 연속 최종 외부 실패가 임계값에 도달하면 캐시 MISS를 차단하되 기존 캐시 HIT는 제공하는지 확인한다.
+     *
+     * @throws InterruptedException 짧은 회로 OPEN 시간 대기가 중단된 경우
+     */
+    @Test
+    void 연속_최종실패_세건이면_회로를_열고_만료후_다시_호출한다() throws InterruptedException {
+        responses.add(successResponse("FD6", "캐시 장소", "음식점 > 한식"));
+        for (int index = 0; index < 6; index++) {
+            responses.add(new MockResponse(500, "{\"message\":\"temporary error\"}"));
+        }
+        responses.add(successResponse("FD6", "복구 장소", "음식점 > 한식"));
+
+        KakaoLocalKeywordSearchClient client = createClient(
+                Duration.ofMinutes(10),
+                1000,
+                3,
+                Duration.ofMillis(30)
+        );
+
+        assertThat(client.search("캐시 장소", "FD6")).hasSize(1);
+        assertThat(client.search("실패 장소 1", "FD6")).isEmpty();
+        assertThat(client.search("실패 장소 2", "FD6")).isEmpty();
+        assertThat(client.search("실패 장소 3", "FD6")).isEmpty();
+        assertThat(requestCount).hasValue(7);
+
+        // 열린 회로에서도 기존 캐시는 사용하지만 새 검색은 외부 요청 없이 제외한다.
+        assertThat(client.search("캐시 장소", "FD6")).hasSize(1);
+        assertThat(client.search("차단 장소", "FD6")).isEmpty();
+        assertThat(requestCount).hasValue(7);
+
+        Thread.sleep(50);
+
+        assertThat(client.search("복구 장소", "FD6")).hasSize(1);
+        assertThat(requestCount).hasValue(8);
+    }
+
+    /**
      * 테스트 서버 주소와 지정한 캐시 정책을 사용하는 실제 검색 Client를 생성한다.
      *
      * @param ttl 테스트에서 적용할 저장 후 만료 시간
@@ -190,6 +277,29 @@ class KakaoLocalKeywordSearchClientTest {
      * @return 로컬 HTTP 서버를 카카오 API 대신 호출하는 검색 Client
      */
     private KakaoLocalKeywordSearchClient createClient(Duration ttl, long maximumSize) {
+        return createClient(
+                ttl,
+                maximumSize,
+                3,
+                Duration.ofSeconds(1)
+        );
+    }
+
+    /**
+     * 테스트별 회로 실패 임계값과 OPEN 시간을 적용한 검색 Client를 생성한다.
+     *
+     * @param ttl 테스트에서 적용할 캐시 만료 시간
+     * @param maximumSize 테스트에서 적용할 최대 캐시 키 개수
+     * @param failureThreshold 회로를 열 연속 최종 실패 횟수
+     * @param openDuration 외부 호출을 차단할 회로 OPEN 시간
+     * @return 로컬 HTTP 서버와 짧은 재시도 간격을 사용하는 검색 Client
+     */
+    private KakaoLocalKeywordSearchClient createClient(
+            Duration ttl,
+            long maximumSize,
+            int failureThreshold,
+            Duration openDuration
+    ) {
         String baseUrl = "http://"
                 + mockServer.getAddress().getHostString()
                 + ":"
@@ -199,11 +309,18 @@ class KakaoLocalKeywordSearchClientTest {
                 baseUrl,
                 "http://localhost/callback"
         );
+        MyDataRecoveryProperties recoveryProperties = new MyDataRecoveryProperties(
+                Duration.ofMillis(1),
+                failureThreshold,
+                openDuration
+        );
 
         return new KakaoLocalKeywordSearchClient(
                 RestClient.builder(),
                 kakaoProperties,
-                new KakaoSearchCacheProperties(ttl, maximumSize)
+                new KakaoSearchCacheProperties(ttl, maximumSize),
+                new MyDataExternalCallRetryExecutor(recoveryProperties),
+                new KakaoSearchCircuitBreaker(recoveryProperties)
         );
     }
 

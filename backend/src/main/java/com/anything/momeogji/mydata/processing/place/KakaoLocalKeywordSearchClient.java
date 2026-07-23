@@ -1,6 +1,8 @@
 package com.anything.momeogji.mydata.processing.place;
 
 import com.anything.momeogji.config.KakaoProperties;
+import com.anything.momeogji.mydata.retry.MyDataExternalCallRetryExecutor;
+import com.anything.momeogji.mydata.retry.RetryableMyDataExternalCallException;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
@@ -11,8 +13,10 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.client.ClientHttpRequestFactory;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
+import org.springframework.web.client.RestClientResponseException;
 
 import java.net.http.HttpClient;
 import java.time.Duration;
@@ -33,11 +37,14 @@ public class KakaoLocalKeywordSearchClient implements MerchantPlaceSearchClient 
     private static final Logger log = LoggerFactory.getLogger(KakaoLocalKeywordSearchClient.class);
     private static final String KEYWORD_SEARCH_PATH = "/v2/local/search/keyword.json";
     private static final int MAX_PAGE_SIZE = 15;
-    private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(5);
+    private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(2);
+    private static final Duration READ_TIMEOUT = Duration.ofSeconds(3);
     private static final Set<String> ALLOWED_CATEGORY_GROUP_CODES = Set.of("FD6", "CE7");
 
     private final RestClient restClient;
     private final Cache<SearchCacheKey, List<SearchCandidate>> searchCache;
+    private final MyDataExternalCallRetryExecutor externalCallRetryExecutor;
+    private final KakaoSearchCircuitBreaker circuitBreaker;
 
     /**
      * 프로젝트의 카카오 REST API 설정과 MyData 전용 검색 캐시 설정으로 Client를 생성한다.
@@ -45,11 +52,15 @@ public class KakaoLocalKeywordSearchClient implements MerchantPlaceSearchClient 
      * @param restClientBuilder Spring이 제공하는 REST 클라이언트 빌더
      * @param properties 카카오 REST API 키와 로컬 API 기본 주소
      * @param cacheProperties 카카오 장소 후보 캐시의 만료 시간과 최대 항목 수
+     * @param externalCallRetryExecutor 일시적인 카카오 외부 실패를 한 번 재시도하는 실행기
+     * @param circuitBreaker 연속 최종 실패 시 캐시 MISS 외부 요청을 제한하는 회로 차단기
      */
     public KakaoLocalKeywordSearchClient(
             RestClient.Builder restClientBuilder,
             KakaoProperties properties,
-            KakaoSearchCacheProperties cacheProperties
+            KakaoSearchCacheProperties cacheProperties,
+            MyDataExternalCallRetryExecutor externalCallRetryExecutor,
+            KakaoSearchCircuitBreaker circuitBreaker
     ) {
         this.restClient = restClientBuilder
                 .baseUrl(properties.baseUrl())
@@ -63,6 +74,8 @@ public class KakaoLocalKeywordSearchClient implements MerchantPlaceSearchClient 
                 .expireAfterWrite(cacheProperties.ttl())
                 .maximumSize(cacheProperties.maximumSize())
                 .build();
+        this.externalCallRetryExecutor = externalCallRetryExecutor;
+        this.circuitBreaker = circuitBreaker;
     }
 
     /**
@@ -88,11 +101,48 @@ public class KakaoLocalKeywordSearchClient implements MerchantPlaceSearchClient 
         }
 
         SearchCacheKey cacheKey = new SearchCacheKey(query, categoryGroupCode);
+
+        // 회로가 열려 있어도 이미 검증·저장된 검색 결과는 외부 호출 없이 그대로 사용한다.
+        List<SearchCandidate> cachedCandidates = searchCache.getIfPresent(cacheKey);
+        if (cachedCandidates != null) {
+            return cachedCandidates;
+        }
+
+        // 연속 외부 실패로 회로가 열렸다면 새로운 검색을 호출하지 않고 해당 가맹점만 제외한다.
+        if (!circuitBreaker.allowRequest()) {
+            return List.of();
+        }
+
         try {
-            // 동일 키의 동시 누락 요청은 Caffeine이 한 번만 실행하고 정상 결과만 캐시에 저장한다.
-            return searchCache.get(cacheKey, this::requestCandidates);
+            // 동일 키의 동시 캐시 MISS는 한 로더로 병합하고 그 안에서 일시적 실패만 한 번 재시도한다.
+            return searchCache.get(cacheKey, key -> {
+                try {
+                    List<SearchCandidate> candidates = externalCallRetryExecutor.execute(
+                            "카카오 로컬 키워드 검색",
+                            () -> requestCandidates(key)
+                    );
+
+                    // 정상적인 빈 장소 배열을 포함한 유효 응답은 연속 외부 실패 상태를 초기화한다.
+                    circuitBreaker.recordSuccess();
+                    return candidates;
+                } catch (RetryableMyDataExternalCallException exception) {
+                    // 같은 캐시 키를 기다리는 호출자가 여럿이어도 실제 실패한 로더 한 건만 기록한다.
+                    circuitBreaker.recordFinalFailure();
+                    throw exception;
+                }
+            });
+        } catch (RetryableMyDataExternalCallException exception) {
+            // 한 번의 재시도까지 실패한 외부 오류는 캐시에 남기지 않고 해당 가맹점만 제외한다.
+            log.warn(
+                    "카카오 로컬 가맹점 검색이 재시도 후에도 실패했습니다. "
+                            + "query={}, categoryGroupCode={}, cause={}",
+                    query,
+                    categoryGroupCode,
+                    exception.getMessage()
+            );
+            return List.of();
         } catch (RestClientException | IllegalStateException exception) {
-            // 외부 호출·응답 오류는 캐시에 남기지 않고 해당 가맹점만 미매칭 처리한다.
+            // 재시도 대상이 아닌 HTTP·역직렬화·응답 구조 오류는 즉시 해당 가맹점만 제외한다.
             log.warn(
                     "카카오 로컬 가맹점 검색에 실패했습니다. query={}, categoryGroupCode={}, cause={}",
                     query,
@@ -108,21 +158,42 @@ public class KakaoLocalKeywordSearchClient implements MerchantPlaceSearchClient 
      *
      * @param cacheKey 실제 요청 검색어와 음식점·카페 그룹을 포함한 캐시 키
      * @return 카카오 정확도 순서를 유지한 불변 후보 목록. 정상적인 결과 없음은 빈 목록
-     * @throws RestClientException 외부 호출 또는 응답 역직렬화에 실패한 경우
+     * @throws RetryableMyDataExternalCallException 연결·타임아웃·429·5xx가 발생한 경우
+     * @throws RestClientException 재시도 대상이 아닌 HTTP 오류 또는 응답 역직렬화에 실패한 경우
      * @throws IllegalStateException 응답 본문이나 장소 배열이 누락된 경우
      */
     private List<SearchCandidate> requestCandidates(SearchCacheKey cacheKey) {
-        // 위치나 반경 조건 없이 요청 그룹 안에서 정확도 순 최대 15개 장소를 조회한다.
-        KakaoKeywordSearchResponse response = restClient.get()
-                .uri(uriBuilder -> uriBuilder
-                        .path(KEYWORD_SEARCH_PATH)
-                        .queryParam("query", cacheKey.query())
-                        .queryParam("category_group_code", cacheKey.categoryGroupCode())
-                        .queryParam("size", MAX_PAGE_SIZE)
-                        .queryParam("sort", "accuracy")
-                        .build())
-                .retrieve()
-                .body(KakaoKeywordSearchResponse.class);
+        KakaoKeywordSearchResponse response;
+        try {
+            // 위치나 반경 조건 없이 요청 그룹 안에서 정확도 순 최대 15개 장소를 조회한다.
+            response = restClient.get()
+                    .uri(uriBuilder -> uriBuilder
+                            .path(KEYWORD_SEARCH_PATH)
+                            .queryParam("query", cacheKey.query())
+                            .queryParam("category_group_code", cacheKey.categoryGroupCode())
+                            .queryParam("size", MAX_PAGE_SIZE)
+                            .queryParam("sort", "accuracy")
+                            .build())
+                    .retrieve()
+                    .body(KakaoKeywordSearchResponse.class);
+        } catch (ResourceAccessException exception) {
+            // 연결 실패와 연결·읽기 타임아웃은 같은 요청으로 회복될 수 있는 외부 실패로 분류한다.
+            throw new RetryableMyDataExternalCallException(
+                    "카카오 로컬 API 연결 또는 응답 대기에 실패했습니다.",
+                    exception
+            );
+        } catch (RestClientResponseException exception) {
+            // 호출량 제한과 서버 오류만 일시적 외부 실패로 분류하고 나머지 4xx는 즉시 전달한다.
+            if (exception.getStatusCode().value() == 429
+                    || exception.getStatusCode().is5xxServerError()) {
+                throw new RetryableMyDataExternalCallException(
+                        "카카오 로컬 API가 일시적 HTTP 오류를 반환했습니다. status="
+                                + exception.getStatusCode().value(),
+                        exception
+                );
+            }
+            throw exception;
+        }
 
         // 정상 빈 배열과 구분할 수 없는 본문·필드 누락은 캐시하지 않도록 예외로 전달한다.
         if (response == null || response.documents() == null) {
@@ -173,17 +244,17 @@ public class KakaoLocalKeywordSearchClient implements MerchantPlaceSearchClient 
     }
 
     /**
-     * 카카오 연결과 응답 대기가 무기한 지속되지 않도록 공통 5초 제한시간이 적용된 요청 팩토리를 만든다.
+     * 카카오 연결에는 2초, 응답 대기에는 3초 제한시간이 적용된 요청 팩토리를 만든다.
      *
      * @return 연결·읽기 제한시간을 설정한 Spring HTTP 요청 팩토리
      */
     private static ClientHttpRequestFactory createRequestFactory() {
         HttpClient httpClient = HttpClient.newBuilder()
-                .connectTimeout(REQUEST_TIMEOUT)
+                .connectTimeout(CONNECT_TIMEOUT)
                 .build();
         JdkClientHttpRequestFactory requestFactory =
                 new JdkClientHttpRequestFactory(httpClient);
-        requestFactory.setReadTimeout(REQUEST_TIMEOUT);
+        requestFactory.setReadTimeout(READ_TIMEOUT);
         return requestFactory;
     }
 

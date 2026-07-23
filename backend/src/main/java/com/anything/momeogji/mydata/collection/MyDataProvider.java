@@ -1,5 +1,7 @@
 package com.anything.momeogji.mydata.collection;
 
+import com.anything.momeogji.mydata.retry.RetryableMyDataExternalCallException;
+
 import java.time.LocalDate;
 
 /**
@@ -41,6 +43,7 @@ public interface MyDataProvider {
      * @return 가공하거나 파싱하지 않은 UTF-8 카드 목록 JSON 문자열
      * @throws IllegalArgumentException 사용자 ID 또는 조회 타임스탬프 형식이 올바르지 않은 경우
      * @throws IllegalStateException Dummy 사용자 슬롯이 부족하거나 대응 파일을 읽을 수 없는 경우
+     * @throws RetryableMyDataExternalCallException 실제 API 구현에서 연결·타임아웃·429·5xx가 발생한 경우
      */
     String fetchCardListRawJson(Long userId, String searchTimestamp, String nextPage, int limit);
 
@@ -73,6 +76,7 @@ public interface MyDataProvider {
      * @return 가공하거나 파싱하지 않은 UTF-8 국내 승인내역 JSON 문자열
      * @throws IllegalArgumentException 사용자 ID 또는 카드 ID 형식이 올바르지 않은 경우
      * @throws IllegalStateException Dummy 사용자 슬롯이 부족하거나 대응 파일을 읽을 수 없는 경우
+     * @throws RetryableMyDataExternalCallException 실제 API 구현에서 연결·타임아웃·429·5xx가 발생한 경우
      */
     String fetchApprovalDomesticRawJson(Long userId, String cardId, LocalDate fromDate,
             LocalDate toDate, String nextPage, int limit);
