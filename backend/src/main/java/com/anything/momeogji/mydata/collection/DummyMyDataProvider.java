@@ -1,0 +1,165 @@
+package com.anything.momeogji.mydata.collection;
+
+import org.springframework.core.io.ClassPathResource;
+import org.springframework.stereotype.Component;
+
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.regex.Pattern;
+
+/**
+ * 실제 금융 마이데이터 API 대신 classpath의 참가자별 Dummy JSON을 반환한다.
+ *
+ * <p>공개 메서드의 상세 호출 조건과 반환 계약은 {@link MyDataProvider}를 참조한다.
+ * 이 클래스에는 classpath 파일 조회와 Dummy 요청값 처리 같은 구현 세부사항만 둔다.</p>
+ *
+ * <p>서버 프로세스에서 처음 조회된 서로 다른 사용자 세 명을 조회 순서대로
+ * {@code user-01}, {@code user-02}, {@code user-03}에 연결한다. 같은 사용자 ID는
+ * 기존 연결을 재사용하며 네 번째 고유 사용자부터는 Dummy 데이터 부족으로 실패한다.
+ * 이 메모리 매핑은 애플리케이션을 재시작하면 초기화된다.</p>
+ */
+@Component
+public class DummyMyDataProvider implements MyDataProvider {
+
+    private static final String DUMMY_BASE_PATH = "mydata/dummy";
+    private static final int MAX_DUMMY_USER_SLOTS = 3;
+    private static final Pattern SAFE_CARD_ID = Pattern.compile("[A-Za-z0-9_-]{1,64}");
+    private static final Pattern SAFE_PAGE_TOKEN = Pattern.compile("page-\\d{3}");
+    private static final String FIRST_PAGE_TOKEN = "page-001";
+
+    private final Map<Long, Integer> dummyUserSlots = new LinkedHashMap<>();
+
+    /**
+     * 상세 호출 계약은 {@link MyDataProvider#fetchCardListRawJson(Long, String, String, int)}를 참조한다.
+     */
+    @Override
+    public String fetchCardListRawJson(Long userId, String searchTimestamp, String nextPage, int limit) {
+        validateUserId(userId);
+
+        String resourcePath = resolveDummyUserDirectory(userId) + "/card-list.json";
+        return readRequiredDummyJson(resourcePath);
+    }
+
+    /**
+     * 상세 호출 계약은
+     * {@link MyDataProvider#fetchApprovalDomesticRawJson(Long, String, LocalDate, LocalDate, String, int)}를
+     * 참조한다.
+     */
+    @Override
+    public String fetchApprovalDomesticRawJson(Long userId, String cardId, LocalDate fromDate,
+                                         LocalDate toDate, String nextPage, int limit) {
+        validateUserId(userId);
+        validateCardId(cardId);
+        String pageToken = nextPage == null ? FIRST_PAGE_TOKEN : validateNextPage(nextPage);
+
+        String resourcePath = resolveDummyUserDirectory(userId)
+                + "/approval-domestic-" + cardId + "-" + pageToken + ".json";
+        return readRequiredDummyJson(resourcePath);
+    }
+
+    /**
+     * 처음 조회된 사용자 순서에 따라 최대 세 개의 Dummy 사용자 슬롯을 할당한다.
+     *
+     * <p>카드 목록과 국내 승인내역 조회가 동시에 실행돼도 같은 사용자에게 서로 다른
+     * 슬롯이 배정되지 않도록 할당과 조회 전체를 동기화한다.</p>
+     *
+     * @param userId 검증이 끝난 사용자 내부 ID
+     * @return {@code mydata/dummy/user-01} 형식의 classpath 상대 경로
+     * @throws IllegalStateException 세 개의 Dummy 슬롯이 모두 할당된 후 새로운 사용자가 요청한 경우
+     */
+    private synchronized String resolveDummyUserDirectory(Long userId) {
+        // 이미 등록된 사용자는 카드 목록과 승인내역에서 동일한 Dummy 슬롯을 재사용한다.
+        Integer assignedSlot = dummyUserSlots.get(userId);
+        if (assignedSlot != null) {
+            return DUMMY_BASE_PATH + "/user-%02d".formatted(assignedSlot);
+        }
+
+        // 준비된 세 사용자보다 많은 고유 사용자가 요청하면 실제 동의값을 바꾸지 않고 조회만 실패시킨다.
+        if (dummyUserSlots.size() >= MAX_DUMMY_USER_SLOTS) {
+            throw new IllegalStateException(
+                    "사용 가능한 Dummy 마이데이터 사용자는 최대 "
+                            + MAX_DUMMY_USER_SLOTS + "명입니다. userId=" + userId
+            );
+        }
+
+        // 새로운 사용자는 최초 조회 순서에 해당하는 다음 Dummy 슬롯에 연결한다.
+        int newSlot = dummyUserSlots.size() + 1;
+        dummyUserSlots.put(userId, newSlot);
+        return DUMMY_BASE_PATH + "/user-%02d".formatted(newSlot);
+    }
+
+    /**
+     * 필수 Dummy 리소스를 UTF-8 문자열로 읽고 파일의 존재 여부와 빈 내용을 확인한다.
+     *
+     * @param resourcePath classpath 기준 JSON 파일 경로
+     * @return 파일의 가공되지 않은 JSON 문자열
+     * @throws IllegalStateException 파일이 없거나 비어 있거나 입출력 오류가 발생한 경우
+     */
+    private String readRequiredDummyJson(String resourcePath) {
+        ClassPathResource resource = new ClassPathResource(resourcePath);
+        if (!resource.exists() || !resource.isReadable()) {
+            throw new IllegalStateException("Dummy 마이데이터 파일을 찾을 수 없습니다: " + resourcePath);
+        }
+
+        try {
+            String rawJson = resource.getContentAsString(StandardCharsets.UTF_8);
+            if (rawJson.isBlank()) {
+                throw new IllegalStateException("Dummy 마이데이터 파일이 비어 있습니다: " + resourcePath);
+            }
+            return rawJson;
+        } catch (IOException exception) {
+            throw new IllegalStateException(
+                    "Dummy 마이데이터 파일을 읽을 수 없습니다: " + resourcePath,
+                    exception
+            );
+        }
+    }
+
+    /**
+     * 사용자 ID가 Dummy 디렉터리 이름으로 사용할 수 있는 양수인지 확인한다.
+     *
+     * @param userId 검사할 사용자 내부 ID
+     * @throws IllegalArgumentException ID가 없거나 1보다 작은 경우
+     */
+    private void validateUserId(Long userId) {
+        if (userId == null || userId <= 0) {
+            throw new IllegalArgumentException("userId는 1 이상이어야 합니다.");
+        }
+    }
+
+    /**
+     * 카드 ID가 파일 경로에 안전하게 포함될 수 있는 문자와 길이인지 확인한다.
+     *
+     * <p>영문자·숫자·밑줄·하이픈만 허용하여 상위 경로 이동과 임의 파일 접근을
+     * 차단한다.</p>
+     *
+     * @param cardId 검사할 카드 고유 식별자
+     * @throws IllegalArgumentException 카드 ID가 없거나 안전한 형식이 아닌 경우
+     */
+    private void validateCardId(String cardId) {
+        if (cardId == null || !SAFE_CARD_ID.matcher(cardId).matches()) {
+            throw new IllegalArgumentException("cardId 형식이 올바르지 않습니다: " + cardId);
+        }
+    }
+
+    /**
+     * 다음 페이지 토큰이 고정 Dummy 파일명에 안전하게 사용할 수 있는 형식인지 확인한다.
+     *
+     * <p>최초 페이지는 호출자가 {@code null}로 전달하며 이 클래스가
+     * {@code page-001}로 변환한다. 후속 페이지는 응답의 {@code next_page}를
+     * 변경하지 않고 전달받되 {@code page-숫자 3자리} 형식만 허용한다.</p>
+     *
+     * @param nextPage 국내 승인내역 응답에서 받은 다음 페이지 토큰
+     * @return 검증을 통과한 원본 페이지 토큰
+     * @throws IllegalArgumentException 페이지 토큰이 허용된 형식이 아닌 경우
+     */
+    private String validateNextPage(String nextPage) {
+        if (!SAFE_PAGE_TOKEN.matcher(nextPage).matches()) {
+            throw new IllegalArgumentException("nextPage 형식이 올바르지 않습니다: " + nextPage);
+        }
+        return nextPage;
+    }
+}

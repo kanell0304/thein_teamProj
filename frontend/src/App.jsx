@@ -6,6 +6,7 @@ import ChatListPage from './pages/ChatListPage'
 import FriendListPage from './pages/FriendListPage'
 import KakaoCallbackPage from './pages/KakaoCallbackPage'
 import LoginPage from './pages/LoginPage'
+import NewChatRoomPage from './pages/NewChatRoomPage'
 import SettingsPage from './pages/SettingsPage'
 
 // ===== 인증 사용자를 현재 채팅방 참가자 형태로 전달 =====
@@ -26,6 +27,7 @@ function App() {
         <Route path="/" element={<Navigate to="/chats" replace />} />
         <Route path="/friends" element={<FriendListPage />} />
         <Route path="/chats" element={<ChatListPage />} />
+        <Route path="/chats/new" element={<NewChatRoomPage />} />
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="/chat/:roomId" element={<AuthenticatedChatRoom />} />
       </Route>

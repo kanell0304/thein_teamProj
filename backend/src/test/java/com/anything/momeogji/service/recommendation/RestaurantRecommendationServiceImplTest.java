@@ -6,6 +6,8 @@ import com.anything.momeogji.dto.recommendation.RecommendationRequest;
 import com.anything.momeogji.dto.recommendation.RecommendationResult;
 import com.anything.momeogji.dto.recommendation.RestaurantCandidate;
 import com.anything.momeogji.exception.recommendation.AiRecommendationException;
+import com.anything.momeogji.mydata.processing.model.MyDataRestaurantData;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -63,10 +65,11 @@ class RestaurantRecommendationServiceImplTest {
     private KakaoImageSearchClient kakaoImageSearchClient;
 
     private RestaurantRecommendationServiceImpl service;
+    private ObjectMapper objectMapper;
 
     @BeforeEach
     void setUp() {
-        ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
+        objectMapper = new ObjectMapper().findAndRegisterModules();
         service = new RestaurantRecommendationServiceImpl(
                 new RecommendationConditionAggregator(),
                 candidateSearchService,
@@ -143,6 +146,29 @@ class RestaurantRecommendationServiceImplTest {
     }
 
     @Test
+    void 마이데이터_음식점_목록을_JSON_배열로_AI에게_전달한다() throws Exception {
+        given(openAiChatClient.requestStructuredJson(any(), any())).willReturn(VALID_RESPONSE_JSON);
+        List<MyDataRestaurantData> myDataRestaurants = List.of(
+                new MyDataRestaurantData("영인성", "중식 > 중화요리"),
+                new MyDataRestaurantData("상무초밥", "일식 > 초밥")
+        );
+
+        service.recommend(sampleRequest(List.of(), myDataRestaurants, null));
+
+        ArgumentCaptor<String> userPromptCaptor = ArgumentCaptor.forClass(String.class);
+        verify(openAiChatClient).requestStructuredJson(any(), userPromptCaptor.capture());
+        JsonNode myDataNode = objectMapper.readTree(userPromptCaptor.getValue())
+                .path("myDataRestaurants");
+
+        assertThat(myDataNode.isArray()).isTrue();
+        assertThat(myDataNode).hasSize(2);
+        assertThat(myDataNode.get(0).path("restaurantName").asText())
+                .isEqualTo("영인성");
+        assertThat(myDataNode.get(0).path("foodCategory").asText())
+                .isEqualTo("중식 > 중화요리");
+    }
+
+    @Test
     void AI_응답_개수가_3이_아니면_예외를_던진다() {
         given(openAiChatClient.requestStructuredJson(any(), any())).willReturn("""
                 { "selections": [
@@ -191,6 +217,14 @@ class RestaurantRecommendationServiceImplTest {
     }
 
     private RecommendationRequest sampleRequest(List<String> excludedRestaurantIds, String preferenceNote) {
+        return sampleRequest(excludedRestaurantIds, List.of(), preferenceNote);
+    }
+
+    private RecommendationRequest sampleRequest(
+            List<String> excludedRestaurantIds,
+            List<MyDataRestaurantData> myDataRestaurants,
+            String preferenceNote
+    ) {
         CommonOptionRequest common = new CommonOptionRequest(
                 "강남역", 37.498, 127.027, LocalDateTime.of(2026, 7, 20, 12, 0), "식사"
         );
@@ -198,6 +232,12 @@ class RestaurantRecommendationServiceImplTest {
                 new PersonalOptionRequest(1L, 5, List.of("한식"), 15000, false, List.of(), "룸"),
                 new PersonalOptionRequest(2L, 10, List.of("한식"), 20000, true, List.of("고수"), "개방형")
         );
-        return new RecommendationRequest(common, personal, excludedRestaurantIds, preferenceNote);
+        return new RecommendationRequest(
+                common,
+                personal,
+                excludedRestaurantIds,
+                myDataRestaurants,
+                preferenceNote
+        );
     }
 }

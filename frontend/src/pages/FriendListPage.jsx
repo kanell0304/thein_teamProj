@@ -100,7 +100,12 @@ function FriendListPage() {
       {/* ===== 로그인한 사용자의 프로필 ===== */}
       <section className="friend-section" aria-labelledby="my-profile-title">
         <h2 id="my-profile-title">내 프로필</h2>
-        <FriendProfile nickname={currentNickname} statusMessage="오늘 모 먹지?" isMe />
+        <FriendProfile
+          nickname={currentNickname}
+          statusMessage="오늘 모 먹지?"
+          profileImageUrl={user?.profileImageUrl}
+          isMe
+        />
       </section>
 
       {/* ===== 실제 회원 API의 로딩·오류·목록 상태 표시 ===== */}

@@ -29,6 +29,7 @@ function createAuthUser(response) {
     memberId: response.memberId,
     name: response.nickname,
     nickname: response.nickname,
+    profileImageUrl: response.profileImageUrl ?? null,
   }
 }
 
