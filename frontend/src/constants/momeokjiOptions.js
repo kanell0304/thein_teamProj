@@ -17,13 +17,11 @@ export const TIME_OPTIONS = Array.from({ length: 24 }, (_, hour) => {
 // label은 화면 표시용, value는 AI·백엔드 API 전달용 고정 코드입니다.
 export const THEMES = [
   { value: 'MEAL', label: '식사' },
-  { value: 'CAFE', label: '카페' },
   { value: 'MEETING', label: '미팅' },
-  { value: 'DRINK', label: '술자리' },
+  { value: 'GATHERING', label: '모임' },
+  { value: 'CAFE', label: '카페' },
   { value: 'DESSERT', label: '디저트' },
   { value: 'DATE', label: '데이트' },
-  { value: 'CASUAL', label: '가벼운 모임' },
-  { value: 'UNDECIDED', label: '미정' },
 ]
 
 export const AVOID_OPTIONS = ['매운 음식', '날것', '밀가루', '기름진 음식', '없어요']
