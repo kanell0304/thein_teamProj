@@ -21,6 +21,10 @@
   font-weight: 700;
 }
 
+.settings-avatar--image {
+  object-fit: cover;
+}
+
 .settings-profile div {
   display: grid;
   gap: 4px;
