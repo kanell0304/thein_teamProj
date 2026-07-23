@@ -1,12 +1,13 @@
 package com.anything.momeogji.mydata;
 
-import com.anything.momeogji.mydata.cardapproval.CardApprovalParser;
-import com.anything.momeogji.mydata.cardapproval.CardApprovalValidator;
-import com.anything.momeogji.mydata.cardlist.CardListParser;
-import com.anything.momeogji.mydata.cardlist.CardListValidator;
-import com.anything.momeogji.mydata.model.UserMyData;
-import com.anything.momeogji.mydata.transform.MyDataTransformer;
-import com.anything.momeogji.mydata.transform.model.TransformedUserMyData;
+import com.anything.momeogji.mydata.collection.MyDataProvider;
+import com.anything.momeogji.mydata.collection.cardapproval.CardApprovalParser;
+import com.anything.momeogji.mydata.collection.cardapproval.CardApprovalValidator;
+import com.anything.momeogji.mydata.collection.cardlist.ConsentedCardIdSelector;
+import com.anything.momeogji.mydata.collection.cardlist.CardListValidator;
+import com.anything.momeogji.mydata.collection.model.CollectedUserMyData;
+import com.anything.momeogji.mydata.processing.MyDataPipeline;
+import com.anything.momeogji.mydata.processing.model.ProcessedUserMyData;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -51,7 +52,7 @@ class MyDataServiceTest {
     private MyDataProvider myDataProvider;
 
     @Mock
-    private MyDataTransformer myDataTransformer;
+    private MyDataPipeline myDataPipeline;
 
     private MyDataService myDataService;
 
@@ -64,10 +65,10 @@ class MyDataServiceTest {
                 new ObjectMapper(),
                 myDataProvider,
                 new CardListValidator(),
-                new CardListParser(),
+                new ConsentedCardIdSelector(),
                 new CardApprovalValidator(),
                 new CardApprovalParser(),
-                myDataTransformer
+                myDataPipeline
         );
     }
 
@@ -76,25 +77,25 @@ class MyDataServiceTest {
      */
     @Test
     void process는_수집_결과를_한_번만_가공한다() {
-        given(myDataProvider.fetchCardList(1L, "0", null, 500))
+        given(myDataProvider.fetchCardListRawJson(1L, "0", null, 500))
                 .willReturn(EMPTY_CARD_LIST_RESPONSE);
-        TransformedUserMyData transformed = new TransformedUserMyData(
+        ProcessedUserMyData processed = new ProcessedUserMyData(
                 1L,
                 List.of()
         );
         LocalTime meetingTime = LocalTime.of(12, 0);
-        given(myDataTransformer.transform(any(UserMyData.class), eq(meetingTime), eq("FD6")))
-                .willReturn(transformed);
+        given(myDataPipeline.execute(any(CollectedUserMyData.class), eq(meetingTime), eq("FD6")))
+                .willReturn(processed);
 
-        TransformedUserMyData result = myDataService.process(
+        ProcessedUserMyData result = myDataService.process(
                 1L,
                 meetingTime,
                 "식사"
         );
 
-        assertThat(result).isSameAs(transformed);
-        verify(myDataProvider).fetchCardList(1L, "0", null, 500);
-        verify(myDataProvider, never()).fetchDomesticApprovals(
+        assertThat(result).isSameAs(processed);
+        verify(myDataProvider).fetchCardListRawJson(1L, "0", null, 500);
+        verify(myDataProvider, never()).fetchApprovalDomesticRawJson(
                 any(),
                 any(),
                 any(LocalDate.class),
@@ -103,9 +104,9 @@ class MyDataServiceTest {
                 eq(500)
         );
 
-        ArgumentCaptor<UserMyData> userMyDataCaptor =
-                ArgumentCaptor.forClass(UserMyData.class);
-        verify(myDataTransformer).transform(
+        ArgumentCaptor<CollectedUserMyData> userMyDataCaptor =
+                ArgumentCaptor.forClass(CollectedUserMyData.class);
+        verify(myDataPipeline).execute(
                 userMyDataCaptor.capture(),
                 eq(meetingTime),
                 eq("FD6")
@@ -123,7 +124,7 @@ class MyDataServiceTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("meetingTime은 필수입니다.");
 
-        verifyNoInteractions(myDataProvider, myDataTransformer);
+        verifyNoInteractions(myDataProvider, myDataPipeline);
     }
 
     /**
@@ -132,21 +133,21 @@ class MyDataServiceTest {
     @ParameterizedTest
     @ValueSource(strings = {"카페", "디저트"})
     void 카페와_디저트_목적은_CE7로_변환한다(String purpose) {
-        given(myDataProvider.fetchCardList(1L, "0", null, 500))
+        given(myDataProvider.fetchCardListRawJson(1L, "0", null, 500))
                 .willReturn(EMPTY_CARD_LIST_RESPONSE);
-        TransformedUserMyData transformed = new TransformedUserMyData(1L, List.of());
+        ProcessedUserMyData processed = new ProcessedUserMyData(1L, List.of());
         LocalTime meetingTime = LocalTime.of(15, 0);
-        given(myDataTransformer.transform(any(UserMyData.class), eq(meetingTime), eq("CE7")))
-                .willReturn(transformed);
+        given(myDataPipeline.execute(any(CollectedUserMyData.class), eq(meetingTime), eq("CE7")))
+                .willReturn(processed);
 
-        TransformedUserMyData result = myDataService.process(
+        ProcessedUserMyData result = myDataService.process(
                 1L,
                 meetingTime,
                 "  " + purpose + "  "
         );
 
-        assertThat(result).isSameAs(transformed);
-        verify(myDataTransformer).transform(any(UserMyData.class), eq(meetingTime), eq("CE7"));
+        assertThat(result).isSameAs(processed);
+        verify(myDataPipeline).execute(any(CollectedUserMyData.class), eq(meetingTime), eq("CE7"));
     }
 
     /**
@@ -155,21 +156,21 @@ class MyDataServiceTest {
     @ParameterizedTest
     @ValueSource(strings = {"식사", "술자리", "회식", "미팅"})
     void 일반_목적은_FD6로_변환한다(String purpose) {
-        given(myDataProvider.fetchCardList(1L, "0", null, 500))
+        given(myDataProvider.fetchCardListRawJson(1L, "0", null, 500))
                 .willReturn(EMPTY_CARD_LIST_RESPONSE);
-        TransformedUserMyData transformed = new TransformedUserMyData(1L, List.of());
+        ProcessedUserMyData processed = new ProcessedUserMyData(1L, List.of());
         LocalTime meetingTime = LocalTime.of(19, 0);
-        given(myDataTransformer.transform(any(UserMyData.class), eq(meetingTime), eq("FD6")))
-                .willReturn(transformed);
+        given(myDataPipeline.execute(any(CollectedUserMyData.class), eq(meetingTime), eq("FD6")))
+                .willReturn(processed);
 
-        TransformedUserMyData result = myDataService.process(
+        ProcessedUserMyData result = myDataService.process(
                 1L,
                 meetingTime,
                 purpose
         );
 
-        assertThat(result).isSameAs(transformed);
-        verify(myDataTransformer).transform(any(UserMyData.class), eq(meetingTime), eq("FD6"));
+        assertThat(result).isSameAs(processed);
+        verify(myDataPipeline).execute(any(CollectedUserMyData.class), eq(meetingTime), eq("FD6"));
     }
 
     /**
@@ -181,7 +182,7 @@ class MyDataServiceTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("purpose는 필수입니다.");
 
-        verifyNoInteractions(myDataProvider, myDataTransformer);
+        verifyNoInteractions(myDataProvider, myDataPipeline);
     }
 
     /**
@@ -189,13 +190,13 @@ class MyDataServiceTest {
      */
     @Test
     void 기존_collect는_가공_컴포넌트를_호출하지_않는다() {
-        given(myDataProvider.fetchCardList(1L, "0", null, 500))
+        given(myDataProvider.fetchCardListRawJson(1L, "0", null, 500))
                 .willReturn(EMPTY_CARD_LIST_RESPONSE);
 
-        UserMyData result = myDataService.collect(1L);
+        CollectedUserMyData result = myDataService.collect(1L);
 
         assertThat(result.userId()).isEqualTo(1L);
         assertThat(result.approvals()).isEmpty();
-        verifyNoInteractions(myDataTransformer);
+        verifyNoInteractions(myDataPipeline);
     }
 }

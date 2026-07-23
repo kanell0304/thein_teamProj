@@ -1,9 +1,10 @@
 package com.anything.momeogji.mydata;
 
-import com.anything.momeogji.mydata.cardapproval.CardApprovalResponse;
-import com.anything.momeogji.mydata.cardapproval.CardApprovalValidator;
-import com.anything.momeogji.mydata.cardlist.CardListResponse;
-import com.anything.momeogji.mydata.cardlist.CardListValidator;
+import com.anything.momeogji.mydata.collection.DummyMyDataProvider;
+import com.anything.momeogji.mydata.collection.cardapproval.CardApprovalResponse;
+import com.anything.momeogji.mydata.collection.cardapproval.CardApprovalValidator;
+import com.anything.momeogji.mydata.collection.cardlist.CardListResponse;
+import com.anything.momeogji.mydata.collection.cardlist.CardListValidator;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
@@ -85,16 +86,16 @@ class DummyMyDataFixtureTest {
         assertThat(user01.searchTimestamp()).isEqualTo("20260722090000");
         assertThat(user02.searchTimestamp()).isEqualTo("20260722090000");
         assertThat(user03.searchTimestamp()).isEqualTo("20260722090000");
-        assertThat(user01.cards()).extracting(CardListResponse.CardItem::consented)
+        assertThat(user01.cards()).extracting(CardListResponse.CardItem::transferConsented)
                 .containsExactly(true, true, false);
-        assertThat(user02.cards()).extracting(CardListResponse.CardItem::consented)
+        assertThat(user02.cards()).extracting(CardListResponse.CardItem::transferConsented)
                 .containsOnly(true);
-        assertThat(user03.cards()).extracting(CardListResponse.CardItem::consented)
+        assertThat(user03.cards()).extracting(CardListResponse.CardItem::transferConsented)
                 .containsOnly(true);
         assertThat(List.of(user01, user02, user03))
                 .flatExtracting(CardListResponse::cards)
                 .allSatisfy(card -> {
-                    assertThat(card.memberCode()).isEqualTo("1");
+                    assertThat(card.cardMemberCode()).isEqualTo("1");
                     assertThat(card.maskedCardNumber()).contains("******");
                 });
     }
@@ -115,15 +116,15 @@ class DummyMyDataFixtureTest {
         assertThat(third.approvalCount()).isEqualTo(20);
         assertThat(third.nextPage()).isNull();
 
-        assertThatThrownBy(() -> provider.fetchDomesticApprovals(
+        assertThatThrownBy(() -> provider.fetchApprovalDomesticRawJson(
                 2L, "001", FROM_DATE, TO_DATE, "page-2", 500
         )).isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("nextPage 형식");
-        assertThatThrownBy(() -> provider.fetchDomesticApprovals(
+        assertThatThrownBy(() -> provider.fetchApprovalDomesticRawJson(
                 2L, "001", FROM_DATE, TO_DATE, "../page-002", 500
         )).isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("nextPage 형식");
-        assertThatThrownBy(() -> provider.fetchDomesticApprovals(
+        assertThatThrownBy(() -> provider.fetchApprovalDomesticRawJson(
                 1L, "003", FROM_DATE, TO_DATE, null, 500
         )).isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("approval-domestic-003-page-001.json");
@@ -248,7 +249,7 @@ class DummyMyDataFixtureTest {
     private CardListResponse cardList(Long userId) {
         try {
             CardListResponse response = objectMapper.readValue(
-                    provider.fetchCardList(userId, "0", null, 500),
+                    provider.fetchCardListRawJson(userId, "0", null, 500),
                     CardListResponse.class
             );
             cardListValidator.validate(response);
@@ -261,7 +262,7 @@ class DummyMyDataFixtureTest {
     private CardApprovalResponse approvalPage(Long userId, String cardId, String nextPage) {
         try {
             CardApprovalResponse response = objectMapper.readValue(
-                    provider.fetchDomesticApprovals(
+                    provider.fetchApprovalDomesticRawJson(
                             userId, cardId, FROM_DATE, TO_DATE, nextPage, 500
                     ),
                     CardApprovalResponse.class
@@ -275,7 +276,7 @@ class DummyMyDataFixtureTest {
 
     private void assertCardTypesSorted(CardListResponse response) {
         List<String> types = response.cards().stream()
-                .map(CardListResponse.CardItem::typeCode)
+                .map(CardListResponse.CardItem::cardTypeCode)
                 .toList();
         assertThat(types).isSortedAccordingTo(Comparator.naturalOrder());
     }
