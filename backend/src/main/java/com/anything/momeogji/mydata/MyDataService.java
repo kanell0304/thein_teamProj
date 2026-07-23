@@ -1,21 +1,23 @@
 package com.anything.momeogji.mydata;
 
-import com.anything.momeogji.mydata.cardapproval.CardApprovalParser;
-import com.anything.momeogji.mydata.cardapproval.CardApprovalResponse;
-import com.anything.momeogji.mydata.cardapproval.CardApprovalValidator;
-import com.anything.momeogji.mydata.cardlist.CardListParser;
-import com.anything.momeogji.mydata.cardlist.CardListResponse;
-import com.anything.momeogji.mydata.cardlist.CardListValidator;
-import com.anything.momeogji.mydata.model.CardApprovalData;
-import com.anything.momeogji.mydata.model.UserMyData;
-import com.anything.momeogji.mydata.transform.MyDataTransformer;
-import com.anything.momeogji.mydata.transform.model.TimeBand;
-import com.anything.momeogji.mydata.transform.model.TransformedUserMyData;
+import com.anything.momeogji.mydata.collection.MyDataProvider;
+import com.anything.momeogji.mydata.collection.cardapproval.CardApprovalParser;
+import com.anything.momeogji.mydata.collection.cardapproval.CardApprovalResponse;
+import com.anything.momeogji.mydata.collection.cardapproval.CardApprovalValidator;
+import com.anything.momeogji.mydata.collection.cardlist.ConsentedCardIdSelector;
+import com.anything.momeogji.mydata.collection.cardlist.CardListResponse;
+import com.anything.momeogji.mydata.collection.cardlist.CardListValidator;
+import com.anything.momeogji.mydata.collection.model.CardApprovalData;
+import com.anything.momeogji.mydata.collection.model.CollectedUserMyData;
+import com.anything.momeogji.mydata.processing.MyDataPipeline;
+import com.anything.momeogji.mydata.processing.model.MyDataRestaurantData;
+import com.anything.momeogji.mydata.retry.MyDataExternalCallRetryExecutor;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -30,7 +32,8 @@ import java.util.Set;
  *
  * 카드 목록과 승인내역의 모든 페이지를 순서대로 처리한다.
  * 처리 중 한 단계라도 실패하면 부분 결과를 반환하지 않고 예외를 전달한다.
- * {@link #collectTransformed(Long, TimeBand)}를 호출하면 수집 결과를 {@link MyDataTransformer}에 전달한다.
+ * {@link #process(Long, LocalTime, String)}를 호출하면 수집 결과와 옵션 계층에서 받은 선택 시각·목적을
+ * {@link MyDataPipeline}에 전달한다.
  * 참가자 단위 비동기 실행, 동의 여부 판단과 실패 상태 기록은 이후 이 서비스를 호출하는 상위 계층이 담당한다.
  */
 @Service
@@ -38,14 +41,18 @@ public class MyDataService {
 
     private static final String FIRST_SEARCH_TIMESTAMP = "0";
     private static final int PAGE_LIMIT = 500;
+    private static final String RESTAURANT_CATEGORY_GROUP_CODE = "FD6";
+    private static final String CAFE_CATEGORY_GROUP_CODE = "CE7";
+    private static final Set<String> CAFE_PURPOSES = Set.of("카페", "디저트");
 
     private final ObjectMapper objectMapper;
     private final MyDataProvider myDataProvider;
     private final CardListValidator cardListValidator;
-    private final CardListParser cardListParser;
+    private final ConsentedCardIdSelector consentedCardIdSelector;
     private final CardApprovalValidator cardApprovalValidator;
     private final CardApprovalParser cardApprovalParser;
-    private final MyDataTransformer myDataTransformer;
+    private final MyDataPipeline myDataPipeline;
+    private final MyDataExternalCallRetryExecutor externalCallRetryExecutor;
 
     /**
      * 마이데이터 수집과 최종 가공에 필요한 Provider와 단계별 처리 구성요소를 주입받는다.
@@ -53,44 +60,47 @@ public class MyDataService {
      * @param objectMapper Raw JSON을 응답 DTO로 역직렬화하는 Jackson 매퍼
      * @param myDataProvider Dummy 또는 실제 API에서 Raw JSON을 가져오는 Provider
      * @param cardListValidator 카드 목록 응답 검증기
-     * @param cardListParser 동의 카드 ID 추출기
+     * @param consentedCardIdSelector 동의 카드 ID 추출기
      * @param cardApprovalValidator 국내 승인내역 응답 검증기
      * @param cardApprovalParser 국내 승인내역 내부 모델 변환기
-     * @param myDataTransformer 수집된 참가자 마이데이터를 최종 가맹점 분류 결과로 가공하는 컴포넌트
+     * @param myDataPipeline 수집된 참가자 마이데이터를 최종 가맹점 분류 결과로 가공하는 컴포넌트
+     * @param externalCallRetryExecutor 일시적인 외부 Provider 실패를 요청 단위로 한 번 재시도하는 실행기
      */
     public MyDataService(
             ObjectMapper objectMapper,
             MyDataProvider myDataProvider,
             CardListValidator cardListValidator,
-            CardListParser cardListParser,
+            ConsentedCardIdSelector consentedCardIdSelector,
             CardApprovalValidator cardApprovalValidator,
             CardApprovalParser cardApprovalParser,
-            MyDataTransformer myDataTransformer
+            MyDataPipeline myDataPipeline,
+            MyDataExternalCallRetryExecutor externalCallRetryExecutor
     ) {
         this.objectMapper = objectMapper;
         this.myDataProvider = myDataProvider;
         this.cardListValidator = cardListValidator;
-        this.cardListParser = cardListParser;
+        this.consentedCardIdSelector = consentedCardIdSelector;
         this.cardApprovalValidator = cardApprovalValidator;
         this.cardApprovalParser = cardApprovalParser;
-        this.myDataTransformer = myDataTransformer;
+        this.myDataPipeline = myDataPipeline;
+        this.externalCallRetryExecutor = externalCallRetryExecutor;
     }
 
     /**
-     * 지정한 참가자의 동의 카드와 국내 승인내역을 수집해 하나의 결과로 반환한다.
+     * 지정한 사용자의 동의 카드와 국내 승인내역을 수집해 하나의 결과로 반환한다.
      *
-     * 정상적으로 조회했지만 동의 카드 또는 승인내역이 없으면 참가자 ID와 빈 승인내역 목록을 가진 {@link UserMyData}를 반환
+     * 정상적으로 조회했지만 동의 카드 또는 승인내역이 없으면 사용자 ID와 빈 승인내역 목록을 가진 {@link CollectedUserMyData}를 반환
      * Provider 호출, JSON 역직렬화, 응답 검증 또는 파싱이 실패하면 부분 결과를 반환하지 않는다.
      *
-     * @param participantId 모임 참가자를 식별하는 내부 ID
-     * @return 참가자 ID와 모든 동의 카드의 정제된 승인내역을 포함하는 불변 결과
-     * @throws IllegalArgumentException 참가자 ID가 없거나 0 이하인 경우
+     * @param userId 마이데이터를 제공한 사용자를 식별하는 내부 ID
+     * @return 사용자 ID와 모든 동의 카드의 정제된 승인내역을 포함하는 불변 결과
+     * @throws IllegalArgumentException 사용자 ID가 없거나 0 이하인 경우
      * @throws IllegalStateException JSON 역직렬화 또는 페이지 반복 상태가 올바르지 않은 경우
      */
-    public UserMyData collect(Long participantId) {
-        // 수집 시작 전에 참가자 ID가 Dummy 경로와 내부 결과에 사용할 수 있는 양수인지 검사한다.
-        if (participantId == null || participantId <= 0) {
-            throw new IllegalArgumentException("participantId는 1 이상이어야 합니다.");
+    public CollectedUserMyData collect(Long userId) {
+        // 수집 시작 전에 사용자 ID가 Dummy 경로와 내부 결과에 사용할 수 있는 양수인지 검사한다.
+        if (userId == null || userId <= 0) {
+            throw new IllegalArgumentException("userId는 1 이상이어야 합니다.");
         }
 
         // 한 번의 수집에 포함된 모든 카드와 페이지가 동일한 조회 종료일을 사용하도록 당일을 한 번만 계산한다.
@@ -99,48 +109,77 @@ public class MyDataService {
         LocalDate fromDate = toDate.minusYears(1);
 
         // 카드 목록의 모든 페이지를 처리해 전송에 동의한 카드 ID만 원본 순서대로 수집한다.
-        List<String> consentedCardIds = collectConsentedCardIds(participantId);
+        List<String> consentedCardIds = collectConsentedCardIds(userId);
 
-        // 동의 카드 순서대로 국내 승인내역을 수집해 하나의 참가자 결과 목록으로 합친다.
+        // 동의 카드 순서대로 국내 승인내역을 수집해 하나의 사용자 결과 목록으로 합친다.
         List<CardApprovalData> approvals = new ArrayList<>();
         for (String cardId : consentedCardIds) {
-            approvals.addAll(collectCardApprovals(participantId, cardId, fromDate, toDate));
+            approvals.addAll(collectCardApprovals(userId, cardId, fromDate, toDate));
         }
 
-        // 정상적인 빈 결과를 포함해 참가자 ID와 승인내역을 불변 결과로 반환한다.
-        return new UserMyData(participantId, approvals);
+        // 정상적인 빈 결과를 포함해 사용자 ID와 승인내역을 불변 결과로 반환한다.
+        return new CollectedUserMyData(userId, approvals);
     }
 
     /**
-     * 지정한 참가자의 마이데이터를 수집한 뒤 선택 시간대의 최종 가맹점 분류 결과까지 가공한다.
+     * 지정한 사용자의 마이데이터를 수집한 뒤 선택 시각이 속한 시간대의 최종 가맹점 분류 결과까지 가공한다.
      *
      * <p>마이데이터 제공에 동의한 참가자에 대해서만 상위 계층이 이 메서드를 호출해야 한다.
-     * 선택 시간대가 잘못된 경우 카드 목록이나 외부 장소 API를 호출하기 전에 즉시 실패한다.</p>
+     * 선택 시각이 잘못된 경우 카드 목록이나 외부 장소 API를 호출하기 전에 즉시 실패한다.</p>
      *
-     * <p>카드나 승인내역이 없거나 선택 시간대에 해당하는 결제가 없으면 참가자 ID와
-     * 시간대를 포함한 빈 분류 목록을 정상 반환한다. 수집·정제·집계 중 발생한 데이터 오류는
+     * <p>카드나 승인내역이 없거나 선택 시각이 속한 시간대에 해당하는 결제가 없으면
+     * 빈 음식점 목록을 정상 반환한다. 수집·정제·집계 중 발생한 데이터 오류는
      * 부분 결과로 바꾸지 않고 호출자에게 전달한다.</p>
      *
-     * @param participantId 모임 참가자를 식별하는 내부 ID
-     * @param selectedTimeBand 주최자 옵션에서 결정한 마이데이터 가공 대상 시간대
-     * @return 참가자 ID와 선택 시간대, 최종 가맹점 분류 결과를 포함한 불변 데이터
-     * @throws IllegalArgumentException 선택 시간대가 없거나 참가자 ID가 올바르지 않은 경우
+     * @param userId 마이데이터를 제공한 사용자를 식별하는 내부 ID
+     * @param meetingTime 옵션 계층에서 검증한 마이데이터 필터 기준 시각
+     * @param purpose 모임에서 선택한 목적. 카페·디저트는 카페, 나머지는 음식점 검색에 사용
+     * @return 카카오 장소명과 음식 카테고리만 포함한 불변 음식점 목록
+     * @throws IllegalArgumentException 선택 시각이 없거나 사용자 ID가 올바르지 않은 경우
      * @throws IllegalStateException 마이데이터 수집·역직렬화·페이지 처리에 실패한 경우
      */
-    public TransformedUserMyData collectTransformed(
-            Long participantId,
-            TimeBand selectedTimeBand
+    public List<MyDataRestaurantData> process(
+            Long userId,
+            LocalTime meetingTime,
+            String purpose
     ) {
-        // 잘못된 요청에서 카드 목록 수집 비용이 발생하지 않도록 선택 시간대를 먼저 검증한다.
-        if (selectedTimeBand == null) {
-            throw new IllegalArgumentException("selectedTimeBand는 필수입니다.");
+        // 잘못된 요청에서 카드 목록 수집 비용이 발생하지 않도록 선택 시각을 먼저 검증한다.
+        if (meetingTime == null) {
+            throw new IllegalArgumentException("meetingTime은 필수입니다.");
         }
 
-        // 기존 수집 흐름을 한 번만 호출해 참가자의 모든 동의 카드 승인내역을 가져온다.
-        UserMyData userMyData = collect(participantId);
+        // 잘못된 목적에서 카드 수집 비용이 발생하지 않도록 목적을 먼저 그룹 코드로 변환한다.
+        String categoryGroupCode = resolveCategoryGroupCode(purpose);
 
-        // 수집 결과를 정제·시간대 집계·가맹점 분류 파이프라인에 전달한다.
-        return myDataTransformer.transform(userMyData, selectedTimeBand);
+        // 기존 수집 흐름을 한 번만 호출해 사용자의 모든 동의 카드 승인내역을 가져온다.
+        CollectedUserMyData userMyData = collect(userId);
+
+        // 수집 결과와 일회성 필터 시각·목적 그룹을 정제·집계·가맹점 분류 파이프라인에 전달한다.
+        return myDataPipeline.execute(
+                userMyData,
+                meetingTime,
+                categoryGroupCode
+        );
+    }
+
+    /**
+     * 모임 목적을 카카오 키워드 검색에서 사용할 음식점 또는 카페 그룹 코드로 변환한다.
+     *
+     * @param purpose Meetup에 저장된 모임 목적 문자열
+     * @return 카페·디저트면 {@code CE7}, 그 외 유효한 목적이면 {@code FD6}
+     * @throws IllegalArgumentException 목적이 null 또는 공백인 경우
+     */
+    private String resolveCategoryGroupCode(String purpose) {
+        // 목적은 카드 수집과 외부 장소 검색의 필수 조건이므로 미입력 값을 거부한다.
+        if (purpose == null || purpose.isBlank()) {
+            throw new IllegalArgumentException("purpose는 필수입니다.");
+        }
+
+        // UI에서 선택한 목적의 앞뒤 공백을 제거해 고정된 카페 관련 옵션과 비교한다.
+        String normalizedPurpose = purpose.strip();
+        return CAFE_PURPOSES.contains(normalizedPurpose)
+                ? CAFE_CATEGORY_GROUP_CODE
+                : RESTAURANT_CATEGORY_GROUP_CODE;
     }
 
     /**
@@ -149,10 +188,10 @@ public class MyDataService {
      * 최초 페이지는 조회 타임스탬프 {@code 0}으로 요청하고, 이후 페이지는 직전 응답의 {@code next_page}만 사용
      * 페이지 간 카드 ID 중복과 페이지 토큰 반복은 정상 응답으로 보지 않는다.
      *
-     * @param participantId 카드 목록을 조회할 참가자 내부 ID
+     * @param userId 카드 목록을 조회할 사용자 내부 ID
      * @return 응답에 처음 등장한 순서를 유지한 동의 카드 ID 불변 목록
      */
-    private List<String> collectConsentedCardIds(Long participantId) {
+    private List<String> collectConsentedCardIds(Long userId) {
         List<String> consentedCardIds = new ArrayList<>();
         Set<String> visitedCardIds = new HashSet<>();
         Set<String> visitedNextPages = new HashSet<>();
@@ -161,19 +200,23 @@ public class MyDataService {
         while (true) {
             // 최초 페이지에는 0을 전달하고 다음 페이지 요청에서는 search_timestamp를 제외한다.
             String searchTimestamp = nextPage == null ? FIRST_SEARCH_TIMESTAMP : null;
+            String requestNextPage = nextPage;
 
-            // 현재 페이지 조건으로 카드 목록 Raw JSON을 Provider에 요청한다.
-            String rawJson = myDataProvider.fetchCardList(
-                    participantId,
-                    searchTimestamp,
-                    nextPage,
-                    PAGE_LIMIT
+            // 현재 페이지 조건의 외부 Provider 요청만 일시적 실패 시 한 번 재시도한다.
+            String rawJson = externalCallRetryExecutor.execute(
+                    "카드 목록 조회",
+                    () -> myDataProvider.fetchCardListRawJson(
+                            userId,
+                            searchTimestamp,
+                            requestNextPage,
+                            PAGE_LIMIT
+                    )
             );
 
             // 카드 목록 Raw JSON을 응답 DTO로 역직렬화한다.
             CardListResponse response = deserialize(rawJson, CardListResponse.class,
-                    "카드 목록 응답(participantId=" + participantId  + ", nextPage=" +
-                            (nextPage == null ? "FIRST" : nextPage) + ")");
+                    "카드 목록 응답(userId=" + userId  + ", nextPage=" +
+                            (requestNextPage == null ? "FIRST" : requestNextPage) + ")");
 
             // 동의 카드 추출 전에 현재 페이지의 응답 상태와 필드 규칙을 검증한다.
             cardListValidator.validate(response);
@@ -188,7 +231,7 @@ public class MyDataService {
             }
 
             // 검증된 현재 페이지에서 전송에 동의한 카드 ID만 추출한다.
-            List<String> currentPageCardIds = cardListParser.parseConsentedCardIds(response);
+            List<String> currentPageCardIds = consentedCardIdSelector.selectCardIds(response);
 
             // 현재 페이지의 동의 카드 ID를 카드 목록의 원본 순서대로 전체 결과에 추가한다.
             consentedCardIds.addAll(currentPageCardIds);
@@ -217,27 +260,38 @@ public class MyDataService {
     /**
      * 카드 한 장의 국내 승인내역을 마지막 페이지까지 조회해 정제 데이터로 변환
      *
-     * @param participantId 승인내역을 조회할 참가자 내부 ID
+     * @param userId 승인내역을 조회할 사용자 내부 ID
      * @param cardId 카드 목록 응답에서 얻은 동의 카드 고유 식별자
      * @param fromDate 모든 페이지에 동일하게 전달할 조회 시작일
      * @param toDate 모든 페이지에 동일하게 전달할 조회 종료일
      * @return 페이지와 응답 내부 순서를 유지한 카드 승인내역 목록
      */
-    private List<CardApprovalData> collectCardApprovals(Long participantId, String cardId, LocalDate fromDate,
+    private List<CardApprovalData> collectCardApprovals(Long userId, String cardId, LocalDate fromDate,
                                                         LocalDate toDate) {
         List<CardApprovalData> approvals = new ArrayList<>();
         Set<String> visitedNextPages = new HashSet<>();
         String nextPage = null;
 
         while (true) {
-            // 수집 시작 시 계산한 동일 기간과 현재 페이지 토큰으로 카드 승인내역을 요청한다.
-            String rawJson = myDataProvider.fetchDomesticApprovals(participantId, cardId, fromDate, toDate,
-                    nextPage, PAGE_LIMIT);
+            String requestNextPage = nextPage;
+
+            // 동일 기간·페이지 조건의 외부 Provider 요청만 일시적 실패 시 한 번 재시도한다.
+            String rawJson = externalCallRetryExecutor.execute(
+                    "국내 승인내역 조회",
+                    () -> myDataProvider.fetchApprovalDomesticRawJson(
+                            userId,
+                            cardId,
+                            fromDate,
+                            toDate,
+                            requestNextPage,
+                            PAGE_LIMIT
+                    )
+            );
 
             // 국내 승인내역 Raw JSON을 응답 DTO로 역직렬화한다.
             CardApprovalResponse response = deserialize(rawJson, CardApprovalResponse.class,
-                    "국내 승인내역 응답(participantId=" + participantId + ", cardId=" + cardId + ", nextPage=" +
-                            (nextPage == null ? "FIRST" : nextPage) + ")");
+                    "국내 승인내역 응답(userId=" + userId + ", cardId=" + cardId + ", nextPage=" +
+                            (requestNextPage == null ? "FIRST" : requestNextPage) + ")");
 
             // 내부 승인 데이터로 변환하기 전에 현재 페이지의 상태와 필드 규칙을 검증한다.
             cardApprovalValidator.validate(response);

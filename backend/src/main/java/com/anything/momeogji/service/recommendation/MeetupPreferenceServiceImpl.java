@@ -10,10 +10,14 @@ import com.anything.momeogji.entity.recommendation.Meetup;
 import com.anything.momeogji.entity.recommendation.MeetupParticipant;
 import com.anything.momeogji.entity.recommendation.ParticipantPreference;
 import com.anything.momeogji.entity.recommendation.SubmissionStatus;
+import com.anything.momeogji.mydata.MyDataService;
+import com.anything.momeogji.mydata.processing.model.MyDataRestaurantData;
 import com.anything.momeogji.repository.MeetupParticipantRepository;
 import com.anything.momeogji.repository.MeetupRepository;
 import com.anything.momeogji.repository.ParticipantPreferenceRepository;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,12 +27,13 @@ import java.util.List;
 @RequiredArgsConstructor
 public class MeetupPreferenceServiceImpl implements MeetupPreferenceService {
 
+    private static final Logger log = LoggerFactory.getLogger(MeetupPreferenceServiceImpl.class);
+
     private final MeetupRepository meetupRepository;
     private final MeetupParticipantRepository meetupParticipantRepository;
     private final ParticipantPreferenceRepository participantPreferenceRepository;
-    private final ParticipantPreferenceUpserter participantPreferenceUpserter;
-    private final MyDataConsentProcessor myDataConsentProcessor;
-    private final MyDataCategoryEnricher myDataCategoryEnricher;
+    private final MyDataService myDataService;
+    private final MeetupMyDataResultStore meetupMyDataResultStore;
     private final RecommendationRoundService recommendationRoundService;
     private final MeetupService meetupService;
     private final RecommendationEventPublisher eventPublisher;
@@ -40,12 +45,47 @@ public class MeetupPreferenceServiceImpl implements MeetupPreferenceService {
         MeetupParticipant participant = meetupParticipantRepository.findByMeetupIdAndUserId(meetupId, callerId)
                 .orElseThrow(() -> new IllegalArgumentException("초대받은 참여자만 개인 선호를 제출할 수 있습니다."));
 
-        PersonalOptionRequest option = new PersonalOptionRequest(callerId, request.walkMinutes(),
-                request.preferredCategories(), request.budgetLimit(), request.parkingNeeded(),
-                request.excludedFoods(), request.atmosphere());
-        participantPreferenceUpserter.upsert(participant, option);
+        if (participantPreferenceRepository.existsByMeetupParticipantId(participant.getId())) {
+            throw new IllegalStateException("개인 옵션은 한 번만 제출할 수 있습니다.");
+        }
+
+        participantPreferenceRepository.save(ParticipantPreference.builder()
+                .meetupParticipant(participant)
+                .walkMinutes(request.walkMinutes())
+                .preferredCategories(request.preferredCategories())
+                .budgetLimit(request.budgetLimit())
+                .parkingNeeded(request.parkingNeeded())
+                .excludedFoods(request.excludedFoods())
+                .atmosphere(request.atmosphere())
+                .myDataConsent(request.myDataConsent())
+                .build());
         participant.markSubmitted();
-        myDataConsentProcessor.process(participant, request.myDataConsent(), meetup.getMeetingTime());
+
+        if (request.myDataConsent()) {
+            try {
+                // 모임 시각과 목적을 함께 전달해 시간대·음식점/카페 범위에 맞는 MyData만 처리한다.
+                List<MyDataRestaurantData> myDataRestaurants = myDataService.process(
+                        callerId,
+                        meetup.getMeetingTime().toLocalTime(),
+                        meetup.getPurpose()
+                );
+
+                // 추천 시작 시 전체 참여자의 결과를 합칠 수 있도록 모임·사용자 키로 임시 보관한다.
+                meetupMyDataResultStore.save(
+                        meetupId,
+                        callerId,
+                        myDataRestaurants
+                );
+            } catch (RuntimeException exception) {
+                // 선택 기능인 MyData 실패가 개인 옵션 저장과 전체 추천 진행을 막지 않게 격리한다.
+                log.warn(
+                        "개인 옵션 제출 중 MyData 처리를 생략했습니다. meetupId={}, userId={}",
+                        meetupId,
+                        callerId,
+                        exception
+                );
+            }
+        }
 
         List<ParticipantSummaryResponse> participants = meetupService.listParticipants(meetupId);
         eventPublisher.preferenceProgress(meetup.getChatRoom().getId(), new MeetupProgressEvent(meetupId, participants));
@@ -93,7 +133,6 @@ public class MeetupPreferenceServiceImpl implements MeetupPreferenceService {
                         preference.getExcludedFoods(),
                         preference.getAtmosphere()))
                 .toList();
-        options = myDataCategoryEnricher.enrich(preferences, options);
         return recommendationRoundService.triggerAutoRecommendation(meetup, options);
     }
 

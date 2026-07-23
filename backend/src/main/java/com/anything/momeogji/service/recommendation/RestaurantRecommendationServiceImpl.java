@@ -49,7 +49,13 @@ public class RestaurantRecommendationServiceImpl implements RestaurantRecommenda
                 .collect(Collectors.toMap(RestaurantCandidate::id, Function.identity()));
 
         String systemPrompt = promptBuilder.buildSystemPrompt();
-        String userPrompt = promptBuilder.buildUserPrompt(request.commonOption(), condition, candidates, request.preferenceNote());
+        String userPrompt = promptBuilder.buildUserPrompt(
+                request.commonOption(),
+                condition,
+                candidates,
+                request.myDataRestaurants(),
+                request.preferenceNote()
+        );
         String rawContent = openAiChatClient.requestStructuredJson(systemPrompt, userPrompt);
 
         AiSelectionPayload payload = parsePayload(rawContent);

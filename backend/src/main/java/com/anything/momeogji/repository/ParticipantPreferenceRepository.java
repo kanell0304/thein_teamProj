@@ -8,6 +8,8 @@ import java.util.Optional;
 
 public interface ParticipantPreferenceRepository extends JpaRepository<ParticipantPreference, Long> {
 
+    boolean existsByMeetupParticipantId(Long meetupParticipantId);
+
     Optional<ParticipantPreference> findByMeetupParticipantId(Long meetupParticipantId);
 
     List<ParticipantPreference> findByMeetupParticipant_Meetup_Id(Long meetupId);

@@ -1,0 +1,190 @@
+{
+  "rsp_code": "00000",
+  "rsp_msg": "정상 처리",
+  "approved_cnt": 20,
+  "approved_list": [
+    {
+      "approved_num": "020010030001",
+      "approved_dtime": "20260603082000",
+      "status": "01",
+      "pay_type": "01",
+      "merchant_name": "삼진어묵 용산역점",
+      "merchant_regno": "000-00-10017",
+      "approved_amt": 18200
+    },
+    {
+      "approved_num": "020010030002",
+      "approved_dtime": "20260602124000",
+      "status": "01",
+      "pay_type": "01",
+      "merchant_name": "용우동 용산역점",
+      "merchant_regno": "000-00-10020",
+      "approved_amt": 24000
+    },
+    {
+      "approved_num": "020010030003",
+      "approved_dtime": "20260601191000",
+      "status": "01",
+      "pay_type": "01",
+      "merchant_name": "버거킹 신논현역점",
+      "merchant_regno": "000-00-10051",
+      "approved_amt": 32100,
+      "total_install_cnt": 6
+    },
+    {
+      "approved_num": "020010030004",
+      "approved_dtime": "20260531082000",
+      "status": "01",
+      "pay_type": "01",
+      "merchant_name": "아그라 용산아이파크몰점",
+      "merchant_regno": "000-00-10040",
+      "approved_amt": 2200
+    },
+    {
+      "approved_num": "020010030005",
+      "approved_dtime": "20260529121000",
+      "status": "02",
+      "pay_type": "01",
+      "trans_dtime": "20260530124000",
+      "merchant_name": "소녀방앗간 용산아이파크몰점",
+      "merchant_regno": "000-00-10001",
+      "approved_amt": 3900
+    },
+    {
+      "approved_num": "020010030006",
+      "approved_dtime": "20260529191000",
+      "status": "01",
+      "pay_type": "01",
+      "merchant_name": "삼송빵집 신논현점",
+      "merchant_regno": "000-00-10042",
+      "approved_amt": 5600
+    },
+    {
+      "approved_num": "020010030007",
+      "approved_dtime": "20260528082000",
+      "status": "01",
+      "pay_type": "01",
+      "merchant_name": "혼고집 용산아이파크몰점",
+      "merchant_regno": "000-00-10044",
+      "approved_amt": 7900
+    },
+    {
+      "approved_num": "020010030008",
+      "approved_dtime": "20260527124000",
+      "status": "01",
+      "pay_type": "01",
+      "merchant_name": "낙원테산도 용산아이파크몰점",
+      "merchant_regno": "000-00-10055",
+      "approved_amt": 9900
+    },
+    {
+      "approved_num": "020010030009",
+      "approved_dtime": "20260526191000",
+      "status": "01",
+      "pay_type": "01",
+      "merchant_name": "멘야서울 용산아이파크몰점",
+      "merchant_regno": "000-00-10005",
+      "approved_amt": 11200
+    },
+    {
+      "approved_num": "020010030010",
+      "approved_dtime": "20260525082000",
+      "status": "01",
+      "pay_type": "01",
+      "merchant_name": "연돈볼카츠 이마트용산점",
+      "merchant_regno": "000-00-10019",
+      "approved_amt": 13600
+    },
+    {
+      "approved_num": "020010030011",
+      "approved_dtime": "20260524124000",
+      "status": "01",
+      "pay_type": "01",
+      "merchant_name": "누들톡 신논현역점",
+      "merchant_regno": "000-00-10012",
+      "approved_amt": 18100
+    },
+    {
+      "approved_num": "020010030012",
+      "approved_dtime": "20260523191000",
+      "status": "01",
+      "pay_type": "01",
+      "merchant_name": "카페 뮬리노 용산아이파크몰점",
+      "merchant_regno": "000-00-10023",
+      "approved_amt": 24000,
+      "total_install_cnt": 12
+    },
+    {
+      "approved_num": "020010030013",
+      "approved_dtime": "20260522082000",
+      "status": "01",
+      "pay_type": "01",
+      "merchant_name": "베르그 아이파크몰 용산점",
+      "merchant_regno": "000-00-10002",
+      "approved_amt": 32000
+    },
+    {
+      "approved_num": "020010030014",
+      "approved_dtime": "20260521124000",
+      "status": "01",
+      "pay_type": "01",
+      "merchant_name": "상무초밥 강남점",
+      "merchant_regno": "000-00-10059",
+      "approved_amt": 2300
+    },
+    {
+      "approved_num": "020010030015",
+      "approved_dtime": "20260520191000",
+      "status": "01",
+      "pay_type": "01",
+      "merchant_name": "CU 용산아이파크몰점",
+      "merchant_regno": "000-00-10060",
+      "approved_amt": 3800
+    },
+    {
+      "approved_num": "020010030016",
+      "approved_dtime": "20260519082000",
+      "status": "01",
+      "pay_type": "01",
+      "merchant_name": "스타약국",
+      "merchant_regno": "000-00-10046",
+      "approved_amt": 5600
+    },
+    {
+      "approved_num": "020010030017",
+      "approved_dtime": "20260518124000",
+      "status": "01",
+      "pay_type": "01",
+      "merchant_name": "삼진어묵 용산역점",
+      "merchant_regno": "000-00-10017",
+      "approved_amt": 8100
+    },
+    {
+      "approved_num": "020010030018",
+      "approved_dtime": "20260517191000",
+      "status": "04",
+      "pay_type": "01",
+      "merchant_name": "용우동 용산역점",
+      "merchant_regno": "000-00-10020",
+      "approved_amt": 10000
+    },
+    {
+      "approved_num": "020010030019",
+      "approved_dtime": "20260516082000",
+      "status": "01",
+      "pay_type": "01",
+      "merchant_name": "원조원주추어탕 강남본점",
+      "merchant_regno": "000-00-10035",
+      "approved_amt": 11100
+    },
+    {
+      "approved_num": "020010030020",
+      "approved_dtime": "20260515124000",
+      "status": "01",
+      "pay_type": "01",
+      "merchant_name": "아그라 용산아이파크몰점",
+      "merchant_regno": "000-00-10040",
+      "approved_amt": 13600
+    }
+  ]
+}

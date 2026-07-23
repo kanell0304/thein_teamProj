@@ -19,7 +19,7 @@ import org.hibernate.type.SqlTypes;
 
 import java.util.List;
 
-/** PersonalOptionRequest와 1:1로 매칭되는 개인 옵션. */
+/** 참여자가 최초 한 번 제출한 개인 옵션과 해당 모임의 마이데이터 활용 동의를 저장한다. */
 @Entity
 @Table(name = "participant_preferences")
 @Getter
@@ -58,14 +58,9 @@ public class ParticipantPreference {
     @Column(length = 50)
     private String atmosphere;
 
-    /** 같은 참여자가 재추천 등으로 선호를 다시 제출했을 때 최신값으로 덮어쓴다. */
-    public void update(Integer walkMinutes, List<String> preferredCategories, Integer budgetLimit,
-                        boolean parkingNeeded, List<String> excludedFoods, String atmosphere) {
-        this.walkMinutes = walkMinutes;
-        this.preferredCategories = preferredCategories;
-        this.budgetLimit = budgetLimit;
-        this.parkingNeeded = parkingNeeded;
-        this.excludedFoods = excludedFoods;
-        this.atmosphere = atmosphere;
-    }
+    /** 해당 모임에서 본인이 카드 마이데이터 활용에 동의했는지 여부. */
+    @Builder.Default
+    @Column(name = "mydata_consent", nullable = false, columnDefinition = "boolean default false")
+    private boolean myDataConsent = false;
+
 }

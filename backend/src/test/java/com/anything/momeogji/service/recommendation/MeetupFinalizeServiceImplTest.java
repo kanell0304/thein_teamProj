@@ -59,6 +59,8 @@ class MeetupFinalizeServiceImplTest {
     private FinalNoticeChangeLogRepository finalNoticeChangeLogRepository;
     @Mock
     private RecommendationEventPublisher eventPublisher;
+    @Mock
+    private MeetupMyDataResultStore meetupMyDataResultStore;
 
     private Meetup meetup;
     private Member host;
@@ -108,6 +110,7 @@ class MeetupFinalizeServiceImplTest {
         assertThat(meetup.getStatus()).isEqualTo(MeetupStatus.FINALIZED);
         verify(finalNoticeRepository).save(any());
         verify(eventPublisher).finalNoticePublished(10L, response);
+        verify(meetupMyDataResultStore).clear(100L);
     }
 
     @Test
@@ -190,6 +193,7 @@ class MeetupFinalizeServiceImplTest {
 
         assertThat(response.restaurantName()).isEqualTo("맛집2");
         assertThat(meetup.getStatus()).isEqualTo(MeetupStatus.FINALIZED);
+        verify(meetupMyDataResultStore).clear(100L);
     }
 
     @Test
@@ -249,6 +253,6 @@ class MeetupFinalizeServiceImplTest {
     private MeetupFinalizeServiceImpl newService(Random random) {
         return new MeetupFinalizeServiceImpl(meetupRepository, recommendationRoundRepository, roundCandidateRepository,
                 voteRepository, meetupParticipantRepository, memberRepository, finalNoticeRepository,
-                finalNoticeChangeLogRepository, eventPublisher, random);
+                finalNoticeChangeLogRepository, eventPublisher, meetupMyDataResultStore, random);
     }
 }
