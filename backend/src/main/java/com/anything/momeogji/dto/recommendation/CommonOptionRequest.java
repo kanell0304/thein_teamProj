@@ -12,7 +12,7 @@ import java.time.LocalDateTime;
  * @param destinationLatitude  목적지 위도. 개인 옵션의 walkMinutes(도보 가능 거리)와 함께 음식점 검색 반경의 기준점이 된다.
  * @param destinationLongitude 목적지 경도.
  * @param meetingTime          약속 일시. ISO-8601 형식(예: "2026-07-20T12:00:00").
- * @param purpose               모임 목적. 예: "식사", "술자리", "회식", "미팅" 등 자유 텍스트.
+ * @param purpose               모임 목적. "식사", "미팅", "모임", "카페", "디저트", "데이트" 중 하나.
  */
 public record CommonOptionRequest(
         @NotBlank String destinationName,

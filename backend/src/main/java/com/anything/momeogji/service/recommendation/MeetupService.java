@@ -15,7 +15,8 @@ public interface MeetupService {
      * 채팅방 참여자만 모임을 만들 수 있다. 만든 사람이 호스트가 된다. voteDeadlineAt은 없으면(null) 마감 없이 진행한다.
      * participantIds로 지정한 사람들은 이 호출 즉시 PENDING 상태의 참여자로 등록되고, 초대 이벤트가 브로드캐스트된다.
      */
-    MeetupResponse createMeetup(Long chatRoomId, CommonOptionRequest commonOption, LocalDateTime voteDeadlineAt,
+    MeetupResponse createMeetup(Long chatRoomId, CommonOptionRequest commonOption,
+                                 LocalDateTime personalOptionDeadlineAt, LocalDateTime voteDeadlineAt,
                                  Integer voteDurationMinutes,
                                  List<Long> participantIds, Long hostMemberId);
 

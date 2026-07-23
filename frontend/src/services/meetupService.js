@@ -48,7 +48,12 @@ function normalizeDeadline(value) {
 }
 
 // ===== 모먹지 설정 화면 값을 POST /api/meetups 요청 DTO로 매핑 =====
-export function createMeetupRequest({ chatRoomId, settings, voteDeadlineAt = null }) {
+export function createMeetupRequest({
+  chatRoomId,
+  settings,
+  personalOptionDeadlineAt,
+  voteDeadlineAt = null,
+}) {
   const place = settings?.place
   if (!place?.name) throw new TypeError('선택한 장소 이름이 필요합니다.')
 
@@ -64,6 +69,7 @@ export function createMeetupRequest({ chatRoomId, settings, voteDeadlineAt = nul
       meetingTime: createMeetingDateTime(settings.date, settings.time),
       purpose: settings.themeLabel || settings.themeCode,
     },
+    personalOptionDeadlineAt: normalizeDeadline(personalOptionDeadlineAt),
     voteDeadlineAt: normalizeDeadline(voteDeadlineAt),
     voteDurationMinutes: Number(settings.voteDurationMinutes ?? 10),
   }
@@ -78,6 +84,7 @@ function createMockMeetup(request) {
     chatRoomId: request.chatRoomId,
     status: 'RECOMMENDING',
     commonOption: request.commonOption,
+    personalOptionDeadlineAt: request.personalOptionDeadlineAt,
     latestRound: null,
     voteDeadlineAt: request.voteDeadlineAt,
     voteDurationMinutes: request.voteDurationMinutes,

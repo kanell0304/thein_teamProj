@@ -62,6 +62,10 @@ public class Meetup {
     @Column(nullable = false, length = 50)
     private String purpose;
 
+    // 기존 로컬 데이터가 있어도 Hibernate update가 컬럼을 안전하게 추가할 수 있도록 DB null은 허용합니다.
+    @Column(name = "personal_option_deadline_at")
+    private LocalDateTime personalOptionDeadlineAt;
+
     @Column(name = "vote_deadline_at")
     private LocalDateTime voteDeadlineAt;
 

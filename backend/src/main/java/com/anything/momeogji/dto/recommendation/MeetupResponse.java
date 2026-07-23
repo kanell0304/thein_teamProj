@@ -7,6 +7,7 @@ public record MeetupResponse(
         Long chatRoomId,
         String status,
         CommonOptionRequest commonOption,
+        LocalDateTime personalOptionDeadlineAt,
         LocalDateTime voteDeadlineAt,
         Integer voteDurationMinutes,
         Long hostMemberId
