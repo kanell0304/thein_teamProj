@@ -24,7 +24,11 @@ const KEYWORD_ROW_CONFIG = [
   { type: 'RESTAURANT', label: '음식점명' },
 ]
 const DRAG_SCROLL_THRESHOLD_PX = 5
-const MAX_EXTRACTED_KEYWORDS_PER_TYPE = 10
+const MAX_EXTRACTED_KEYWORDS_PER_TYPE = 7
+const MAX_CUSTOM_MENU_LENGTH = 30
+const MAX_CUSTOM_MENU_COUNT = 7
+const MAX_SELECTED_KEYWORDS = 3
+const CUSTOM_MENU_ALLOWED_PATTERN = /^[\p{L}\p{N}\s&+·'()\u002F-]+$/u
 
 function createKeywordOption(type, name) {
   return {
@@ -40,6 +44,26 @@ function isVisibleKeywordScore(item) {
     && typeof item.name === 'string'
     && item.name.trim()
     && Number(item.score) >= 1
+}
+
+function normalizeCustomMenuInput(value) {
+  return value.replace(/\s+/g, ' ').trim()
+}
+
+function getCustomMenuInputError(value, customMenuCount) {
+  const normalizedValue = normalizeCustomMenuInput(value)
+
+  if (customMenuCount >= MAX_CUSTOM_MENU_COUNT) {
+    return `직접 추가 메뉴는 최대 ${MAX_CUSTOM_MENU_COUNT}개까지 입력할 수 있어요.`
+  }
+  if (!normalizedValue) return ''
+  if ([...normalizedValue].length > MAX_CUSTOM_MENU_LENGTH) {
+    return `메뉴는 최대 ${MAX_CUSTOM_MENU_LENGTH}자까지 입력할 수 있어요.`
+  }
+  if (!CUSTOM_MENU_ALLOWED_PATTERN.test(normalizedValue)) {
+    return '메뉴명에는 문자, 숫자, 공백과 일부 기호(&, +, ·, \', (), /, -)만 사용할 수 있어요.'
+  }
+  return ''
 }
 
 function formatLocalDate(date) {
@@ -71,8 +95,8 @@ function getNearestTimeValue(now = new Date()) {
   }, TIME_OPTIONS[0].value)
 }
 
-// ===== PersonalPreferencePage 등 다른 화면에서도 재사용하는 칩 선택 그룹 =====
-export function ChipGroup({ label, options, selected, onToggle, single = false }) {
+// ===== 공통 설정 단계에서 재사용하는 칩 선택 그룹 =====
+function ChipGroup({ label, options, selected, onToggle, single = false }) {
   return (
     <div className="ui-chip-group momeokji-chips" aria-label={label}>
       {options.map((option) => {
@@ -235,6 +259,7 @@ function MomeokjiPage({
   const [keywordScores, setKeywordScores] = useState([])
   const [customMenuOptions, setCustomMenuOptions] = useState([])
   const [selectedKeywordKeys, setSelectedKeywordKeys] = useState([])
+  const [keywordSelectionError, setKeywordSelectionError] = useState('')
   const [menuInput, setMenuInput] = useState('')
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [analysisMessage, setAnalysisMessage] = useState('')
@@ -283,6 +308,7 @@ function MomeokjiPage({
     setAnalysisMessage('')
     setKeywordScores([])
     setSelectedKeywordKeys([])
+    setKeywordSelectionError('')
 
     analyzeConversationKeywords(chatRoomId, featureStartedAt, analysisParticipantIds)
       .then((items) => {
@@ -318,7 +344,7 @@ function MomeokjiPage({
     [effectiveParticipantIds, participants],
   )
 
-  // ===== 순점수 1 이상 대화 키워드를 유형별 최대 10개로 분리 =====
+  // ===== 순점수 1 이상 대화 키워드를 유형별 최대 7개로 분리 =====
   const extractedKeywordOptions = useMemo(() => {
     const optionsByType = {
       MENU: [],
@@ -363,6 +389,11 @@ function MomeokjiPage({
     ]
     return [...new Map(options.map((option) => [option.key, option])).values()]
   }, [customMenuOptions])
+  const customMenuInputError = useMemo(
+    () => getCustomMenuInputError(menuInput, customMenuOptions.length),
+    [customMenuOptions.length, menuInput],
+  )
+  const isCustomMenuInputDisabled = customMenuOptions.length >= MAX_CUSTOM_MENU_COUNT
 
   const keywordOptions = useMemo(
     () => [
@@ -373,27 +404,75 @@ function MomeokjiPage({
     ],
     [customMenuRowOptions, extractedKeywordOptions],
   )
+  const keywordNameByKey = useMemo(
+    () => new Map(keywordOptions.map((option) => [option.key, option.name])),
+    [keywordOptions],
+  )
   const selectedKeywordNames = useMemo(() => {
-    const nameByKey = new Map(keywordOptions.map((option) => [option.key, option.name]))
     return [...new Set(
       selectedKeywordKeys
-        .map((key) => nameByKey.get(key))
+        .map((key) => keywordNameByKey.get(key))
         .filter(Boolean),
     )]
-  }, [keywordOptions, selectedKeywordKeys])
+  }, [keywordNameByKey, selectedKeywordKeys])
+  const selectedPreferenceNames = useMemo(
+    () => selectedKeywordNames.filter((name) => name !== MENU_ANY_OPTION),
+    [selectedKeywordNames],
+  )
+  const isAnyMenuSelected = selectedKeywordNames.includes(MENU_ANY_OPTION)
 
-  const toggleArrayValue = (setter, value) => {
-    setter((previous) => (
-      previous.includes(value)
-        ? previous.filter((item) => item !== value)
-        : [...previous, value]
-    ))
+  // ===== AI 후보 검색이 사용하는 상위 3개에 맞춰 선택값도 최대 3개로 제한 =====
+  const toggleKeywordSelection = (key) => {
+    const optionName = keywordNameByKey.get(key)
+    if (!optionName) return
+
+    if (selectedKeywordKeys.includes(key)) {
+      setSelectedKeywordKeys((previous) => previous.filter((item) => item !== key))
+      setKeywordSelectionError('')
+      return
+    }
+
+    if (optionName === MENU_ANY_OPTION) {
+      setSelectedKeywordKeys([key])
+      setKeywordSelectionError('')
+      return
+    }
+
+    const keysWithoutAnyOrSameName = selectedKeywordKeys.filter((selectedKey) => {
+      const selectedName = keywordNameByKey.get(selectedKey)
+      return selectedName !== MENU_ANY_OPTION && selectedName !== optionName
+    })
+    const selectedNames = new Set(
+      keysWithoutAnyOrSameName.map((selectedKey) => keywordNameByKey.get(selectedKey)),
+    )
+    if (selectedNames.size >= MAX_SELECTED_KEYWORDS) {
+      setKeywordSelectionError(
+        `추천 조건은 최대 ${MAX_SELECTED_KEYWORDS}개까지 선택할 수 있어요. 하나를 해제한 뒤 선택해주세요.`,
+      )
+      return
+    }
+
+    setSelectedKeywordKeys([...keysWithoutAnyOrSameName, key])
+    setKeywordSelectionError('')
   }
 
   // ===== 입력 메뉴를 칩으로 추가하고 즉시 선택 상태로 전환 =====
   const addCustomMenu = () => {
-    const newMenu = menuInput.trim()
-    if (!newMenu) return
+    const newMenu = normalizeCustomMenuInput(menuInput)
+    if (!newMenu || customMenuInputError) return
+
+    if (selectedPreferenceNames.includes(newMenu)) {
+      setMenuInput('')
+      setKeywordSelectionError('')
+      return
+    }
+    if (selectedPreferenceNames.length >= MAX_SELECTED_KEYWORDS) {
+      setKeywordSelectionError(
+        `추천 조건은 최대 ${MAX_SELECTED_KEYWORDS}개까지 선택할 수 있어요. 하나를 해제한 뒤 추가해주세요.`,
+      )
+      return
+    }
+
     const newMenuKey = createKeywordOption('MENU', newMenu).key
 
     setCustomMenuOptions((previous) => (
@@ -403,9 +482,15 @@ function MomeokjiPage({
         : [...previous, newMenu]
     ))
     setSelectedKeywordKeys((previous) => (
-      previous.includes(newMenuKey) ? previous : [...previous, newMenuKey]
+      previous.includes(newMenuKey)
+        ? previous
+        : [
+            ...previous.filter((key) => keywordNameByKey.get(key) !== MENU_ANY_OPTION),
+            newMenuKey,
+          ]
     ))
     setMenuInput('')
+    setKeywordSelectionError('')
   }
 
   const isStepValid = [
@@ -548,15 +633,23 @@ function MomeokjiPage({
                     label={label}
                     options={options}
                     selected={selectedKeywordKeys}
-                    onToggle={(value) => toggleArrayValue(setSelectedKeywordKeys, value)}
+                    onToggle={toggleKeywordSelection}
                   />
                 ))}
                 <KeywordRow
                   label="직접 추가 메뉴"
                   options={customMenuRowOptions}
                   selected={selectedKeywordKeys}
-                  onToggle={(value) => toggleArrayValue(setSelectedKeywordKeys, value)}
+                  onToggle={toggleKeywordSelection}
                 />
+                <p
+                  className={`momeokji-keyword-selection-status${keywordSelectionError ? ' is-error' : ''}`}
+                  aria-live="polite"
+                >
+                  {keywordSelectionError || (isAnyMenuSelected
+                    ? '아무거나는 다른 추천 조건 대신 단독으로 적용돼요.'
+                    : `추천에 반영할 항목을 최대 ${MAX_SELECTED_KEYWORDS}개 선택해주세요. (${selectedPreferenceNames.length}/${MAX_SELECTED_KEYWORDS})`)}
+                </p>
               </div>
             )}
           </div>
@@ -587,6 +680,9 @@ function MomeokjiPage({
               value={menuInput}
               onChange={setMenuInput}
               onAdd={addCustomMenu}
+              maxLength={MAX_CUSTOM_MENU_LENGTH}
+              errorMessage={customMenuInputError}
+              disabled={isCustomMenuInputDisabled}
             />
           </div>
         )}

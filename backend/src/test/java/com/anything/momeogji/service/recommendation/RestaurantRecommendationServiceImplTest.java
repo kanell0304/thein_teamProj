@@ -146,6 +146,18 @@ class RestaurantRecommendationServiceImplTest {
     }
 
     @Test
+    void AI에게_categoryPriority가_메뉴_카테고리_음식점명_통합_키워드임을_설명한다() {
+        given(openAiChatClient.requestStructuredJson(any(), any())).willReturn(VALID_RESPONSE_JSON);
+
+        service.recommend(sampleRequest(List.of(), null));
+
+        ArgumentCaptor<String> systemPromptCaptor = ArgumentCaptor.forClass(String.class);
+        verify(openAiChatClient).requestStructuredJson(systemPromptCaptor.capture(), any());
+        assertThat(systemPromptCaptor.getValue())
+                .contains("메뉴·카테고리·음식점명을 합친 선호 검색 키워드 우선순위");
+    }
+
+    @Test
     void 마이데이터_음식점_목록을_JSON_배열로_AI에게_전달한다() throws Exception {
         given(openAiChatClient.requestStructuredJson(any(), any())).willReturn(VALID_RESPONSE_JSON);
         List<MyDataRestaurantData> myDataRestaurants = List.of(

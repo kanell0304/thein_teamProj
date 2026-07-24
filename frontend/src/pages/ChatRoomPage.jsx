@@ -178,7 +178,10 @@ function toServerVoteSession(round, settings, previousSession = null) {
 
 // ===== 개인 조건 화면 값을 백엔드 PreferenceSubmitRequest 규격으로 정리 =====
 function toPreferenceRequest(preference, settings) {
-  const preferredCategories = (settings.menus ?? []).filter((menu) => menu !== '아무거나')
+  // 현재 추천 계약은 메뉴·카테고리·음식점명을 모두 카카오 검색용 선호 키워드 문자열로 집계합니다.
+  const preferredCategories = [...new Set(
+    (settings.menus ?? []).filter((menu) => menu !== '아무거나'),
+  )]
   return {
     walkMinutes: 10,
     preferredCategories: preferredCategories.length > 0
