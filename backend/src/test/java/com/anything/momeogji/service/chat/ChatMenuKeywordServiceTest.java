@@ -1,6 +1,7 @@
 package com.anything.momeogji.service.chat;
 
 import com.anything.momeogji.dto.chat.ChatMenuKeywordResponse;
+import com.anything.momeogji.dto.chat.ChatMenuKeywordScoreResponse;
 import com.anything.momeogji.entity.ChatMessage;
 import com.anything.momeogji.repository.ChatMessageRepository;
 import com.anything.momeogji.repository.ChatRoomMemberRepository;
@@ -66,7 +67,18 @@ class ChatMenuKeywordServiceTest {
                 toExclusive
         )).willReturn(messages);
         given(keywordDictionaryService.loadCandidates()).willReturn(candidates);
-        given(keywordExtractor.extract(messages, candidates)).willReturn(List.of("초밥"));
+        given(keywordExtractor.extract(messages, candidates)).willReturn(
+                new ChatKeywordAnalysisResult(
+                        List.of("초밥"),
+                        List.of(new ChatKeywordScore(
+                                "초밥",
+                                ChatKeywordCandidate.Type.MENU,
+                                2,
+                                1,
+                                1
+                        ))
+                )
+        );
 
         ChatMenuKeywordResponse response = service.extract(
                 chatRoomId,
@@ -76,6 +88,15 @@ class ChatMenuKeywordServiceTest {
         );
 
         assertThat(response.menus()).containsExactly("초밥");
+        assertThat(response.keywordScores()).containsExactly(
+                new ChatMenuKeywordScoreResponse(
+                        "초밥",
+                        ChatMenuKeywordScoreResponse.KeywordType.MENU,
+                        2,
+                        1,
+                        1
+                )
+        );
         assertThat(response.analyzedMessageCount()).isEqualTo(2);
         verify(chatMessageRepository).findParticipantMessagesInPeriod(
                 chatRoomId,

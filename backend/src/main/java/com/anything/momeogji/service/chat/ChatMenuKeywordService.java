@@ -1,6 +1,7 @@
 package com.anything.momeogji.service.chat;
 
 import com.anything.momeogji.dto.chat.ChatMenuKeywordResponse;
+import com.anything.momeogji.dto.chat.ChatMenuKeywordScoreResponse;
 import com.anything.momeogji.entity.ChatMessage;
 import com.anything.momeogji.repository.ChatMessageRepository;
 import com.anything.momeogji.repository.ChatRoomMemberRepository;
@@ -60,8 +61,20 @@ public class ChatMenuKeywordService {
         );
 
         List<ChatKeywordCandidate> candidates = keywordDictionaryService.loadCandidates();
+        ChatKeywordAnalysisResult analysis = keywordExtractor.extract(messages, candidates);
         return new ChatMenuKeywordResponse(
-                keywordExtractor.extract(messages, candidates),
+                analysis.menus(),
+                analysis.keywordScores().stream()
+                        .map(score -> new ChatMenuKeywordScoreResponse(
+                                score.name(),
+                                ChatMenuKeywordScoreResponse.KeywordType.valueOf(
+                                        score.type().name()
+                                ),
+                                score.positiveCount(),
+                                score.negativeCount(),
+                                score.score()
+                        ))
+                        .toList(),
                 messages.size()
         );
     }

@@ -24,27 +24,40 @@ public class ChatMenuKeywordExtractor {
             ChatKeywordCandidate.Type.MENU,
             ChatKeywordCandidate.Type.CATEGORY
     );
-    private static final Pattern CLAUSE_BOUNDARY = Pattern.compile("[,.!?;。\\n]");
-    private static final Pattern NEGATIVE_MARKER = Pattern.compile(
+    private static final String CLAUSE_BOUNDARIES = ",.!?;。！？\n";
+    private static final Pattern NEGATIVE_AFTER_MARKER = Pattern.compile(
             "말고|싫|제외|빼고|안\\s*먹|못\\s*먹|안\\s*땡|별로"
     );
+    private static final Pattern NEGATIVE_BEFORE_MARKER = Pattern.compile(
+            "(?:"
+                    + "안\\s*먹(?:고\\s*싶(?:은|었던)|는|을)"
+                    + "|먹고\\s*싶지\\s*않(?:은|는)"
+                    + "|못\\s*먹(?:는|을)"
+                    + "|안\\s*땡기(?:는|던)"
+                    + "|싫어하(?:는|던)"
+                    + "|싫은"
+                    + "|별로인"
+                    + "|제외할"
+                    + "|빼고\\s*싶(?:은|었던)"
+                    + ")\\s*$"
+    );
 
-    public List<String> extract(
+    public ChatKeywordAnalysisResult extract(
             List<ChatMessage> messages,
             List<ChatKeywordCandidate> candidates
     ) {
         if (messages == null || messages.isEmpty() || candidates == null || candidates.isEmpty()) {
-            return List.of();
+            return ChatKeywordAnalysisResult.empty();
         }
 
         List<KeywordRule> rules = toRules(candidates);
         if (rules.isEmpty()) {
-            return List.of();
+            return ChatKeywordAnalysisResult.empty();
         }
 
-        Map<String, KeywordStat> stats = new LinkedHashMap<>();
-        for (int messageOrder = 0; messageOrder < messages.size(); messageOrder++) {
-            ChatMessage message = messages.get(messageOrder);
+        Map<KeywordKey, KeywordStat> stats = new LinkedHashMap<>();
+        int mentionOrder = 0;
+        for (ChatMessage message : messages) {
             if (message == null || message.getContent() == null || message.getContent().isBlank()) {
                 continue;
             }
@@ -55,43 +68,50 @@ public class ChatMenuKeywordExtractor {
                     rules
             );
 
-            for (KeywordRule rule : rules) {
-                MentionPolarity polarity = findPolarity(
-                        normalized,
-                        rule,
-                        selectedOccurrences
-                );
-                if (polarity == MentionPolarity.NONE) {
-                    continue;
-                }
-
+            for (int occurrenceIndex = 0;
+                 occurrenceIndex < selectedOccurrences.size();
+                 occurrenceIndex++) {
+                KeywordOccurrence occurrence = selectedOccurrences.get(occurrenceIndex);
+                KeywordRule rule = rules.get(occurrence.ruleOrder());
+                KeywordKey key = new KeywordKey(rule.type(), rule.keyword());
                 KeywordStat stat = stats.computeIfAbsent(
-                        rule.keyword(),
+                        key,
                         ignored -> new KeywordStat(
                                 rule.keyword(),
                                 rule.type(),
                                 rule.ruleOrder()
                         )
                 );
-                stat.record(
-                        polarity,
-                        messageOrder,
-                        rule.type(),
-                        rule.ruleOrder()
+                MentionPolarity polarity = classifyPolarity(
+                        normalized,
+                        selectedOccurrences,
+                        occurrenceIndex
                 );
+                stat.record(polarity, mentionOrder++);
             }
         }
 
-        return stats.values().stream()
-                .filter(KeywordStat::isPreferred)
+        List<KeywordStat> sortedStats = stats.values().stream()
                 .sorted(Comparator
-                        .comparingInt(KeywordStat::positiveMentionCount).reversed()
-                        .thenComparingInt(KeywordStat::typePriority)
-                        .thenComparing(Comparator.comparingInt(KeywordStat::lastMentionOrder).reversed())
+                        .comparingInt(KeywordStat::score).reversed()
+                        .thenComparingInt(stat -> resultPriority(stat.type()))
+                        .thenComparing(Comparator.comparingInt(
+                                KeywordStat::lastPositiveMentionOrder
+                        ).reversed())
                         .thenComparingInt(KeywordStat::ruleOrder))
-                .limit(MAX_KEYWORD_COUNT)
-                .map(KeywordStat::keyword)
                 .toList();
+
+        List<String> menus = sortedStats.stream()
+                .filter(stat -> stat.score() >= 1)
+                .map(KeywordStat::keyword)
+                .distinct()
+                .limit(MAX_KEYWORD_COUNT)
+                .toList();
+        List<ChatKeywordScore> keywordScores = sortedStats.stream()
+                .map(KeywordStat::toScore)
+                .toList();
+
+        return new ChatKeywordAnalysisResult(menus, keywordScores);
     }
 
     private List<KeywordRule> toRules(List<ChatKeywordCandidate> candidates) {
@@ -141,22 +161,46 @@ public class ChatMenuKeywordExtractor {
                 }
             }
         }
-        return List.copyOf(accepted);
+        return accepted.stream()
+                .sorted(Comparator
+                        .comparingInt(KeywordOccurrence::start)
+                        .thenComparingInt(KeywordOccurrence::end)
+                        .thenComparingInt(KeywordOccurrence::ruleOrder))
+                .toList();
     }
 
-    private MentionPolarity findPolarity(
+    private MentionPolarity classifyPolarity(
             String text,
-            KeywordRule rule,
-            List<KeywordOccurrence> selectedOccurrences
+            List<KeywordOccurrence> occurrences,
+            int occurrenceIndex
     ) {
-        List<KeywordOccurrence> occurrences = selectedOccurrences.stream()
-                .filter(occurrence -> occurrence.ruleOrder() == rule.ruleOrder())
-                .toList();
+        KeywordOccurrence occurrence = occurrences.get(occurrenceIndex);
+        int contextStart = Math.max(
+                findClauseStart(text, occurrence.start()),
+                occurrence.start() - NEGATIVE_CONTEXT_LENGTH
+        );
+        int contextEnd = Math.min(
+                findClauseEnd(text, occurrence.end()),
+                occurrence.end() + NEGATIVE_CONTEXT_LENGTH
+        );
 
-        if (occurrences.isEmpty()) {
-            return MentionPolarity.NONE;
+        if (occurrenceIndex > 0) {
+            contextStart = Math.max(
+                    contextStart,
+                    occurrences.get(occurrenceIndex - 1).end()
+            );
         }
-        if (occurrences.stream().anyMatch(occurrence -> isNegated(text, occurrence.end()))) {
+        if (occurrenceIndex + 1 < occurrences.size()) {
+            contextEnd = Math.min(
+                    contextEnd,
+                    occurrences.get(occurrenceIndex + 1).start()
+            );
+        }
+
+        String prefix = text.substring(contextStart, occurrence.start());
+        String suffix = text.substring(occurrence.end(), contextEnd);
+        if (NEGATIVE_AFTER_MARKER.matcher(suffix).find()
+                || NEGATIVE_BEFORE_MARKER.matcher(prefix).find()) {
             return MentionPolarity.NEGATIVE;
         }
         return MentionPolarity.POSITIVE;
@@ -180,20 +224,35 @@ public class ChatMenuKeywordExtractor {
         return occurrences;
     }
 
-    private boolean isNegated(String text, int aliasEnd) {
-        int maxEnd = Math.min(text.length(), aliasEnd + NEGATIVE_CONTEXT_LENGTH);
-        String suffix = text.substring(aliasEnd, maxEnd);
-        var boundaryMatcher = CLAUSE_BOUNDARY.matcher(suffix);
-        if (boundaryMatcher.find()) {
-            suffix = suffix.substring(0, boundaryMatcher.start());
+    private int findClauseStart(String text, int occurrenceStart) {
+        for (int index = occurrenceStart - 1; index >= 0; index--) {
+            if (isClauseBoundary(text.charAt(index))) {
+                return index + 1;
+            }
         }
-        return NEGATIVE_MARKER.matcher(suffix).find();
+        return 0;
+    }
+
+    private int findClauseEnd(String text, int occurrenceEnd) {
+        for (int index = occurrenceEnd; index < text.length(); index++) {
+            if (isClauseBoundary(text.charAt(index))) {
+                return index;
+            }
+        }
+        return text.length();
+    }
+
+    private boolean isClauseBoundary(char character) {
+        return CLAUSE_BOUNDARIES.indexOf(character) >= 0;
     }
 
     private String normalize(String content) {
         return Normalizer.normalize(content, Normalizer.Form.NFC)
                 .toLowerCase(Locale.ROOT)
-                .replaceAll("\\s+", " ")
+                .replace("\r\n", "\n")
+                .replace('\r', '\n')
+                .replaceAll("[\\t\\f ]+", " ")
+                .replaceAll(" *\\n+ *", "\n")
                 .trim();
     }
 
@@ -216,19 +275,24 @@ public class ChatMenuKeywordExtractor {
         }
     }
 
+    private record KeywordKey(
+            ChatKeywordCandidate.Type type,
+            String keyword
+    ) {
+    }
+
     private enum MentionPolarity {
-        NONE,
         POSITIVE,
         NEGATIVE
     }
 
     private static final class KeywordStat {
         private final String keyword;
-        private int typePriority;
-        private int ruleOrder;
-        private int positiveMentionCount;
-        private int lastMentionOrder;
-        private MentionPolarity lastPolarity;
+        private final ChatKeywordCandidate.Type type;
+        private final int ruleOrder;
+        private int positiveCount;
+        private int negativeCount;
+        private int lastPositiveMentionOrder = -1;
 
         private KeywordStat(
                 String keyword,
@@ -236,58 +300,47 @@ public class ChatMenuKeywordExtractor {
                 int ruleOrder
         ) {
             this.keyword = keyword;
-            this.typePriority = resultPriority(type);
+            this.type = type;
             this.ruleOrder = ruleOrder;
         }
 
-        private void record(
-                MentionPolarity polarity,
-                int messageOrder,
-                ChatKeywordCandidate.Type type,
-                int candidateOrder
-        ) {
+        private void record(MentionPolarity polarity, int mentionOrder) {
             if (polarity == MentionPolarity.POSITIVE) {
-                positiveMentionCount++;
-            }
-            updateResultPriority(type, candidateOrder);
-            lastPolarity = polarity;
-            lastMentionOrder = messageOrder;
-        }
-
-        private void updateResultPriority(
-                ChatKeywordCandidate.Type type,
-                int candidateOrder
-        ) {
-            int candidateTypePriority = resultPriority(type);
-            if (candidateTypePriority < typePriority
-                    || (candidateTypePriority == typePriority && candidateOrder < ruleOrder)) {
-                typePriority = candidateTypePriority;
-                ruleOrder = candidateOrder;
+                positiveCount++;
+                lastPositiveMentionOrder = mentionOrder;
+            } else {
+                negativeCount++;
             }
         }
 
-        private boolean isPreferred() {
-            return positiveMentionCount > 0 && lastPolarity == MentionPolarity.POSITIVE;
+        private int score() {
+            return positiveCount - negativeCount;
+        }
+
+        private ChatKeywordScore toScore() {
+            return new ChatKeywordScore(
+                    keyword,
+                    type,
+                    positiveCount,
+                    negativeCount,
+                    score()
+            );
         }
 
         private String keyword() {
             return keyword;
         }
 
+        private ChatKeywordCandidate.Type type() {
+            return type;
+        }
+
+        private int lastPositiveMentionOrder() {
+            return lastPositiveMentionOrder;
+        }
+
         private int ruleOrder() {
             return ruleOrder;
-        }
-
-        private int typePriority() {
-            return typePriority;
-        }
-
-        private int positiveMentionCount() {
-            return positiveMentionCount;
-        }
-
-        private int lastMentionOrder() {
-            return lastMentionOrder;
         }
     }
 
