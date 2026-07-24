@@ -18,6 +18,12 @@ import { analyzeConversationKeywords } from '../services/momeokjiService'
 import './MomeokjiPage.css'
 
 const KEYWORD_TYPES = ['MENU', 'CATEGORY', 'RESTAURANT']
+const KEYWORD_ROW_CONFIG = [
+  { type: 'MENU', label: '메뉴' },
+  { type: 'CATEGORY', label: '카테고리' },
+  { type: 'RESTAURANT', label: '음식점명' },
+]
+const DRAG_SCROLL_THRESHOLD_PX = 5
 const MAX_EXTRACTED_KEYWORDS_PER_TYPE = 10
 
 function createKeywordOption(type, name) {
@@ -26,12 +32,6 @@ function createKeywordOption(type, name) {
     type,
     name,
   }
-}
-
-// TODO: DB 사전·음식점 데이터가 준비되면 제거할 7/7 화면 확인용 목업
-const TEMP_MOCK_KEYWORD_OPTIONS = {
-  CATEGORY: [createKeywordOption('CATEGORY', '일식')],
-  RESTAURANT: [createKeywordOption('RESTAURANT', '스시하루')],
 }
 
 function isVisibleKeywordScore(item) {
@@ -97,8 +97,80 @@ export function ChipGroup({ label, options, selected, onToggle, single = false }
 }
 
 function KeywordRow({ label, options, selected, onToggle }) {
+  const dragStateRef = useRef(null)
+  const suppressClickRef = useRef(false)
+  const [isDragging, setIsDragging] = useState(false)
+
+  if (options.length === 0) return null
+
+  const handlePointerDown = (event) => {
+    if (event.pointerType === 'touch' || event.button !== 0) return
+
+    const row = event.currentTarget
+    if (row.scrollWidth <= row.clientWidth) return
+
+    dragStateRef.current = {
+      pointerId: event.pointerId,
+      captureTarget: event.target,
+      startX: event.clientX,
+      startScrollLeft: row.scrollLeft,
+      isDragging: false,
+    }
+    event.target.setPointerCapture(event.pointerId)
+  }
+
+  const handlePointerMove = (event) => {
+    const dragState = dragStateRef.current
+    if (!dragState || dragState.pointerId !== event.pointerId) return
+
+    const distance = event.clientX - dragState.startX
+    if (!dragState.isDragging) {
+      if (Math.abs(distance) < DRAG_SCROLL_THRESHOLD_PX) return
+      dragState.isDragging = true
+      setIsDragging(true)
+    }
+
+    event.preventDefault()
+    event.currentTarget.scrollLeft = dragState.startScrollLeft - distance
+  }
+
+  const finishPointerDrag = (event) => {
+    const dragState = dragStateRef.current
+    if (!dragState || dragState.pointerId !== event.pointerId) return
+
+    dragStateRef.current = null
+    if (dragState.captureTarget.hasPointerCapture(event.pointerId)) {
+      dragState.captureTarget.releasePointerCapture(event.pointerId)
+    }
+    setIsDragging(false)
+
+    if (dragState.isDragging) {
+      suppressClickRef.current = true
+      window.setTimeout(() => {
+        suppressClickRef.current = false
+      }, 0)
+    }
+  }
+
+  const preventClickAfterDrag = (event) => {
+    if (!suppressClickRef.current) return
+    suppressClickRef.current = false
+    event.preventDefault()
+    event.stopPropagation()
+  }
+
   return (
-    <div className="momeokji-keyword-row" role="group" aria-label={`${label} 선택`}>
+    <div
+      className={`momeokji-keyword-row${isDragging ? ' is-dragging' : ''}`}
+      role="group"
+      aria-label={`${label} 선택`}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={finishPointerDrag}
+      onPointerCancel={finishPointerDrag}
+      onLostPointerCapture={finishPointerDrag}
+      onClickCapture={preventClickAfterDrag}
+    >
       {options.map((option) => {
         const isSelected = selected.includes(option.key)
         return (
@@ -218,12 +290,12 @@ function MomeokjiPage({
         setKeywordScores(items)
         setAnalysisMessage(items.some(isVisibleKeywordScore)
           ? '대화 내용을 바탕으로 찾은 선택지예요.'
-          : '대화에서 선택지를 찾지 못했어요. 메뉴를 직접 추가해주세요.')
+          : '대화에서 선택지를 찾지 못했어요. 아무거나를 선택하거나 메뉴를 직접 추가해주세요.')
       })
       .catch(() => {
         if (analyzedRequestKeyRef.current !== analysisRequestKey) return
         setKeywordScores([])
-        setAnalysisMessage('대화 추천 항목을 불러오지 못했어요. 메뉴를 직접 추가해주세요.')
+        setAnalysisMessage('대화 추천 항목을 불러오지 못했어요. 아무거나를 선택하거나 메뉴를 직접 추가해주세요.')
       })
       .finally(() => {
         if (analyzedRequestKeyRef.current === analysisRequestKey) {
@@ -271,7 +343,19 @@ function MomeokjiPage({
     return optionsByType
   }, [keywordScores])
 
-  // ===== 아무거나와 직접 추가 메뉴는 추천 결과와 분리한 네 번째 줄에 유지 =====
+  // ===== 결과가 있는 유형만 행으로 만들어 빈 공간이 생기지 않도록 구성 =====
+  const visibleExtractedKeywordRows = useMemo(
+    () => KEYWORD_ROW_CONFIG
+      .map(({ type, label }) => ({
+        type,
+        label,
+        options: extractedKeywordOptions[type],
+      }))
+      .filter(({ options }) => options.length > 0),
+    [extractedKeywordOptions],
+  )
+
+  // ===== 아무거나와 직접 추가 메뉴는 실제 추천 행 바로 다음 줄에 유지 =====
   const customMenuRowOptions = useMemo(() => {
     const options = [
       createKeywordOption('MENU', MENU_ANY_OPTION),
@@ -280,28 +364,14 @@ function MomeokjiPage({
     return [...new Map(options.map((option) => [option.key, option])).values()]
   }, [customMenuOptions])
 
-  const temporarySectorOptions = useMemo(() => {
-    const mergeOptions = (type) => [...new Map(
-      [
-        ...TEMP_MOCK_KEYWORD_OPTIONS[type],
-        ...extractedKeywordOptions[type],
-      ].map((option) => [option.key, option]),
-    ).values()].slice(0, MAX_EXTRACTED_KEYWORDS_PER_TYPE)
-
-    return {
-      CATEGORY: mergeOptions('CATEGORY'),
-      RESTAURANT: mergeOptions('RESTAURANT'),
-    }
-  }, [extractedKeywordOptions])
-
   const keywordOptions = useMemo(
     () => [
       ...extractedKeywordOptions.MENU,
-      ...temporarySectorOptions.CATEGORY,
-      ...temporarySectorOptions.RESTAURANT,
+      ...extractedKeywordOptions.CATEGORY,
+      ...extractedKeywordOptions.RESTAURANT,
       ...customMenuRowOptions,
     ],
-    [customMenuRowOptions, extractedKeywordOptions.MENU, temporarySectorOptions],
+    [customMenuRowOptions, extractedKeywordOptions],
   )
   const selectedKeywordNames = useMemo(() => {
     const nameByKey = new Map(keywordOptions.map((option) => [option.key, option.name]))
@@ -354,6 +424,14 @@ function MomeokjiPage({
   const handleNext = () => {
     if (!isStepValid) return
     if (step < TOTAL_STEPS - 1) {
+      if (
+        step === TOTAL_STEPS - 2
+        && analysisRequestKey
+        && analyzedRequestKeyRef.current !== analysisRequestKey
+      ) {
+        setIsAnalyzing(true)
+        setAnalysisMessage('')
+      }
       setStep((previous) => previous + 1)
       return
     }
@@ -459,35 +537,28 @@ function MomeokjiPage({
               <h3>오늘 대화엔 이런 메뉴가 나왔어요</h3>
               <span>필수</span>
             </div>
-            <p className="momeokji-description">
+            <p className="momeokji-description" aria-live="polite">
               {isAnalyzing ? '대화에서 메뉴와 음식점을 찾고 있어요…' : analysisMessage}
             </p>
-            <div className="momeokji-keyword-sectors">
-              <KeywordRow
-                label="메뉴"
-                options={extractedKeywordOptions.MENU}
-                selected={selectedKeywordKeys}
-                onToggle={(value) => toggleArrayValue(setSelectedKeywordKeys, value)}
-              />
-              <KeywordRow
-                label="카테고리"
-                options={temporarySectorOptions.CATEGORY}
-                selected={selectedKeywordKeys}
-                onToggle={(value) => toggleArrayValue(setSelectedKeywordKeys, value)}
-              />
-              <KeywordRow
-                label="음식점명"
-                options={temporarySectorOptions.RESTAURANT}
-                selected={selectedKeywordKeys}
-                onToggle={(value) => toggleArrayValue(setSelectedKeywordKeys, value)}
-              />
-              <KeywordRow
-                label="직접 추가 메뉴"
-                options={customMenuRowOptions}
-                selected={selectedKeywordKeys}
-                onToggle={(value) => toggleArrayValue(setSelectedKeywordKeys, value)}
-              />
-            </div>
+            {!isAnalyzing && (
+              <div className="momeokji-keyword-sectors">
+                {visibleExtractedKeywordRows.map(({ type, label, options }) => (
+                  <KeywordRow
+                    key={type}
+                    label={label}
+                    options={options}
+                    selected={selectedKeywordKeys}
+                    onToggle={(value) => toggleArrayValue(setSelectedKeywordKeys, value)}
+                  />
+                ))}
+                <KeywordRow
+                  label="직접 추가 메뉴"
+                  options={customMenuRowOptions}
+                  selected={selectedKeywordKeys}
+                  onToggle={(value) => toggleArrayValue(setSelectedKeywordKeys, value)}
+                />
+              </div>
+            )}
           </div>
         )
       default:
