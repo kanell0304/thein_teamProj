@@ -13,6 +13,7 @@ function MomeokjiVotePage({
   currentUserId,
   participants = [],
   onClose,
+  onRestart,
   onSubmit,
   isResolvingVote = false,
   result,
@@ -105,23 +106,33 @@ function MomeokjiVotePage({
           )}
         </div>
 
-        <div className="ui-sheet__footer momeokji-vote-sheet__footer">
-          <button
-            className="app-button app-button--primary app-button--large"
-            type="button"
-            disabled={!isClosed && (isResolvingVote || (!isSubmittedView && activeSelectedIds.length === 0))}
-            onClick={isClosed ? onClose : isSubmittedView ? startEditingVote : submitCurrentVote}
-          >
-            {isClosed
-              ? '확인'
-              : isResolvingVote
+        <div className={`ui-sheet__footer momeokji-vote-sheet__footer${isClosed ? ' momeokji-vote-sheet__footer--result' : ''}`}>
+          {isClosed ? (
+            <>
+              {/* ===== 결과만 닫거나 새 모먹지 설정으로 이동하는 종료 후 동작 ===== */}
+              <button className="app-button app-button--primary app-button--large" type="button" onClick={onRestart}>
+                새 모먹지 만들기
+              </button>
+              <button className="app-button app-button--large momeokji-vote-sheet__close-button" type="button" onClick={onClose}>
+                확인
+              </button>
+            </>
+          ) : (
+            <button
+              className="app-button app-button--primary app-button--large"
+              type="button"
+              disabled={isResolvingVote || (!isSubmittedView && activeSelectedIds.length === 0)}
+              onClick={isSubmittedView ? startEditingVote : submitCurrentVote}
+            >
+              {isResolvingVote
                 ? '새 가게를 찾는 중…'
                 : isSubmittedView
                   ? '투표 다시하기'
                   : isEditingVote
                     ? '투표 변경하기'
                     : '투표하기'}
-          </button>
+            </button>
+          )}
         </div>
       </section>
     </div>

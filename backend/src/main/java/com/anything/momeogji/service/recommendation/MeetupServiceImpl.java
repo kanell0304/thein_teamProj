@@ -115,7 +115,15 @@ public class MeetupServiceImpl implements MeetupService {
     @Override
     @Transactional(readOnly = true)
     public Optional<MeetupDetailResponse> getActiveMeetupForChatRoom(Long chatRoomId) {
-        return meetupRepository.findFirstByChatRoomIdOrderByIdDesc(chatRoomId)
+        // 종료·만료된 모임은 재접속 시 현재 진행 중인 모임으로 복원하지 않는다.
+        List<MeetupStatus> activeStatuses = List.of(
+                MeetupStatus.DRAFT,
+                MeetupStatus.PARTICIPANT_CONFIRMING,
+                MeetupStatus.PREFERENCE_COLLECTING,
+                MeetupStatus.RECOMMENDING,
+                MeetupStatus.VOTING
+        );
+        return meetupRepository.findFirstByChatRoomIdAndStatusInOrderByIdDesc(chatRoomId, activeStatuses)
                 .map(meetup -> {
                     RoundResponse latestRound = recommendationRoundRepository.findFirstByMeetupIdOrderByRoundNoDesc(meetup.getId())
                             .map(roundResponseAssembler::assemble)

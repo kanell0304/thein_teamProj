@@ -1,10 +1,6 @@
-import {
-  postConversationMenuAnalysis,
-  postRestaurantRecommendation,
-} from '../api/momeokjiApi'
+import { postRestaurantRecommendation } from '../api/momeokjiApi'
+import { getChatRoomMenuKeywords } from './chatApi'
 import { attachRestaurantImages } from './placeImageService'
-
-const FALLBACK_MENUS = ['돈까스', '파스타', '초밥', '치킨', '햄버거', '떡볶이']
 
 // ===== 추천 API 미연결 상태에서 사용하는 3개 단위 가게 묶음 =====
 const FALLBACK_RECOMMENDATION_GROUPS = [
@@ -20,40 +16,16 @@ const FALLBACK_RECOMMENDATION_GROUPS = [
   ],
 ]
 
-// ===== 대화·모임 조건을 AI 메뉴 분석 요청 형태로 가공 =====
-export async function analyzeConversationMenus(
-  messages,
-  { themeCode, meetingDate, meetingTime, timeZone, place } = {},
-) {
-  const textMessages = messages.filter((message) => typeof message.text === 'string')
-  const endpoint = import.meta.env.VITE_MOMEOKJI_AI_URL
-
-  if (endpoint) {
-    try {
-      const data = await postConversationMenuAnalysis(endpoint, {
-        themeCode,
-        meetingDate,
-        meetingTime,
-        timeZone,
-        place: place ? {
-          placeId: place.id,
-          provider: place.provider,
-          name: place.name,
-          address: place.address,
-          latitude: place.latitude,
-          longitude: place.longitude,
-        } : null,
-        messages: textMessages.map(({ name, text }) => ({ name, text })),
-      })
-      return data.menus
-    } catch (error) {
-      throw new Error(error.userMessage || '메뉴 분석에 실패했습니다.', { cause: error })
-    }
+// ===== 기능 시작 직전 2시간의 채팅에서 백엔드가 추출한 유형별 키워드 점수를 조회 =====
+export async function analyzeConversationKeywords(chatRoomId, featureStartedAt, participantIds) {
+  try {
+    const data = await getChatRoomMenuKeywords(chatRoomId, featureStartedAt, participantIds)
+    return Array.isArray(data?.keywordScores) ? data.keywordScores : []
+  } catch (error) {
+    throw new Error(error.userMessage || '대화 추천 항목을 불러오지 못했습니다.', {
+      cause: error,
+    })
   }
-
-  const conversation = textMessages.map((message) => message.text).join(' ')
-  const found = FALLBACK_MENUS.filter((menu) => conversation.includes(menu))
-  return found.length ? found : FALLBACK_MENUS
 }
 
 // ===== API 추천 결과에서 제외·중복 식당을 제거하고 3곳만 반환 =====

@@ -1,8 +1,10 @@
 package com.anything.momeogji.dto.recommendation;
 
 import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 
 import java.util.List;
 
@@ -13,7 +15,8 @@ import java.util.List;
  * @param participantId       이 선호를 제출하는 실제 회원 ID. 존재하는 회원이어야 하며, 개인 선호(ParticipantPreference)가
  *                             이 값으로 저장된다. 채팅방 멤버십까지는 요구하지 않는다(투표할 때만 멤버십을 확인함).
  * @param walkMinutes         목적지 좌표 기준 도보로 이동 가능한 시간(분). 예: 10 → 도보 10분 이내 음식점만 후보로 검색.
- * @param preferredCategories 선호하는 음식 카테고리 목록. 예: ["한식", "일식"]. 참여자 전체를 합산해 카테고리 우선순위를 정한다.
+ * @param preferredCategories 선호 검색 키워드 목록. 메뉴·카테고리·음식점명을 최대 3개까지 받고,
+ *                            참여자 전체를 합산해 카카오 후보 검색과 AI 조건 우선순위를 정한다.
  * @param budgetLimit         1인당 지출 가능 금액 상한(원). 비워두면(null) 예산 제한 없음으로 처리된다.
  * @param parkingNeeded       자차로 이동해 주차가 필요한지 여부.
  * @param excludedFoods       못 먹거나 제외하고 싶은 음식/재료. 예: ["고수", "해산물"]. 참여자 중 한 명이라도 제외하면 후보에서 빠진다.
@@ -22,7 +25,7 @@ import java.util.List;
 public record PersonalOptionRequest(
         @NotNull Long participantId,
         @NotNull @Min(1) Integer walkMinutes,
-        @NotEmpty List<String> preferredCategories,
+        @NotEmpty @Size(max = 3) List<@NotBlank String> preferredCategories,
         Integer budgetLimit,
         boolean parkingNeeded,
         List<String> excludedFoods,
@@ -30,6 +33,8 @@ public record PersonalOptionRequest(
 ) {
     public PersonalOptionRequest {
         excludedFoods = excludedFoods == null ? List.of() : List.copyOf(excludedFoods);
-        preferredCategories = preferredCategories == null ? List.of() : List.copyOf(preferredCategories);
+        preferredCategories = preferredCategories == null
+                ? List.of()
+                : preferredCategories.stream().distinct().toList();
     }
 }

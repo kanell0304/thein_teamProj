@@ -10,7 +10,7 @@ import com.anything.momeogji.entity.recommendation.MeetupStatus;
 
 public interface MeetupRepository extends JpaRepository<Meetup, Long> {
 
-    Optional<Meetup> findFirstByChatRoomIdOrderByIdDesc(Long chatRoomId);
+    Optional<Meetup> findFirstByChatRoomIdAndStatusInOrderByIdDesc(Long chatRoomId, List<MeetupStatus> statuses);
 
     List<Meetup> findByStatusAndVoteDeadlineAtLessThanEqual(MeetupStatus status, LocalDateTime deadline);
 }

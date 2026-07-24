@@ -36,9 +36,9 @@ public class DevChatSeedService {
         chatRoomService.joinRoom(chatRoomId, gyeongjun.memberId());
 
         chatMessageService.saveAndBroadcast(chatRoomId, currentMemberId, "오늘 모먹지??");
-        chatMessageService.saveAndBroadcast(chatRoomId, seojun.memberId(), "저는 상관없어요 아무거나?");
-        chatMessageService.saveAndBroadcast(chatRoomId, currentMemberId, "또 아무거나야? 좀 골라봐봐");
-        chatMessageService.saveAndBroadcast(chatRoomId, gyeongjun.memberId(), "모 먹지 써볼까요 그럼?");
+        chatMessageService.saveAndBroadcast(chatRoomId, seojun.memberId(), "일식이나 초밥 어때요?");
+        chatMessageService.saveAndBroadcast(chatRoomId, currentMemberId, "치킨은 오늘 말고 돈까스가 좋아요");
+        chatMessageService.saveAndBroadcast(chatRoomId, gyeongjun.memberId(), "저도 초밥 좋아요. 모 먹지 써볼까요?");
 
         return chatMessageService.getRecentMessages(chatRoomId);
     }
