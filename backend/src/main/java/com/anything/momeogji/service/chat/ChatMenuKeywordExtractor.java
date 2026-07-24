@@ -7,12 +7,13 @@ import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.regex.Pattern;
 
-/** 외부 AI 없이 한정된 음식·메뉴 사전과 부정 표현 규칙으로 대화의 메뉴 후보를 추출한다. */
+/** DB 음식 사전과 누적 음식점명을 이용해 대화의 메뉴 후보를 추출한다. */
 @Component
 public class ChatMenuKeywordExtractor {
 
@@ -22,35 +23,17 @@ public class ChatMenuKeywordExtractor {
     private static final Pattern NEGATIVE_MARKER = Pattern.compile(
             "말고|싫|제외|빼고|안\\s*먹|못\\s*먹|안\\s*땡|별로"
     );
-    private static final List<MenuRule> MENU_RULES = List.of(
-            rule("한식", "한식", "한정식"),
-            rule("중식", "중식", "중국집"),
-            rule("일식", "일식", "일본 음식"),
-            rule("양식", "양식", "서양 음식"),
-            rule("돈까스", "돈까스", "돈가스", "돈카츠"),
-            rule("파스타", "파스타", "스파게티"),
-            rule("초밥", "초밥", "스시"),
-            rule("치킨", "치킨", "닭튀김"),
-            rule("햄버거", "햄버거", "버거"),
-            rule("떡볶이", "떡볶이"),
-            rule("피자", "피자"),
-            rule("국밥", "국밥"),
-            rule("삼겹살", "삼겹살"),
-            rule("족발", "족발"),
-            rule("보쌈", "보쌈"),
-            rule("냉면", "냉면"),
-            rule("라멘", "라멘", "라면"),
-            rule("우동", "우동"),
-            rule("쌀국수", "쌀국수"),
-            rule("마라탕", "마라탕"),
-            rule("샤브샤브", "샤브샤브"),
-            rule("짜장면", "짜장면", "자장면"),
-            rule("짬뽕", "짬뽕"),
-            rule("곱창", "곱창")
-    );
 
-    public List<String> extract(List<ChatMessage> messages) {
-        if (messages == null || messages.isEmpty()) {
+    public List<String> extract(
+            List<ChatMessage> messages,
+            List<ChatKeywordCandidate> candidates
+    ) {
+        if (messages == null || messages.isEmpty() || candidates == null || candidates.isEmpty()) {
+            return List.of();
+        }
+
+        List<KeywordRule> rules = toRules(candidates);
+        if (rules.isEmpty()) {
             return List.of();
         }
 
@@ -62,17 +45,24 @@ public class ChatMenuKeywordExtractor {
             }
 
             String normalized = normalize(message.getContent());
-            for (int ruleOrder = 0; ruleOrder < MENU_RULES.size(); ruleOrder++) {
-                MenuRule rule = MENU_RULES.get(ruleOrder);
-                int currentRuleOrder = ruleOrder;
-                MentionPolarity polarity = findPolarity(normalized, rule);
+            List<KeywordOccurrence> restaurantOccurrences = findRestaurantOccurrences(
+                    normalized,
+                    rules
+            );
+
+            for (KeywordRule rule : rules) {
+                MentionPolarity polarity = findPolarity(
+                        normalized,
+                        rule,
+                        restaurantOccurrences
+                );
                 if (polarity == MentionPolarity.NONE) {
                     continue;
                 }
 
                 KeywordStat stat = stats.computeIfAbsent(
                         rule.keyword(),
-                        ignored -> new KeywordStat(rule.keyword(), currentRuleOrder)
+                        ignored -> new KeywordStat(rule.keyword(), rule.ruleOrder())
                 );
                 stat.record(polarity, messageOrder);
             }
@@ -89,21 +79,96 @@ public class ChatMenuKeywordExtractor {
                 .toList();
     }
 
-    private MentionPolarity findPolarity(String text, MenuRule rule) {
-        boolean foundPositive = false;
+    private List<KeywordRule> toRules(List<ChatKeywordCandidate> candidates) {
+        List<KeywordRule> rules = new ArrayList<>();
+        for (ChatKeywordCandidate candidate : candidates) {
+            if (candidate == null) {
+                continue;
+            }
+
+            LinkedHashSet<String> normalizedAliases = new LinkedHashSet<>();
+            normalizedAliases.add(normalize(candidate.name()));
+            candidate.aliases().stream()
+                    .map(this::normalize)
+                    .filter(alias -> !alias.isBlank())
+                    .forEach(normalizedAliases::add);
+
+            if (!normalizedAliases.isEmpty()) {
+                rules.add(new KeywordRule(
+                        candidate.name().trim(),
+                        candidate.type(),
+                        List.copyOf(normalizedAliases),
+                        rules.size()
+                ));
+            }
+        }
+        return List.copyOf(rules);
+    }
+
+    private List<KeywordOccurrence> findRestaurantOccurrences(
+            String text,
+            List<KeywordRule> rules
+    ) {
+        List<KeywordOccurrence> found = rules.stream()
+                .filter(rule -> rule.type() == ChatKeywordCandidate.Type.RESTAURANT)
+                .flatMap(rule -> findOccurrences(text, rule).stream())
+                .sorted(Comparator
+                        .comparingInt(KeywordOccurrence::length).reversed()
+                        .thenComparingInt(KeywordOccurrence::start)
+                        .thenComparingInt(KeywordOccurrence::ruleOrder))
+                .toList();
+
+        List<KeywordOccurrence> accepted = new ArrayList<>();
+        for (KeywordOccurrence occurrence : found) {
+            if (accepted.stream().noneMatch(existing -> existing.overlaps(occurrence))) {
+                accepted.add(occurrence);
+            }
+        }
+        return List.copyOf(accepted);
+    }
+
+    private MentionPolarity findPolarity(
+            String text,
+            KeywordRule rule,
+            List<KeywordOccurrence> restaurantOccurrences
+    ) {
+        List<KeywordOccurrence> occurrences;
+        if (rule.type() == ChatKeywordCandidate.Type.RESTAURANT) {
+            occurrences = restaurantOccurrences.stream()
+                    .filter(occurrence -> occurrence.ruleOrder() == rule.ruleOrder())
+                    .toList();
+        } else {
+            occurrences = findOccurrences(text, rule).stream()
+                    .filter(occurrence -> restaurantOccurrences.stream()
+                            .noneMatch(restaurant -> restaurant.overlaps(occurrence)))
+                    .toList();
+        }
+
+        if (occurrences.isEmpty()) {
+            return MentionPolarity.NONE;
+        }
+        if (occurrences.stream().anyMatch(occurrence -> isNegated(text, occurrence.end()))) {
+            return MentionPolarity.NEGATIVE;
+        }
+        return MentionPolarity.POSITIVE;
+    }
+
+    private List<KeywordOccurrence> findOccurrences(String text, KeywordRule rule) {
+        List<KeywordOccurrence> occurrences = new ArrayList<>();
         for (String alias : rule.aliases()) {
             int searchFrom = 0;
             int occurrence;
             while ((occurrence = text.indexOf(alias, searchFrom)) >= 0) {
                 int aliasEnd = occurrence + alias.length();
-                if (isNegated(text, aliasEnd)) {
-                    return MentionPolarity.NEGATIVE;
-                }
-                foundPositive = true;
+                occurrences.add(new KeywordOccurrence(
+                        occurrence,
+                        aliasEnd,
+                        rule.ruleOrder()
+                ));
                 searchFrom = aliasEnd;
             }
         }
-        return foundPositive ? MentionPolarity.POSITIVE : MentionPolarity.NONE;
+        return occurrences;
     }
 
     private boolean isNegated(String text, int aliasEnd) {
@@ -123,15 +188,23 @@ public class ChatMenuKeywordExtractor {
                 .trim();
     }
 
-    private static MenuRule rule(String keyword, String... aliases) {
-        List<String> normalizedAliases = new ArrayList<>(aliases.length);
-        for (String alias : aliases) {
-            normalizedAliases.add(alias.toLowerCase(Locale.ROOT));
-        }
-        return new MenuRule(keyword, List.copyOf(normalizedAliases));
+    private record KeywordRule(
+            String keyword,
+            ChatKeywordCandidate.Type type,
+            List<String> aliases,
+            int ruleOrder
+    ) {
     }
 
-    private record MenuRule(String keyword, List<String> aliases) {
+    private record KeywordOccurrence(int start, int end, int ruleOrder) {
+
+        private int length() {
+            return end - start;
+        }
+
+        private boolean overlaps(KeywordOccurrence other) {
+            return start < other.end && other.start < end;
+        }
     }
 
     private enum MentionPolarity {

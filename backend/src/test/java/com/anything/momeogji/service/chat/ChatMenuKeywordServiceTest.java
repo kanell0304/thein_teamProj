@@ -31,6 +31,9 @@ class ChatMenuKeywordServiceTest {
     private ChatRoomMemberRepository chatRoomMemberRepository;
 
     @Mock
+    private ChatKeywordDictionaryService keywordDictionaryService;
+
+    @Mock
     private ChatMenuKeywordExtractor keywordExtractor;
 
     @InjectMocks
@@ -44,6 +47,13 @@ class ChatMenuKeywordServiceTest {
         LocalDateTime fromInclusive = LocalDateTime.of(2026, 7, 22, 19, 0);
         LocalDateTime toExclusive = LocalDateTime.of(2026, 7, 22, 21, 0);
         List<ChatMessage> messages = List.of(message("초밥"), message("스시"));
+        List<ChatKeywordCandidate> candidates = List.of(
+                new ChatKeywordCandidate(
+                        ChatKeywordCandidate.Type.MENU,
+                        "초밥",
+                        List.of("스시")
+                )
+        );
 
         given(chatRoomMemberRepository.existsByChatRoomIdAndUserId(chatRoomId, memberId))
                 .willReturn(true);
@@ -55,7 +65,8 @@ class ChatMenuKeywordServiceTest {
                 fromInclusive,
                 toExclusive
         )).willReturn(messages);
-        given(keywordExtractor.extract(messages)).willReturn(List.of("초밥"));
+        given(keywordDictionaryService.loadCandidates()).willReturn(candidates);
+        given(keywordExtractor.extract(messages, candidates)).willReturn(List.of("초밥"));
 
         ChatMenuKeywordResponse response = service.extract(
                 chatRoomId,
@@ -86,7 +97,7 @@ class ChatMenuKeywordServiceTest {
                 List.of(11L)
         )).isInstanceOf(AccessDeniedException.class);
 
-        verifyNoInteractions(chatMessageRepository, keywordExtractor);
+        verifyNoInteractions(chatMessageRepository, keywordDictionaryService, keywordExtractor);
     }
 
     @Test
@@ -103,7 +114,7 @@ class ChatMenuKeywordServiceTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("요청자는 모먹지 참가자에 포함되어야 합니다.");
 
-        verifyNoInteractions(chatMessageRepository, keywordExtractor);
+        verifyNoInteractions(chatMessageRepository, keywordDictionaryService, keywordExtractor);
     }
 
     @Test
@@ -122,7 +133,7 @@ class ChatMenuKeywordServiceTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("모먹지 참가자는 모두 해당 채팅방 참여자여야 합니다.");
 
-        verifyNoInteractions(chatMessageRepository, keywordExtractor);
+        verifyNoInteractions(chatMessageRepository, keywordDictionaryService, keywordExtractor);
     }
 
     @Test
@@ -139,7 +150,7 @@ class ChatMenuKeywordServiceTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("participantIds는 한 명 이상이어야 합니다.");
 
-        verifyNoInteractions(chatMessageRepository, keywordExtractor);
+        verifyNoInteractions(chatMessageRepository, keywordDictionaryService, keywordExtractor);
     }
 
     @Test
@@ -156,7 +167,7 @@ class ChatMenuKeywordServiceTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("participantIds는 양수여야 합니다.");
 
-        verifyNoInteractions(chatMessageRepository, keywordExtractor);
+        verifyNoInteractions(chatMessageRepository, keywordDictionaryService, keywordExtractor);
     }
 
     private ChatMessage message(String content) {

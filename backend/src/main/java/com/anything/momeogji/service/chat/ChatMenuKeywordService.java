@@ -24,6 +24,7 @@ public class ChatMenuKeywordService {
 
     private final ChatMessageRepository chatMessageRepository;
     private final ChatRoomMemberRepository chatRoomMemberRepository;
+    private final ChatKeywordDictionaryService keywordDictionaryService;
     private final ChatMenuKeywordExtractor keywordExtractor;
 
     @Transactional(readOnly = true)
@@ -58,7 +59,11 @@ public class ChatMenuKeywordService {
                 toExclusive
         );
 
-        return new ChatMenuKeywordResponse(keywordExtractor.extract(messages), messages.size());
+        List<ChatKeywordCandidate> candidates = keywordDictionaryService.loadCandidates();
+        return new ChatMenuKeywordResponse(
+                keywordExtractor.extract(messages, candidates),
+                messages.size()
+        );
     }
 
     private List<Long> normalizeParticipantIds(List<Long> participantIds) {
