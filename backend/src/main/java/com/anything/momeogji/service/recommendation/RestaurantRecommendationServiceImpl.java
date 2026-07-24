@@ -45,7 +45,8 @@ public class RestaurantRecommendationServiceImpl implements RestaurantRecommenda
 
     @Override
     public RecommendationResult recommend(RecommendationRequest request) {
-        AggregatedCondition condition = conditionAggregator.aggregate(request.personalOptions(), request.myDataRestaurants());
+        AggregatedCondition condition = conditionAggregator.aggregate(
+                request.personalOptions(), request.myDataRestaurants(), request.commonOption().purpose());
         // MyData 방문 이력이 categoryPriority에 실제로 표를 더했는지 눈으로 확인할 수 있도록 남긴다.
         log.info("추천 조건 집계 결과: categoryPriority={}, myDataRestaurants={}",
                 condition.categoryPriority(), request.myDataRestaurants());

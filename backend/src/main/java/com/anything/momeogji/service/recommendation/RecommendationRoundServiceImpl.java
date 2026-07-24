@@ -22,7 +22,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 @Service
 @RequiredArgsConstructor
@@ -30,6 +32,8 @@ public class RecommendationRoundServiceImpl implements RecommendationRoundServic
 
     /** 네 번째 선택지를 일반 식당과 같은 후보/투표 구조로 다루기 위한 내부 장소 ID. */
     static final String RECOMMEND_AGAIN_PLACE_ID = "__RECOMMEND_AGAIN__";
+    /** 개인 선택지의 "원하는 분위기"에서 이 키워드를 고르면, 본인 MyData 방문 카테고리를 오히려 피하고 싶다는 의미다. */
+    private static final String NEW_FOOD_MOOD_KEYWORD = "새로운 메뉴";
 
     private final MeetupRepository meetupRepository;
     private final ChatRoomMemberRepository chatRoomMemberRepository;
@@ -58,19 +62,27 @@ public class RecommendationRoundServiceImpl implements RecommendationRoundServic
     private RoundResponse executeRecommendation(Meetup meetup, List<PersonalOptionRequest> personalOptions, String preferenceNote) {
         Long chatRoomId = meetup.getChatRoom().getId();
         List<String> excludedRestaurantIds = derivePreviouslyRecommendedRestaurantIds(meetup.getId());
-        List<Long> userIds = personalOptions.stream()
-                .map(PersonalOptionRequest::participantId)
-                .toList();
 
-        // 사용자별로 임시 보관된 MyData 결과를 사용자 식별자 없이 하나의 목록으로 연결한다.
-        List<MyDataRestaurantData> myDataRestaurants =
-                meetupMyDataResultStore.findAll(meetup.getId(), userIds);
+        // 참여자별로 MyData를 나눠서, "새로운 메뉴"를 원하는 사람의 것은 추천에 더하는 대신 오히려 피할 카테고리로 돌린다.
+        List<PersonalOptionRequest> resolvedOptions = new ArrayList<>();
+        List<MyDataRestaurantData> myDataForRecommendation = new ArrayList<>();
+        for (PersonalOptionRequest option : personalOptions) {
+            List<MyDataRestaurantData> participantMyData =
+                    meetupMyDataResultStore.findAll(meetup.getId(), List.of(option.participantId()));
+
+            if (seeksNewFood(option)) {
+                resolvedOptions.add(withAvoidedCategories(option, participantMyData));
+            } else {
+                resolvedOptions.add(option);
+                myDataForRecommendation.addAll(participantMyData);
+            }
+        }
 
         RecommendationRequest recommendationRequest = new RecommendationRequest(
                 MeetupCommonOptionMapper.toCommonOption(meetup),
-                personalOptions,
+                resolvedOptions,
                 excludedRestaurantIds,
-                myDataRestaurants,
+                myDataForRecommendation,
                 preferenceNote
         );
 
@@ -141,6 +153,29 @@ public class RecommendationRoundServiceImpl implements RecommendationRoundServic
                         .latitude(recommendation.latitude() == null ? null : BigDecimal.valueOf(recommendation.latitude()))
                         .longitude(recommendation.longitude() == null ? null : BigDecimal.valueOf(recommendation.longitude()))
                         .build()));
+    }
+
+    private boolean seeksNewFood(PersonalOptionRequest option) {
+        return option.atmosphere() != null && option.atmosphere().contains(NEW_FOOD_MOOD_KEYWORD);
+    }
+
+    /** "새로운 메뉴"를 고른 참여자는 본인 MyData 방문 카테고리를 반대로 제외 목록에 추가한다. */
+    private PersonalOptionRequest withAvoidedCategories(PersonalOptionRequest option,
+                                                          List<MyDataRestaurantData> participantMyData) {
+        List<String> avoidedCategories = participantMyData.stream()
+                .map(MyDataRestaurantData::foodCategory)
+                .map(MyDataCategoryMatcher::match)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+        if (avoidedCategories.isEmpty()) {
+            return option;
+        }
+
+        List<String> mergedExcludedFoods = new ArrayList<>(option.excludedFoods());
+        mergedExcludedFoods.addAll(avoidedCategories);
+        return new PersonalOptionRequest(option.participantId(), option.walkMinutes(), option.preferredCategories(),
+                option.budgetLimit(), option.parkingNeeded(), mergedExcludedFoods, option.atmosphere());
     }
 
     private List<String> derivePreviouslyRecommendedRestaurantIds(Long meetupId) {

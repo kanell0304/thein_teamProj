@@ -139,6 +139,46 @@ class RecommendationRoundServiceImplTest {
     }
 
     @Test
+    void 새로운_메뉴를_고른_참여자의_MyData는_추천_대신_제외_카테고리로_돌아간다() {
+        given(meetupRepository.findById(100L)).willReturn(Optional.of(meetup));
+        given(chatRoomMemberRepository.existsByChatRoomIdAndUserId(10L, 1L)).willReturn(true);
+        given(roundCandidateRepository.findByRound_Meetup_Id(100L)).willReturn(List.of());
+        given(recommendationRoundRepository.countByMeetupId(100L)).willReturn(0L);
+
+        List<MyDataRestaurantData> myDataRestaurants = List.of(
+                new MyDataRestaurantData("스시야", "일식 > 초밥")
+        );
+        given(meetupMyDataResultStore.findAll(100L, List.of(1L))).willReturn(myDataRestaurants);
+
+        RecommendationResult aiResult = new RecommendationResult(1, List.of(
+                new RestaurantRecommendation("new-1", 1, "새맛집", "한식", "도로명", "지번", 37.5, 127.0, "이유", "img")
+        ));
+        given(restaurantRecommendationService.recommend(any())).willReturn(aiResult);
+        given(restaurantRepository.findByKakaoPlaceId("new-1")).willReturn(Optional.empty());
+        given(restaurantRepository.save(any())).willReturn(Restaurant.builder().id(6L).kakaoPlaceId("new-1").name("새맛집").build());
+        given(recommendationRoundRepository.save(any()))
+                .willReturn(RecommendationRound.builder().id(2L).meetup(meetup).roundNo(1).build());
+        given(roundResponseAssembler.assemble(any()))
+                .willReturn(new RoundResponse(100L, 2L, 1, 1, 0, "VOTING", null, List.of()));
+
+        PersonalOptionRequest optionSeekingNewFood =
+                new PersonalOptionRequest(1L, 10, List.of("한식"), 15000, false, List.of("고수"), "새로운 메뉴");
+        RoundCreateRequest request = new RoundCreateRequest(List.of(optionSeekingNewFood), null);
+
+        service.createRound(100L, request, 1L);
+
+        ArgumentCaptor<RecommendationRequest> captor = ArgumentCaptor.forClass(RecommendationRequest.class);
+        verify(restaurantRecommendationService).recommend(captor.capture());
+
+        // MyData가 추천 가중치에는 더 이상 쓰이지 않는다.
+        assertThat(captor.getValue().myDataRestaurants()).isEmpty();
+        // 대신 매칭된 카테고리("일식")가 그 참여자의 제외 목록에 추가되고, 기존 제외 목록("고수")은 그대로 남는다.
+        assertThat(captor.getValue().personalOptions()).hasSize(1);
+        assertThat(captor.getValue().personalOptions().get(0).excludedFoods())
+                .containsExactlyInAnyOrder("고수", "일식");
+    }
+
+    @Test
     void 채팅방_참여자가_아니면_예외() {
         given(meetupRepository.findById(100L)).willReturn(Optional.of(meetup));
         given(chatRoomMemberRepository.existsByChatRoomIdAndUserId(10L, 1L)).willReturn(false);
