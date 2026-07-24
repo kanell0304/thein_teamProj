@@ -14,6 +14,7 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.inOrder;
 
 @ExtendWith(MockitoExtension.class)
 class ChatKeywordDictionaryServiceTest {
@@ -28,7 +29,7 @@ class ChatKeywordDictionaryServiceTest {
     private ChatKeywordDictionaryService service;
 
     @Test
-    void combinesRestaurantNamesAndFoodDictionaryEntries() {
+    void loadsFoodDictionaryOnceThenGroupsMenuCategoryAndRestaurantCandidates() {
         given(restaurantRepository.findKeywordCandidateNames())
                 .willReturn(List.of("스시하루"));
         given(foodKeywordRepository.findAllByOrderByIdAsc())
@@ -41,9 +42,9 @@ class ChatKeywordDictionaryServiceTest {
 
         assertThat(candidates).containsExactly(
                 new ChatKeywordCandidate(
-                        ChatKeywordCandidate.Type.RESTAURANT,
-                        "스시하루",
-                        List.of()
+                        ChatKeywordCandidate.Type.MENU,
+                        "초밥",
+                        List.of("스시")
                 ),
                 new ChatKeywordCandidate(
                         ChatKeywordCandidate.Type.CATEGORY,
@@ -51,11 +52,14 @@ class ChatKeywordDictionaryServiceTest {
                         List.of("일본 음식")
                 ),
                 new ChatKeywordCandidate(
-                        ChatKeywordCandidate.Type.MENU,
-                        "초밥",
-                        List.of("스시")
+                        ChatKeywordCandidate.Type.RESTAURANT,
+                        "스시하루",
+                        List.of()
                 )
         );
+        var repositoryOrder = inOrder(foodKeywordRepository, restaurantRepository);
+        repositoryOrder.verify(foodKeywordRepository).findAllByOrderByIdAsc();
+        repositoryOrder.verify(restaurantRepository).findKeywordCandidateNames();
     }
 
     @Test

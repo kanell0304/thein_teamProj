@@ -100,6 +100,46 @@ class ChatMenuKeywordExtractorTest {
     }
 
     @Test
+    void continuesMatchingNonOverlappingMenuCategoryAndRestaurantMentions() {
+        List<String> menus = extractor.extract(
+                List.of(message("스시하루에서 초밥과 일식 먹는 건 어때요?")),
+                List.of(
+                        category("일식"),
+                        restaurant("스시하루"),
+                        menu("초밥")
+                )
+        );
+
+        assertThat(menus).containsExactly("초밥", "일식", "스시하루");
+    }
+
+    @Test
+    void menuBlocksAnOverlappingCategoryMatch() {
+        List<String> menus = extractor.extract(
+                List.of(message("초밥 먹을까요?")),
+                List.of(
+                        category("밥"),
+                        menu("초밥")
+                )
+        );
+
+        assertThat(menus).containsExactly("초밥");
+    }
+
+    @Test
+    void prefersTheLongestOverlappingMenuName() {
+        List<String> menus = extractor.extract(
+                List.of(message("돼지갈비 먹고 싶어요")),
+                List.of(
+                        menu("갈비"),
+                        menu("돼지갈비")
+                )
+        );
+
+        assertThat(menus).containsExactly("돼지갈비");
+    }
+
+    @Test
     void prefersTheLongestOverlappingRestaurantName() {
         List<String> menus = extractor.extract(
                 List.of(message("스시하루 강남점 가자")),
@@ -110,6 +150,24 @@ class ChatMenuKeywordExtractorTest {
         );
 
         assertThat(menus).containsExactly("스시하루 강남점");
+    }
+
+    @Test
+    void usesMenuCategoryRestaurantOrderBeforeRecencyWhenScoresAreEqual() {
+        List<String> menus = extractor.extract(
+                List.of(
+                        message("초밥 좋아요"),
+                        message("일식 좋아요"),
+                        message("스시하루 좋아요")
+                ),
+                List.of(
+                        restaurant("스시하루"),
+                        category("일식"),
+                        menu("초밥")
+                )
+        );
+
+        assertThat(menus).containsExactly("초밥", "일식", "스시하루");
     }
 
     @Test

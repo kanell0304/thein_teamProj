@@ -19,6 +19,11 @@ public class ChatMenuKeywordExtractor {
 
     private static final int MAX_KEYWORD_COUNT = 5;
     private static final int NEGATIVE_CONTEXT_LENGTH = 24;
+    private static final List<ChatKeywordCandidate.Type> MATCH_PRIORITY = List.of(
+            ChatKeywordCandidate.Type.RESTAURANT,
+            ChatKeywordCandidate.Type.MENU,
+            ChatKeywordCandidate.Type.CATEGORY
+    );
     private static final Pattern CLAUSE_BOUNDARY = Pattern.compile("[,.!?;。\\n]");
     private static final Pattern NEGATIVE_MARKER = Pattern.compile(
             "말고|싫|제외|빼고|안\\s*먹|못\\s*먹|안\\s*땡|별로"
@@ -45,7 +50,7 @@ public class ChatMenuKeywordExtractor {
             }
 
             String normalized = normalize(message.getContent());
-            List<KeywordOccurrence> restaurantOccurrences = findRestaurantOccurrences(
+            List<KeywordOccurrence> selectedOccurrences = selectOccurrences(
                     normalized,
                     rules
             );
@@ -54,7 +59,7 @@ public class ChatMenuKeywordExtractor {
                 MentionPolarity polarity = findPolarity(
                         normalized,
                         rule,
-                        restaurantOccurrences
+                        selectedOccurrences
                 );
                 if (polarity == MentionPolarity.NONE) {
                     continue;
@@ -62,9 +67,18 @@ public class ChatMenuKeywordExtractor {
 
                 KeywordStat stat = stats.computeIfAbsent(
                         rule.keyword(),
-                        ignored -> new KeywordStat(rule.keyword(), rule.ruleOrder())
+                        ignored -> new KeywordStat(
+                                rule.keyword(),
+                                rule.type(),
+                                rule.ruleOrder()
+                        )
                 );
-                stat.record(polarity, messageOrder);
+                stat.record(
+                        polarity,
+                        messageOrder,
+                        rule.type(),
+                        rule.ruleOrder()
+                );
             }
         }
 
@@ -72,6 +86,7 @@ public class ChatMenuKeywordExtractor {
                 .filter(KeywordStat::isPreferred)
                 .sorted(Comparator
                         .comparingInt(KeywordStat::positiveMentionCount).reversed()
+                        .thenComparingInt(KeywordStat::typePriority)
                         .thenComparing(Comparator.comparingInt(KeywordStat::lastMentionOrder).reversed())
                         .thenComparingInt(KeywordStat::ruleOrder))
                 .limit(MAX_KEYWORD_COUNT)
@@ -105,23 +120,25 @@ public class ChatMenuKeywordExtractor {
         return List.copyOf(rules);
     }
 
-    private List<KeywordOccurrence> findRestaurantOccurrences(
+    private List<KeywordOccurrence> selectOccurrences(
             String text,
             List<KeywordRule> rules
     ) {
-        List<KeywordOccurrence> found = rules.stream()
-                .filter(rule -> rule.type() == ChatKeywordCandidate.Type.RESTAURANT)
-                .flatMap(rule -> findOccurrences(text, rule).stream())
-                .sorted(Comparator
-                        .comparingInt(KeywordOccurrence::length).reversed()
-                        .thenComparingInt(KeywordOccurrence::start)
-                        .thenComparingInt(KeywordOccurrence::ruleOrder))
-                .toList();
-
         List<KeywordOccurrence> accepted = new ArrayList<>();
-        for (KeywordOccurrence occurrence : found) {
-            if (accepted.stream().noneMatch(existing -> existing.overlaps(occurrence))) {
-                accepted.add(occurrence);
+        for (ChatKeywordCandidate.Type type : MATCH_PRIORITY) {
+            List<KeywordOccurrence> found = rules.stream()
+                    .filter(rule -> rule.type() == type)
+                    .flatMap(rule -> findOccurrences(text, rule).stream())
+                    .sorted(Comparator
+                            .comparingInt(KeywordOccurrence::length).reversed()
+                            .thenComparingInt(KeywordOccurrence::start)
+                            .thenComparingInt(KeywordOccurrence::ruleOrder))
+                    .toList();
+
+            for (KeywordOccurrence occurrence : found) {
+                if (accepted.stream().noneMatch(existing -> existing.overlaps(occurrence))) {
+                    accepted.add(occurrence);
+                }
             }
         }
         return List.copyOf(accepted);
@@ -130,19 +147,11 @@ public class ChatMenuKeywordExtractor {
     private MentionPolarity findPolarity(
             String text,
             KeywordRule rule,
-            List<KeywordOccurrence> restaurantOccurrences
+            List<KeywordOccurrence> selectedOccurrences
     ) {
-        List<KeywordOccurrence> occurrences;
-        if (rule.type() == ChatKeywordCandidate.Type.RESTAURANT) {
-            occurrences = restaurantOccurrences.stream()
-                    .filter(occurrence -> occurrence.ruleOrder() == rule.ruleOrder())
-                    .toList();
-        } else {
-            occurrences = findOccurrences(text, rule).stream()
-                    .filter(occurrence -> restaurantOccurrences.stream()
-                            .noneMatch(restaurant -> restaurant.overlaps(occurrence)))
-                    .toList();
-        }
+        List<KeywordOccurrence> occurrences = selectedOccurrences.stream()
+                .filter(occurrence -> occurrence.ruleOrder() == rule.ruleOrder())
+                .toList();
 
         if (occurrences.isEmpty()) {
             return MentionPolarity.NONE;
@@ -215,22 +224,46 @@ public class ChatMenuKeywordExtractor {
 
     private static final class KeywordStat {
         private final String keyword;
-        private final int ruleOrder;
+        private int typePriority;
+        private int ruleOrder;
         private int positiveMentionCount;
         private int lastMentionOrder;
         private MentionPolarity lastPolarity;
 
-        private KeywordStat(String keyword, int ruleOrder) {
+        private KeywordStat(
+                String keyword,
+                ChatKeywordCandidate.Type type,
+                int ruleOrder
+        ) {
             this.keyword = keyword;
+            this.typePriority = resultPriority(type);
             this.ruleOrder = ruleOrder;
         }
 
-        private void record(MentionPolarity polarity, int messageOrder) {
+        private void record(
+                MentionPolarity polarity,
+                int messageOrder,
+                ChatKeywordCandidate.Type type,
+                int candidateOrder
+        ) {
             if (polarity == MentionPolarity.POSITIVE) {
                 positiveMentionCount++;
             }
+            updateResultPriority(type, candidateOrder);
             lastPolarity = polarity;
             lastMentionOrder = messageOrder;
+        }
+
+        private void updateResultPriority(
+                ChatKeywordCandidate.Type type,
+                int candidateOrder
+        ) {
+            int candidateTypePriority = resultPriority(type);
+            if (candidateTypePriority < typePriority
+                    || (candidateTypePriority == typePriority && candidateOrder < ruleOrder)) {
+                typePriority = candidateTypePriority;
+                ruleOrder = candidateOrder;
+            }
         }
 
         private boolean isPreferred() {
@@ -245,6 +278,10 @@ public class ChatMenuKeywordExtractor {
             return ruleOrder;
         }
 
+        private int typePriority() {
+            return typePriority;
+        }
+
         private int positiveMentionCount() {
             return positiveMentionCount;
         }
@@ -252,5 +289,13 @@ public class ChatMenuKeywordExtractor {
         private int lastMentionOrder() {
             return lastMentionOrder;
         }
+    }
+
+    private static int resultPriority(ChatKeywordCandidate.Type type) {
+        return switch (type) {
+            case MENU -> 0;
+            case CATEGORY -> 1;
+            case RESTAURANT -> 2;
+        };
     }
 }

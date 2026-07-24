@@ -10,7 +10,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.ArrayList;
 import java.util.List;
 
-/** 빈 DB 사전과 누적 음식점명을 현재 분석 요청의 후보 목록으로 조합한다. */
+/** 음식 사전을 한 번 조회해 유형별로 나눈 뒤 누적 음식점명을 결합한다. */
 @Service
 @RequiredArgsConstructor
 public class ChatKeywordDictionaryService {
@@ -22,6 +22,15 @@ public class ChatKeywordDictionaryService {
     public List<ChatKeywordCandidate> loadCandidates() {
         List<ChatKeywordCandidate> candidates = new ArrayList<>();
 
+        List<ChatKeywordCandidate> foodCandidates = foodKeywordRepository
+                .findAllByOrderByIdAsc()
+                .stream()
+                .map(this::toCandidate)
+                .toList();
+
+        addType(candidates, foodCandidates, ChatKeywordCandidate.Type.MENU);
+        addType(candidates, foodCandidates, ChatKeywordCandidate.Type.CATEGORY);
+
         restaurantRepository.findKeywordCandidateNames().stream()
                 .map(name -> new ChatKeywordCandidate(
                         ChatKeywordCandidate.Type.RESTAURANT,
@@ -30,11 +39,17 @@ public class ChatKeywordDictionaryService {
                 ))
                 .forEach(candidates::add);
 
-        foodKeywordRepository.findAllByOrderByIdAsc().stream()
-                .map(this::toCandidate)
-                .forEach(candidates::add);
-
         return List.copyOf(candidates);
+    }
+
+    private void addType(
+            List<ChatKeywordCandidate> target,
+            List<ChatKeywordCandidate> candidates,
+            ChatKeywordCandidate.Type type
+    ) {
+        candidates.stream()
+                .filter(candidate -> candidate.type() == type)
+                .forEach(target::add);
     }
 
     private ChatKeywordCandidate toCandidate(FoodKeyword keyword) {
