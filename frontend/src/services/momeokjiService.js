@@ -17,9 +17,9 @@ const FALLBACK_RECOMMENDATION_GROUPS = [
 ]
 
 // ===== 기능 시작 직전 2시간의 채팅에서 백엔드가 추출한 메뉴를 조회 =====
-export async function analyzeConversationMenus(chatRoomId, featureStartedAt) {
+export async function analyzeConversationMenus(chatRoomId, featureStartedAt, participantIds) {
   try {
-    const data = await getChatRoomMenuKeywords(chatRoomId, featureStartedAt)
+    const data = await getChatRoomMenuKeywords(chatRoomId, featureStartedAt, participantIds)
     return Array.isArray(data?.menus) ? data.menus : []
   } catch (error) {
     throw new Error(error.userMessage || '대화 추천 메뉴를 불러오지 못했습니다.', {

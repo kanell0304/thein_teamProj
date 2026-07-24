@@ -17,12 +17,14 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> 
             from ChatMessage message
             where message.chatRoom.id = :chatRoomId
               and message.user is not null
+              and message.user.id in :participantIds
               and message.createdAt >= :fromInclusive
               and message.createdAt < :toExclusive
             order by message.createdAt asc
             """)
-    List<ChatMessage> findUserMessagesInPeriod(
+    List<ChatMessage> findParticipantMessagesInPeriod(
             @Param("chatRoomId") Long chatRoomId,
+            @Param("participantIds") List<Long> participantIds,
             @Param("fromInclusive") LocalDateTime fromInclusive,
             @Param("toExclusive") LocalDateTime toExclusive
     );

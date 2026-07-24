@@ -14,9 +14,11 @@ export function getRecentMessages(chatRoomId) {
   return apiFetch(`/api/chatrooms/${chatRoomId}/messages`)
 }
 
-export function getChatRoomMenuKeywords(chatRoomId, featureStartedAt) {
-  const query = new URLSearchParams({ featureStartedAt }).toString()
-  return apiFetch(`/api/chatrooms/${chatRoomId}/menu-keywords?${query}`)
+export function getChatRoomMenuKeywords(chatRoomId, featureStartedAt, participantIds) {
+  return apiFetch(`/api/chatrooms/${chatRoomId}/menu-keywords`, {
+    method: 'POST',
+    body: JSON.stringify({ featureStartedAt, participantIds }),
+  })
 }
 
 export function getChatRoomMembers(chatRoomId) {

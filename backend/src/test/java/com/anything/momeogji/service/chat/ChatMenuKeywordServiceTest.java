@@ -47,8 +47,11 @@ class ChatMenuKeywordServiceTest {
 
         given(chatRoomMemberRepository.existsByChatRoomIdAndUserId(chatRoomId, memberId))
                 .willReturn(true);
-        given(chatMessageRepository.findUserMessagesInPeriod(
+        given(chatRoomMemberRepository.countByChatRoomIdAndUserIdIn(chatRoomId, List.of(11L, 12L)))
+                .willReturn(2L);
+        given(chatMessageRepository.findParticipantMessagesInPeriod(
                 chatRoomId,
+                List.of(11L, 12L),
                 fromInclusive,
                 toExclusive
         )).willReturn(messages);
@@ -57,13 +60,15 @@ class ChatMenuKeywordServiceTest {
         ChatMenuKeywordResponse response = service.extract(
                 chatRoomId,
                 memberId,
-                featureStartedAt
+                featureStartedAt,
+                List.of(11L, 12L, 12L)
         );
 
         assertThat(response.menus()).containsExactly("초밥");
         assertThat(response.analyzedMessageCount()).isEqualTo(2);
-        verify(chatMessageRepository).findUserMessagesInPeriod(
+        verify(chatMessageRepository).findParticipantMessagesInPeriod(
                 chatRoomId,
+                List.of(11L, 12L),
                 fromInclusive,
                 toExclusive
         );
@@ -77,8 +82,79 @@ class ChatMenuKeywordServiceTest {
         assertThatThrownBy(() -> service.extract(
                 7L,
                 11L,
-                Instant.parse("2026-07-22T12:00:00Z")
+                Instant.parse("2026-07-22T12:00:00Z"),
+                List.of(11L)
         )).isInstanceOf(AccessDeniedException.class);
+
+        verifyNoInteractions(chatMessageRepository, keywordExtractor);
+    }
+
+    @Test
+    void rejectsRequestWhenCallerIsNotAMomeokjiParticipant() {
+        given(chatRoomMemberRepository.existsByChatRoomIdAndUserId(7L, 11L))
+                .willReturn(true);
+
+        assertThatThrownBy(() -> service.extract(
+                7L,
+                11L,
+                Instant.parse("2026-07-22T12:00:00Z"),
+                List.of(12L)
+        ))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("요청자는 모먹지 참가자에 포함되어야 합니다.");
+
+        verifyNoInteractions(chatMessageRepository, keywordExtractor);
+    }
+
+    @Test
+    void rejectsParticipantWhoDoesNotBelongToTheChatRoom() {
+        given(chatRoomMemberRepository.existsByChatRoomIdAndUserId(7L, 11L))
+                .willReturn(true);
+        given(chatRoomMemberRepository.countByChatRoomIdAndUserIdIn(7L, List.of(11L, 99L)))
+                .willReturn(1L);
+
+        assertThatThrownBy(() -> service.extract(
+                7L,
+                11L,
+                Instant.parse("2026-07-22T12:00:00Z"),
+                List.of(11L, 99L)
+        ))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("모먹지 참가자는 모두 해당 채팅방 참여자여야 합니다.");
+
+        verifyNoInteractions(chatMessageRepository, keywordExtractor);
+    }
+
+    @Test
+    void rejectsEmptyParticipantIds() {
+        given(chatRoomMemberRepository.existsByChatRoomIdAndUserId(7L, 11L))
+                .willReturn(true);
+
+        assertThatThrownBy(() -> service.extract(
+                7L,
+                11L,
+                Instant.parse("2026-07-22T12:00:00Z"),
+                List.of()
+        ))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("participantIds는 한 명 이상이어야 합니다.");
+
+        verifyNoInteractions(chatMessageRepository, keywordExtractor);
+    }
+
+    @Test
+    void rejectsNonPositiveParticipantId() {
+        given(chatRoomMemberRepository.existsByChatRoomIdAndUserId(7L, 11L))
+                .willReturn(true);
+
+        assertThatThrownBy(() -> service.extract(
+                7L,
+                11L,
+                Instant.parse("2026-07-22T12:00:00Z"),
+                List.of(11L, 0L)
+        ))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("participantIds는 양수여야 합니다.");
 
         verifyNoInteractions(chatMessageRepository, keywordExtractor);
     }

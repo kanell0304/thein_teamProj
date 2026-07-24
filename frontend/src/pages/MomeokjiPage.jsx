@@ -119,7 +119,20 @@ function MomeokjiPage({
   const [menuInput, setMenuInput] = useState('')
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [analysisMessage, setAnalysisMessage] = useState('')
-  const analyzedFeatureStartedAtRef = useRef(null)
+  const analyzedRequestKeyRef = useRef(null)
+
+  // ===== 주최자 ID는 UI 상태와 무관하게 최종 참가자 값에 항상 포함 =====
+  const effectiveParticipantIds = useMemo(
+    () => [...new Set([...defaultParticipantIds, ...participantIds])],
+    [defaultParticipantIds, participantIds],
+  )
+  const analysisParticipantIds = useMemo(
+    () => [...effectiveParticipantIds].sort((left, right) => Number(left) - Number(right)),
+    [effectiveParticipantIds],
+  )
+  const analysisRequestKey = featureStartedAt
+    ? `${featureStartedAt}|${analysisParticipantIds.join(',')}`
+    : null
 
   useEffect(() => {
     if (!open) return undefined
@@ -132,44 +145,52 @@ function MomeokjiPage({
 
   useEffect(() => {
     if (
+      analyzedRequestKeyRef.current !== null
+      && analyzedRequestKeyRef.current !== analysisRequestKey
+    ) {
+      analyzedRequestKeyRef.current = null
+    }
+
+    if (
       !open
       || step !== TOTAL_STEPS - 1
       || !chatRoomId
-      || !featureStartedAt
-      || analyzedFeatureStartedAtRef.current === featureStartedAt
+      || !analysisRequestKey
+      || analyzedRequestKeyRef.current === analysisRequestKey
     ) return
 
-    analyzedFeatureStartedAtRef.current = featureStartedAt
+    analyzedRequestKeyRef.current = analysisRequestKey
     setIsAnalyzing(true)
     setAnalysisMessage('')
     setMenuOptions([])
     setMenus([])
 
-    analyzeConversationMenus(chatRoomId, featureStartedAt)
+    analyzeConversationMenus(chatRoomId, featureStartedAt, analysisParticipantIds)
       .then((items) => {
-        if (analyzedFeatureStartedAtRef.current !== featureStartedAt) return
+        if (analyzedRequestKeyRef.current !== analysisRequestKey) return
         setMenuOptions(items)
         setAnalysisMessage(items.length > 0
           ? '대화 내용을 바탕으로 추천한 메뉴예요.'
           : '대화에서 메뉴를 찾지 못했어요. 메뉴를 직접 추가해주세요.')
       })
       .catch(() => {
-        if (analyzedFeatureStartedAtRef.current !== featureStartedAt) return
+        if (analyzedRequestKeyRef.current !== analysisRequestKey) return
         setMenuOptions([])
         setAnalysisMessage('대화 추천 메뉴를 불러오지 못했어요. 메뉴를 직접 추가해주세요.')
       })
       .finally(() => {
-        if (analyzedFeatureStartedAtRef.current === featureStartedAt) {
+        if (analyzedRequestKeyRef.current === analysisRequestKey) {
           setIsAnalyzing(false)
         }
       })
-  }, [chatRoomId, featureStartedAt, open, step])
-
-  // ===== 주최자 ID는 UI 상태와 무관하게 최종 참가자 값에 항상 포함 =====
-  const effectiveParticipantIds = useMemo(
-    () => [...new Set([...defaultParticipantIds, ...participantIds])],
-    [defaultParticipantIds, participantIds],
-  )
+  }, [
+    analysisParticipantIds,
+    analysisRequestKey,
+    chatRoomId,
+    featureStartedAt,
+    open,
+    step,
+  ])
 
   const selectedParticipantNames = useMemo(
     () => participants
