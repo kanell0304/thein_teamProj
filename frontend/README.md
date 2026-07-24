@@ -135,3 +135,5 @@ setAccessToken(loginResponse.accessToken)
 - Spring Boot 개발 서버: `http://localhost:8081`
 - 프론트의 `/api` 요청은 Vite 프록시를 통해 Spring Boot로 전달됩니다.
 - 화면 기본 경로는 `/chat/1`이며 `/` 접속 시 자동으로 이동합니다.
+
+<!-- CI/CD 배포 파이프라인 테스트 -->
