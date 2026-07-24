@@ -229,14 +229,14 @@ class ChatMenuKeywordExtractorTest {
                         category("일식"),
                         menu("초밥", "스시"),
                         menu("치킨"),
-                        menu("돈까스", "돈가스", "돈카츠")
+                        menu("돈가스", "돈까스", "돈카츠")
                 )
         );
 
-        assertThat(result.menus()).containsExactly("초밥", "돈까스", "일식");
+        assertThat(result.menus()).containsExactly("초밥", "돈가스", "일식");
         assertThat(result.keywordScores()).containsExactly(
                 score("초밥", ChatKeywordCandidate.Type.MENU, 2, 0),
-                score("돈까스", ChatKeywordCandidate.Type.MENU, 1, 0),
+                score("돈가스", ChatKeywordCandidate.Type.MENU, 1, 0),
                 score("일식", ChatKeywordCandidate.Type.CATEGORY, 1, 0),
                 score("치킨", ChatKeywordCandidate.Type.MENU, 0, 1)
         );
@@ -272,6 +272,22 @@ class ChatMenuKeywordExtractorTest {
         assertThat(result.menus()).containsExactly("스시하루");
         assertThat(result.keywordScores()).containsExactly(
                 score("스시하루", ChatKeywordCandidate.Type.RESTAURANT, 1, 0)
+        );
+    }
+
+    @Test
+    void demonstrationRestaurantNameBlocksTheOverlappingBulbaekAlias() {
+        ChatKeywordAnalysisResult result = extractor.extract(
+                List.of(message("딸부자네불백 강남역점 어때요?")),
+                List.of(
+                        restaurant("딸부자네불백 강남역점"),
+                        menu("불고기", "불백")
+                )
+        );
+
+        assertThat(result.menus()).containsExactly("딸부자네불백 강남역점");
+        assertThat(result.keywordScores()).containsExactly(
+                score("딸부자네불백 강남역점", ChatKeywordCandidate.Type.RESTAURANT, 1, 0)
         );
     }
 
