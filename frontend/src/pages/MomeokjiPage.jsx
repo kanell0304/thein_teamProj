@@ -14,8 +14,33 @@ import {
   TOTAL_STEPS,
   VOTE_DURATION,
 } from '../constants/momeokjiOptions'
-import { analyzeConversationMenus } from '../services/momeokjiService'
+import { analyzeConversationKeywords } from '../services/momeokjiService'
 import './MomeokjiPage.css'
+
+const KEYWORD_TYPES = ['MENU', 'CATEGORY', 'RESTAURANT']
+const MAX_EXTRACTED_KEYWORDS_PER_TYPE = 10
+
+function createKeywordOption(type, name) {
+  return {
+    key: `${type}:${name}`,
+    type,
+    name,
+  }
+}
+
+// TODO: DB 사전·음식점 데이터가 준비되면 제거할 7/7 화면 확인용 목업
+const TEMP_MOCK_KEYWORD_OPTIONS = {
+  CATEGORY: [createKeywordOption('CATEGORY', '일식')],
+  RESTAURANT: [createKeywordOption('RESTAURANT', '스시하루')],
+}
+
+function isVisibleKeywordScore(item) {
+  return item
+    && KEYWORD_TYPES.includes(item.type)
+    && typeof item.name === 'string'
+    && item.name.trim()
+    && Number(item.score) >= 1
+}
 
 function formatLocalDate(date) {
   const year = date.getFullYear()
@@ -71,6 +96,28 @@ export function ChipGroup({ label, options, selected, onToggle, single = false }
   )
 }
 
+function KeywordRow({ label, options, selected, onToggle }) {
+  return (
+    <div className="momeokji-keyword-row" role="group" aria-label={`${label} 선택`}>
+      {options.map((option) => {
+        const isSelected = selected.includes(option.key)
+        return (
+          <button
+            className={`ui-chip${isSelected ? ' is-selected' : ''}`}
+            data-option-value={option.name}
+            type="button"
+            aria-pressed={isSelected}
+            key={option.key}
+            onClick={() => onToggle(option.key)}
+          >
+            {option.name}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
 // ===== 개인 옵션과 식당 투표 제한시간을 동일한 분 단위 입력으로 관리 =====
 function DurationField({ label, description, value, min, max, onChange }) {
   return (
@@ -113,9 +160,9 @@ function MomeokjiPage({
   )
   const [voteDurationMinutes, setVoteDurationMinutes] = useState(VOTE_DURATION.defaultValue)
   const [themeCode, setThemeCode] = useState('MEAL')
-  const [menuOptions, setMenuOptions] = useState([])
+  const [keywordScores, setKeywordScores] = useState([])
   const [customMenuOptions, setCustomMenuOptions] = useState([])
-  const [menus, setMenus] = useState([])
+  const [selectedKeywordKeys, setSelectedKeywordKeys] = useState([])
   const [menuInput, setMenuInput] = useState('')
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [analysisMessage, setAnalysisMessage] = useState('')
@@ -162,21 +209,21 @@ function MomeokjiPage({
     analyzedRequestKeyRef.current = analysisRequestKey
     setIsAnalyzing(true)
     setAnalysisMessage('')
-    setMenuOptions([])
-    setMenus([])
+    setKeywordScores([])
+    setSelectedKeywordKeys([])
 
-    analyzeConversationMenus(chatRoomId, featureStartedAt, analysisParticipantIds)
+    analyzeConversationKeywords(chatRoomId, featureStartedAt, analysisParticipantIds)
       .then((items) => {
         if (analyzedRequestKeyRef.current !== analysisRequestKey) return
-        setMenuOptions(items)
-        setAnalysisMessage(items.length > 0
-          ? '대화 내용을 바탕으로 추천한 메뉴예요.'
-          : '대화에서 메뉴를 찾지 못했어요. 메뉴를 직접 추가해주세요.')
+        setKeywordScores(items)
+        setAnalysisMessage(items.some(isVisibleKeywordScore)
+          ? '대화 내용을 바탕으로 찾은 선택지예요.'
+          : '대화에서 선택지를 찾지 못했어요. 메뉴를 직접 추가해주세요.')
       })
       .catch(() => {
         if (analyzedRequestKeyRef.current !== analysisRequestKey) return
-        setMenuOptions([])
-        setAnalysisMessage('대화 추천 메뉴를 불러오지 못했어요. 메뉴를 직접 추가해주세요.')
+        setKeywordScores([])
+        setAnalysisMessage('대화 추천 항목을 불러오지 못했어요. 메뉴를 직접 추가해주세요.')
       })
       .finally(() => {
         if (analyzedRequestKeyRef.current === analysisRequestKey) {
@@ -199,11 +246,71 @@ function MomeokjiPage({
     [effectiveParticipantIds, participants],
   )
 
-  // ===== 대화 추출 메뉴와 직접 추가 메뉴를 중복 없이 하나의 선택 목록으로 구성 =====
-  const selectableMenuOptions = useMemo(
-    () => [...new Set([...menuOptions, ...customMenuOptions, MENU_ANY_OPTION])],
-    [customMenuOptions, menuOptions],
+  // ===== 순점수 1 이상 대화 키워드를 유형별 최대 10개로 분리 =====
+  const extractedKeywordOptions = useMemo(() => {
+    const optionsByType = {
+      MENU: [],
+      CATEGORY: [],
+      RESTAURANT: [],
+    }
+    const seenKeys = new Set()
+
+    keywordScores.forEach((item) => {
+      if (!isVisibleKeywordScore(item)) return
+
+      const option = createKeywordOption(item.type, item.name.trim())
+      if (
+        seenKeys.has(option.key)
+        || optionsByType[option.type].length >= MAX_EXTRACTED_KEYWORDS_PER_TYPE
+      ) return
+
+      seenKeys.add(option.key)
+      optionsByType[option.type].push(option)
+    })
+
+    return optionsByType
+  }, [keywordScores])
+
+  // ===== 아무거나와 직접 추가 메뉴는 추천 결과와 분리한 네 번째 줄에 유지 =====
+  const customMenuRowOptions = useMemo(() => {
+    const options = [
+      createKeywordOption('MENU', MENU_ANY_OPTION),
+      ...customMenuOptions.map((name) => createKeywordOption('MENU', name)),
+    ]
+    return [...new Map(options.map((option) => [option.key, option])).values()]
+  }, [customMenuOptions])
+
+  const temporarySectorOptions = useMemo(() => {
+    const mergeOptions = (type) => [...new Map(
+      [
+        ...TEMP_MOCK_KEYWORD_OPTIONS[type],
+        ...extractedKeywordOptions[type],
+      ].map((option) => [option.key, option]),
+    ).values()].slice(0, MAX_EXTRACTED_KEYWORDS_PER_TYPE)
+
+    return {
+      CATEGORY: mergeOptions('CATEGORY'),
+      RESTAURANT: mergeOptions('RESTAURANT'),
+    }
+  }, [extractedKeywordOptions])
+
+  const keywordOptions = useMemo(
+    () => [
+      ...extractedKeywordOptions.MENU,
+      ...temporarySectorOptions.CATEGORY,
+      ...temporarySectorOptions.RESTAURANT,
+      ...customMenuRowOptions,
+    ],
+    [customMenuRowOptions, extractedKeywordOptions.MENU, temporarySectorOptions],
   )
+  const selectedKeywordNames = useMemo(() => {
+    const nameByKey = new Map(keywordOptions.map((option) => [option.key, option.name]))
+    return [...new Set(
+      selectedKeywordKeys
+        .map((key) => nameByKey.get(key))
+        .filter(Boolean),
+    )]
+  }, [keywordOptions, selectedKeywordKeys])
 
   const toggleArrayValue = (setter, value) => {
     setter((previous) => (
@@ -217,14 +324,16 @@ function MomeokjiPage({
   const addCustomMenu = () => {
     const newMenu = menuInput.trim()
     if (!newMenu) return
+    const newMenuKey = createKeywordOption('MENU', newMenu).key
 
     setCustomMenuOptions((previous) => (
-      menuOptions.includes(newMenu) || previous.includes(newMenu)
+      extractedKeywordOptions.MENU.some((option) => option.name === newMenu)
+        || previous.includes(newMenu)
         ? previous
         : [...previous, newMenu]
     ))
-    setMenus((previous) => (
-      previous.includes(newMenu) ? previous : [...previous, newMenu]
+    setSelectedKeywordKeys((previous) => (
+      previous.includes(newMenuKey) ? previous : [...previous, newMenuKey]
     ))
     setMenuInput('')
   }
@@ -239,7 +348,7 @@ function MomeokjiPage({
       && voteDurationMinutes >= VOTE_DURATION.min
       && voteDurationMinutes <= VOTE_DURATION.max,
     Boolean(themeCode),
-    menus.length > 0,
+    selectedKeywordKeys.length > 0,
   ][step]
 
   const handleNext = () => {
@@ -261,7 +370,7 @@ function MomeokjiPage({
       voteDurationMinutes,
       themeCode,
       themeLabel: THEMES.find((option) => option.value === themeCode)?.label ?? themeCode,
-      menus,
+      menus: selectedKeywordNames,
       // 개인 취향은 주최자를 포함한 각 참가자의 개인 조건 화면에서만 수집합니다.
       avoidFoods: [],
       moods: [],
@@ -345,25 +454,40 @@ function MomeokjiPage({
         )
       case 6:
         return (
-          <div className="momeokji-step">
+          <div className="momeokji-step momeokji-keyword-step">
             <div className="momeokji-step-title">
               <h3>오늘 대화엔 이런 메뉴가 나왔어요</h3>
               <span>필수</span>
             </div>
             <p className="momeokji-description">
-              {isAnalyzing ? '대화에서 메뉴를 찾고 있어요…' : analysisMessage}
+              {isAnalyzing ? '대화에서 메뉴와 음식점을 찾고 있어요…' : analysisMessage}
             </p>
-            <ChipGroup
-              label="대화 추천 메뉴"
-              options={selectableMenuOptions}
-              selected={menus}
-              onToggle={(value) => toggleArrayValue(setMenus, value)}
-            />
-            <AddableMenuInput
-              value={menuInput}
-              onChange={setMenuInput}
-              onAdd={addCustomMenu}
-            />
+            <div className="momeokji-keyword-sectors">
+              <KeywordRow
+                label="메뉴"
+                options={extractedKeywordOptions.MENU}
+                selected={selectedKeywordKeys}
+                onToggle={(value) => toggleArrayValue(setSelectedKeywordKeys, value)}
+              />
+              <KeywordRow
+                label="카테고리"
+                options={temporarySectorOptions.CATEGORY}
+                selected={selectedKeywordKeys}
+                onToggle={(value) => toggleArrayValue(setSelectedKeywordKeys, value)}
+              />
+              <KeywordRow
+                label="음식점명"
+                options={temporarySectorOptions.RESTAURANT}
+                selected={selectedKeywordKeys}
+                onToggle={(value) => toggleArrayValue(setSelectedKeywordKeys, value)}
+              />
+              <KeywordRow
+                label="직접 추가 메뉴"
+                options={customMenuRowOptions}
+                selected={selectedKeywordKeys}
+                onToggle={(value) => toggleArrayValue(setSelectedKeywordKeys, value)}
+              />
+            </div>
           </div>
         )
       default:
@@ -386,6 +510,15 @@ function MomeokjiPage({
           <span className="momeokji-step-count">{step + 1}/{TOTAL_STEPS}</span>
         </header>
         <div className="ui-sheet__body">{renderStep()}</div>
+        {step === TOTAL_STEPS - 1 && (
+          <div className="momeokji-menu-input-footer">
+            <AddableMenuInput
+              value={menuInput}
+              onChange={setMenuInput}
+              onAdd={addCustomMenu}
+            />
+          </div>
+        )}
         <NextProgressButton
           currentStep={step + 1}
           totalSteps={TOTAL_STEPS}
