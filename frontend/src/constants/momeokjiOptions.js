@@ -34,8 +34,3 @@ export const MOOD_OPTIONS = [
   '새로운 메뉴',
   '상관없어요',
 ]
-
-export const CATEGORY_OPTIONS = ['한식', '중식', '일식', '양식', '분식', '카페/디저트', '고기', '아시안']
-
-// 목적지 좌표 기준 도보 이동 가능 시간(분). AI 추천의 walkMinutes 조건으로 그대로 전달됩니다.
-export const WALK_MINUTES_OPTIONS = [5, 10, 15, 20, 30]

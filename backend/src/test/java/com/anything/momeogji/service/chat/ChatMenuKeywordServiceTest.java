@@ -69,7 +69,6 @@ class ChatMenuKeywordServiceTest {
         given(keywordDictionaryService.loadCandidates()).willReturn(candidates);
         given(keywordExtractor.extract(messages, candidates)).willReturn(
                 new ChatKeywordAnalysisResult(
-                        List.of("초밥"),
                         List.of(new ChatKeywordScore(
                                 "초밥",
                                 ChatKeywordCandidate.Type.MENU,
@@ -87,7 +86,6 @@ class ChatMenuKeywordServiceTest {
                 List.of(11L, 12L, 12L)
         );
 
-        assertThat(response.menus()).containsExactly("초밥");
         assertThat(response.keywordScores()).containsExactly(
                 new ChatMenuKeywordScoreResponse(
                         "초밥",
@@ -97,7 +95,6 @@ class ChatMenuKeywordServiceTest {
                         1
                 )
         );
-        assertThat(response.analyzedMessageCount()).isEqualTo(2);
         verify(chatMessageRepository).findParticipantMessagesInPeriod(
                 chatRoomId,
                 List.of(11L, 12L),

@@ -22,7 +22,7 @@ class ChatMenuKeywordExtractorTest {
                 List.of(menu("초밥"))
         );
 
-        assertThat(result.menus()).containsExactly("초밥");
+        assertThat(positiveKeywordNames(result)).containsExactly("초밥");
         assertThat(result.keywordScores()).containsExactly(
                 score("초밥", ChatKeywordCandidate.Type.MENU, 3, 0)
         );
@@ -56,7 +56,7 @@ class ChatMenuKeywordExtractorTest {
                 List.of(menu("치킨"))
         );
 
-        assertThat(result.menus()).isEmpty();
+        assertThat(positiveKeywordNames(result)).isEmpty();
         assertThat(result.keywordScores()).containsExactly(
                 score("치킨", ChatKeywordCandidate.Type.MENU, 0, 8)
         );
@@ -95,7 +95,7 @@ class ChatMenuKeywordExtractorTest {
                 )
         );
 
-        assertThat(result.menus()).containsExactly("피자");
+        assertThat(positiveKeywordNames(result)).containsExactly("피자");
         assertThat(result.keywordScores()).containsExactly(
                 score("피자", ChatKeywordCandidate.Type.MENU, 2, 0),
                 score("치킨", ChatKeywordCandidate.Type.MENU, 0, 2)
@@ -109,7 +109,7 @@ class ChatMenuKeywordExtractorTest {
                 List.of(menu("치킨"))
         );
 
-        assertThat(result.menus()).isEmpty();
+        assertThat(positiveKeywordNames(result)).isEmpty();
         assertThat(result.keywordScores()).containsExactly(
                 score("치킨", ChatKeywordCandidate.Type.MENU, 1, 1)
         );
@@ -126,7 +126,7 @@ class ChatMenuKeywordExtractorTest {
                 List.of(menu("초밥"))
         );
 
-        assertThat(result.menus()).containsExactly("초밥");
+        assertThat(positiveKeywordNames(result)).containsExactly("초밥");
         assertThat(result.keywordScores()).containsExactly(
                 score("초밥", ChatKeywordCandidate.Type.MENU, 2, 1)
         );
@@ -143,7 +143,7 @@ class ChatMenuKeywordExtractorTest {
                 )
         );
 
-        assertThat(result.menus()).containsExactly("피자");
+        assertThat(positiveKeywordNames(result)).containsExactly("피자");
         assertThat(result.keywordScores()).containsExactly(
                 score("피자", ChatKeywordCandidate.Type.MENU, 1, 0),
                 score("치킨", ChatKeywordCandidate.Type.MENU, 1, 1),
@@ -166,7 +166,7 @@ class ChatMenuKeywordExtractorTest {
                 )
         );
 
-        assertThat(result.menus()).containsExactly("초밥", "일식", "스시하루");
+        assertThat(positiveKeywordNames(result)).containsExactly("초밥", "일식", "스시하루");
     }
 
     @Test
@@ -180,7 +180,7 @@ class ChatMenuKeywordExtractorTest {
                 )
         );
 
-        assertThat(result.menus()).containsExactly("초밥", "일식", "스시하루");
+        assertThat(positiveKeywordNames(result)).containsExactly("초밥", "일식", "스시하루");
     }
 
     @Test
@@ -196,7 +196,7 @@ class ChatMenuKeywordExtractorTest {
                 )
         );
 
-        assertThat(result.menus()).containsExactly("초밥", "피자");
+        assertThat(positiveKeywordNames(result)).containsExactly("초밥", "피자");
     }
 
     @Test
@@ -209,7 +209,7 @@ class ChatMenuKeywordExtractorTest {
                 )
         );
 
-        assertThat(result.menus()).isEmpty();
+        assertThat(positiveKeywordNames(result)).isEmpty();
         assertThat(result.keywordScores()).containsExactly(
                 score("피자", ChatKeywordCandidate.Type.MENU, 0, 1),
                 score("초밥", ChatKeywordCandidate.Type.MENU, 0, 1)
@@ -233,7 +233,7 @@ class ChatMenuKeywordExtractorTest {
                 )
         );
 
-        assertThat(result.menus()).containsExactly("초밥", "돈가스", "일식");
+        assertThat(positiveKeywordNames(result)).containsExactly("초밥", "돈가스", "일식");
         assertThat(result.keywordScores()).containsExactly(
                 score("초밥", ChatKeywordCandidate.Type.MENU, 2, 0),
                 score("돈가스", ChatKeywordCandidate.Type.MENU, 1, 0),
@@ -243,7 +243,7 @@ class ChatMenuKeywordExtractorTest {
     }
 
     @Test
-    void keepsSameNameInDifferentTypesAsSeparateScoresAndOneMenuName() {
+    void keepsSameNameInDifferentTypesAsSeparateScores() {
         ChatKeywordAnalysisResult result = extractor.extract(
                 List.of(message("메뉴별칭 카테고리별칭")),
                 List.of(
@@ -252,7 +252,6 @@ class ChatMenuKeywordExtractorTest {
                 )
         );
 
-        assertThat(result.menus()).containsExactly("공통");
         assertThat(result.keywordScores()).containsExactly(
                 score("공통", ChatKeywordCandidate.Type.MENU, 1, 0),
                 score("공통", ChatKeywordCandidate.Type.CATEGORY, 1, 0)
@@ -269,7 +268,7 @@ class ChatMenuKeywordExtractorTest {
                 )
         );
 
-        assertThat(result.menus()).containsExactly("스시하루");
+        assertThat(positiveKeywordNames(result)).containsExactly("스시하루");
         assertThat(result.keywordScores()).containsExactly(
                 score("스시하루", ChatKeywordCandidate.Type.RESTAURANT, 1, 0)
         );
@@ -285,7 +284,7 @@ class ChatMenuKeywordExtractorTest {
                 )
         );
 
-        assertThat(result.menus()).containsExactly("딸부자네불백 강남역점");
+        assertThat(positiveKeywordNames(result)).containsExactly("딸부자네불백 강남역점");
         assertThat(result.keywordScores()).containsExactly(
                 score("딸부자네불백 강남역점", ChatKeywordCandidate.Type.RESTAURANT, 1, 0)
         );
@@ -301,7 +300,7 @@ class ChatMenuKeywordExtractorTest {
                 )
         );
 
-        assertThat(result.menus()).containsExactly("초밥");
+        assertThat(positiveKeywordNames(result)).containsExactly("초밥");
     }
 
     @Test
@@ -316,11 +315,11 @@ class ChatMenuKeywordExtractorTest {
                 )
         );
 
-        assertThat(result.menus()).containsExactly("돼지갈비", "스시하루 강남점");
+        assertThat(positiveKeywordNames(result)).containsExactly("돼지갈비", "스시하루 강남점");
     }
 
     @Test
-    void removesDuplicateNamesAndReturnsAtMostFiveMenus() {
+    void returnsAllKeywordScoresWithoutABackendDisplayLimit() {
         ChatKeywordAnalysisResult result = extractor.extract(
                 List.of(message("한식 중식 일식 양식 피자 초밥")),
                 List.of(
@@ -333,9 +332,8 @@ class ChatMenuKeywordExtractorTest {
                 )
         );
 
-        assertThat(result.menus())
-                .containsExactly("초밥", "피자", "양식", "일식", "중식")
-                .doesNotHaveDuplicates();
+        assertThat(positiveKeywordNames(result))
+                .containsExactly("초밥", "피자", "양식", "일식", "중식", "한식");
         assertThat(result.keywordScores()).hasSize(6);
     }
 
@@ -365,6 +363,13 @@ class ChatMenuKeywordExtractorTest {
                 negativeCount,
                 positiveCount - negativeCount
         );
+    }
+
+    private List<String> positiveKeywordNames(ChatKeywordAnalysisResult result) {
+        return result.keywordScores().stream()
+                .filter(keywordScore -> keywordScore.score() >= 1)
+                .map(ChatKeywordScore::name)
+                .toList();
     }
 
     private ChatKeywordCandidate category(String name, String... aliases) {

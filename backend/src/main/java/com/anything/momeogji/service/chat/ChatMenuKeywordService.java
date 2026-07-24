@@ -63,7 +63,6 @@ public class ChatMenuKeywordService {
         List<ChatKeywordCandidate> candidates = keywordDictionaryService.loadCandidates();
         ChatKeywordAnalysisResult analysis = keywordExtractor.extract(messages, candidates);
         return new ChatMenuKeywordResponse(
-                analysis.menus(),
                 analysis.keywordScores().stream()
                         .map(score -> new ChatMenuKeywordScoreResponse(
                                 score.name(),
@@ -74,8 +73,7 @@ public class ChatMenuKeywordService {
                                 score.negativeCount(),
                                 score.score()
                         ))
-                        .toList(),
-                messages.size()
+                        .toList()
         );
     }
 

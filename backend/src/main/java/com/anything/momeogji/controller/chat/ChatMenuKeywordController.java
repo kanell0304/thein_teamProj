@@ -27,7 +27,7 @@ public class ChatMenuKeywordController {
     @PostMapping
     @Operation(
             summary = "최근 대화 메뉴 추출",
-            description = "기능 시작 직전 2시간 대화에서 순점수 1 이상 메뉴와 모든 언급 키워드의 긍정·부정 점수를 반환합니다."
+            description = "기능 시작 직전 2시간 대화에서 모든 언급 키워드의 긍정·부정 점수를 반환합니다."
     )
     public ChatMenuKeywordResponse getMenuKeywords(
             @PathVariable Long chatRoomId,

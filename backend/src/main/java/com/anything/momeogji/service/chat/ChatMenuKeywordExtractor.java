@@ -17,7 +17,6 @@ import java.util.regex.Pattern;
 @Component
 public class ChatMenuKeywordExtractor {
 
-    private static final int MAX_KEYWORD_COUNT = 5;
     private static final int NEGATIVE_CONTEXT_LENGTH = 24;
     private static final List<ChatKeywordCandidate.Type> MATCH_PRIORITY = List.of(
             ChatKeywordCandidate.Type.RESTAURANT,
@@ -101,17 +100,11 @@ public class ChatMenuKeywordExtractor {
                         .thenComparingInt(KeywordStat::ruleOrder))
                 .toList();
 
-        List<String> menus = sortedStats.stream()
-                .filter(stat -> stat.score() >= 1)
-                .map(KeywordStat::keyword)
-                .distinct()
-                .limit(MAX_KEYWORD_COUNT)
-                .toList();
         List<ChatKeywordScore> keywordScores = sortedStats.stream()
                 .map(KeywordStat::toScore)
                 .toList();
 
-        return new ChatKeywordAnalysisResult(menus, keywordScores);
+        return new ChatKeywordAnalysisResult(keywordScores);
     }
 
     private List<KeywordRule> toRules(List<ChatKeywordCandidate> candidates) {
@@ -325,10 +318,6 @@ public class ChatMenuKeywordExtractor {
                     negativeCount,
                     score()
             );
-        }
-
-        private String keyword() {
-            return keyword;
         }
 
         private ChatKeywordCandidate.Type type() {
