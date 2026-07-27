@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import MainScreen from '../components/layout/MainScreen'
 import useAuth from '../hooks/useAuth'
@@ -7,11 +8,23 @@ function SettingsPage() {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
   const nickname = user?.nickname || user?.name || '사용자'
+  const [copyStatus, setCopyStatus] = useState('')
 
   // ===== 저장된 인증 정보를 삭제하고 로그인 화면으로 이동 =====
   const handleLogout = () => {
     logout()
     navigate('/login', { replace: true })
+  }
+
+  // ===== 친구 추가에 쓸 내 UID를 클립보드로 복사 =====
+  const handleCopyUid = async () => {
+    if (!user?.id) return
+    try {
+      await navigator.clipboard.writeText(String(user.id))
+      setCopyStatus('복사됐어요')
+    } catch {
+      setCopyStatus('복사에 실패했어요')
+    }
   }
 
   return (
@@ -26,6 +39,14 @@ function SettingsPage() {
         <div>
           <strong>{nickname}</strong>
           <small>오늘 모 먹지? 계정</small>
+          {user?.id && (
+            <small className="settings-uid">
+              UID: {user.id}
+              <button type="button" className="settings-uid__copy" onClick={handleCopyUid}>
+                {copyStatus || '복사'}
+              </button>
+            </small>
+          )}
         </div>
       </section>
 

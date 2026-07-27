@@ -40,6 +40,20 @@
   font-size: 11px;
 }
 
+.settings-uid {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.settings-uid__copy {
+  padding: 2px 8px;
+  border: 1px solid var(--color-line-soft);
+  border-radius: 999px;
+  color: var(--color-subtle);
+  font-size: 10px;
+}
+
 .settings-menu {
   border-top: 1px solid var(--color-line-soft);
 }

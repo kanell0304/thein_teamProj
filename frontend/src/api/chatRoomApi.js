@@ -17,3 +17,9 @@ export async function fetchChatRoom(chatRoomId, { signal } = {}) {
   const response = await axiosInstance.get(`/chatrooms/${chatRoomId}`, { signal })
   return response.data
 }
+
+// ===== 공유 코드로 채팅방에 합류 =====
+export async function postJoinChatRoomByCode(code, { signal } = {}) {
+  const response = await axiosInstance.post('/chatrooms/join', { code }, { signal })
+  return response.data
+}
