@@ -13,11 +13,14 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.core.Authentication;
 import org.springframework.transaction.UnexpectedRollbackException;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.http.HttpStatus;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -64,6 +67,13 @@ public class ChatRoomController {
             // 나면 flush 시점이 아니라 여기서 곧바로 unique 제약 위반이 터진다 - 마찬가지로 이미 다른 요청이
             // 참여를 성공시켰다는 뜻이므로 무시한다.
         }
+    }
+
+    @Operation(summary = "채팅방 나가기", description = "현재 로그인 사용자만 참가자에서 제거해 자신의 목록에서 채팅방을 삭제합니다.")
+    @DeleteMapping("/{chatRoomId}/members/me")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void leaveRoom(@PathVariable Long chatRoomId, Authentication authentication) {
+        chatRoomService.leaveRoom(chatRoomId, memberId(authentication));
     }
 
     @Operation(summary = "코드로 채팅방 참여", description = "채팅방 공유 코드로 참여자로 등록됩니다.")

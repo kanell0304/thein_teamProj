@@ -2,6 +2,7 @@ package com.anything.momeogji.service.chat;
 
 import com.anything.momeogji.dto.chat.ChatRoomResponse;
 import com.anything.momeogji.entity.ChatRoom;
+import com.anything.momeogji.entity.ChatRoomMember;
 import com.anything.momeogji.entity.Member;
 import com.anything.momeogji.mapper.chat.ChatRoomQueryMapper;
 import com.anything.momeogji.repository.ChatRoomMemberRepository;
@@ -99,6 +100,34 @@ class ChatRoomServiceImplTest {
 
         assertThat(response).isEqualTo(new ChatRoomResponse(5L, "방 이름", "ABCD2345"));
         verify(chatRoomMemberRepository, never()).save(any());
+    }
+
+    @Test
+    void 채팅방에서_나가면_현재_회원의_참여관계만_삭제한다() {
+        ChatRoom chatRoom = ChatRoom.builder().id(5L).name("방 이름").build();
+        ChatRoomMember membership = ChatRoomMember.builder()
+                .id(11L)
+                .chatRoom(chatRoom)
+                .user(member(9L))
+                .build();
+        given(chatRoomRepository.findById(5L)).willReturn(Optional.of(chatRoom));
+        given(chatRoomMemberRepository.findByChatRoomIdAndUserId(5L, 9L)).willReturn(Optional.of(membership));
+
+        service.leaveRoom(5L, 9L);
+
+        verify(chatRoomMemberRepository).delete(membership);
+        verify(chatRoomRepository, never()).delete(any());
+    }
+
+    @Test
+    void 참여하지_않은_채팅방에서는_나갈_수_없다() {
+        ChatRoom chatRoom = ChatRoom.builder().id(5L).name("방 이름").build();
+        given(chatRoomRepository.findById(5L)).willReturn(Optional.of(chatRoom));
+        given(chatRoomMemberRepository.findByChatRoomIdAndUserId(5L, 9L)).willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.leaveRoom(5L, 9L))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("참여 중인 채팅방이 아닙니다.");
     }
 
     @Test

@@ -1,4 +1,9 @@
-import { fetchChatRooms, postChatRoom, postJoinChatRoomByCode } from '../api/chatRoomApi'
+import {
+  deleteMyChatRoomMembership,
+  fetchChatRooms,
+  postChatRoom,
+  postJoinChatRoomByCode,
+} from '../api/chatRoomApi'
 
 const USE_MOCK_API = String(import.meta.env.VITE_USE_MOCK ?? 'false').toLowerCase() === 'true'
 
@@ -40,5 +45,16 @@ export async function joinChatRoomByCode(code) {
     return await postJoinChatRoomByCode(code)
   } catch (error) {
     throw new Error(error.userMessage || '코드로 채팅방에 참여하지 못했습니다.', { cause: error })
+  }
+}
+
+// ===== 현재 사용자에게서만 채팅방을 제거하고 다른 참가자의 방은 유지 =====
+export async function leaveChatRoom(chatRoomId) {
+  if (USE_MOCK_API) return
+
+  try {
+    await deleteMyChatRoomMembership(chatRoomId)
+  } catch (error) {
+    throw new Error(error.userMessage || '채팅방에서 나가지 못했습니다.', { cause: error })
   }
 }

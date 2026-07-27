@@ -75,6 +75,16 @@ public class ChatRoomServiceImpl implements ChatRoomService {
                 .build());
     }
 
+    // ===== 다른 참가자의 방과 대화는 유지하고 요청한 회원의 참여 관계만 제거 =====
+    @Override
+    @Transactional
+    public void leaveRoom(Long chatRoomId, Long memberId) {
+        findChatRoom(chatRoomId);
+        ChatRoomMember membership = chatRoomMemberRepository.findByChatRoomIdAndUserId(chatRoomId, memberId)
+                .orElseThrow(() -> new IllegalArgumentException("참여 중인 채팅방이 아닙니다."));
+        chatRoomMemberRepository.delete(membership);
+    }
+
     @Override
     @Transactional
     public ChatRoomResponse joinRoomByCode(String joinCode, Long memberId) {

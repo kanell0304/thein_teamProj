@@ -210,6 +210,8 @@ function ParticipantPreferencePage({
   // ===== 마우스·터치·펜을 포인터 캡처 하나로 처리해 시트 밖에서도 드래그 유지 =====
   const startSheetPointerDrag = (event) => {
     if (event.pointerType === 'mouse' && event.button !== 0) return
+    const interactiveControl = event.target.closest?.('button, a, input, select, textarea')
+    if (interactiveControl && !interactiveControl.classList.contains('participant-preference-handle')) return
     event.preventDefault()
     prepareSheetDrag(event.clientY, event.pointerId)
     event.currentTarget.setPointerCapture?.(event.pointerId)
@@ -396,7 +398,14 @@ function ParticipantPreferencePage({
           <span />
         </button>
 
-        <header className="ui-sheet__header participant-preference-header" aria-hidden={isCollapsed}>
+        <header
+          className="ui-sheet__header participant-preference-header"
+          aria-hidden={isCollapsed}
+          onPointerDown={startSheetPointerDrag}
+          onPointerMove={moveSheetPointerDrag}
+          onPointerUp={finishSheetPointerDrag}
+          onPointerCancel={cancelSheetDrag}
+        >
           <button className="ui-sheet__back" type="button" aria-label="개인 조건 입력 닫기" onClick={closePreferencePage}>‹</button>
           <img src={momeokjiIcon} alt="" />
           <h2 id="participant-preference-title">내 조건 입력</h2>

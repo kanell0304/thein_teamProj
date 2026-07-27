@@ -9,8 +9,13 @@
   list-style: none;
 }
 
+.chat-list-item {
+  display: flex;
+  align-items: center;
+}
+
 .chat-list-room {
-  width: 100%;
+  min-width: 0;
   min-height: 78px;
   padding: 10px 16px;
   display: flex;
@@ -20,6 +25,7 @@
   color: inherit;
   background: transparent;
   text-align: left;
+  flex: 1;
 }
 
 .chat-list-room:hover,
@@ -104,4 +110,117 @@
   background: var(--color-primary);
   font-size: 11px;
   font-weight: 700;
+}
+
+/* ===== 현재 사용자에게서만 채팅방을 제거하는 목록 동작 ===== */
+.chat-list-leave {
+  width: 42px;
+  height: 42px;
+  margin-right: 8px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 42px;
+  border: 0;
+  border-radius: 50%;
+  color: var(--color-subtle);
+  background: transparent;
+}
+
+.chat-list-leave:hover:not(:disabled),
+.chat-list-leave:focus-visible {
+  color: #e84b4b;
+  background: #fff1f1;
+}
+
+.chat-list-leave:focus-visible {
+  outline: 2px solid rgba(232, 75, 75, 0.25);
+}
+
+.chat-list-leave:disabled { opacity: 0.45; }
+.chat-list-leave-icon {
+  width: 23px;
+  height: 23px;
+  overflow: visible;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.chat-list-action-error { margin: 4px 16px 8px; color: #e84b4b; font-size: 12px; }
+
+/* ===== 채팅방 나가기 확인 모달 ===== */
+.chat-list-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(24, 25, 27, 0.38);
+}
+
+.chat-list-dialog {
+  width: min(100%, 320px);
+  padding: 24px 20px 16px;
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 14px 40px rgba(24, 25, 27, 0.2);
+  text-align: center;
+}
+
+.chat-list-dialog h2 {
+  margin: 0;
+  font-size: 19px;
+}
+
+.chat-list-dialog p {
+  margin: 12px 0 20px;
+  color: var(--color-subtle);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.chat-list-dialog p strong {
+  display: block;
+  color: var(--color-text);
+}
+
+.chat-list-dialog-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.chat-list-dialog-actions button {
+  min-height: 46px;
+  border-radius: 12px;
+  background: #f1f2f4;
+  font-weight: 700;
+}
+
+.chat-list-dialog-actions .chat-list-dialog-leave {
+  color: #fff;
+  background: var(--color-primary);
+}
+
+.chat-list-dialog-actions button:disabled {
+  opacity: 0.55;
+}
+
+/* ===== 비동기 동작 완료를 알리는 하단 토스트 ===== */
+.chat-list-toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(76px + env(safe-area-inset-bottom));
+  z-index: 90;
+  width: max-content;
+  max-width: calc(100% - 40px);
+  margin: 0;
+  padding: 11px 16px;
+  border-radius: 999px;
+  color: #fff;
+  background: rgba(24, 25, 27, 0.9);
+  box-shadow: 0 8px 24px rgba(24, 25, 27, 0.2);
+  font-size: 13px;
+  transform: translateX(-50%);
 }

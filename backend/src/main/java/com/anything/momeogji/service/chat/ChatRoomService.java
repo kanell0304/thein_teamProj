@@ -14,6 +14,9 @@ public interface ChatRoomService {
     /** 이미 참여 중이면 아무 일도 하지 않는다(중복 참여 방지). */
     void joinRoom(Long chatRoomId, Long memberId);
 
+    /** 현재 회원만 채팅방 참가자에서 제거해 자신의 채팅 목록에서 나가게 한다. */
+    void leaveRoom(Long chatRoomId, Long memberId);
+
     /** 공유 코드로 채팅방을 찾아 참여자로 등록한다. 코드가 유효하지 않으면 예외를 던진다. */
     ChatRoomResponse joinRoomByCode(String joinCode, Long memberId);
 

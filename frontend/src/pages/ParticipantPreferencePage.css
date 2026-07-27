@@ -34,6 +34,9 @@
 }
 .participant-preference-handle:active { cursor: grabbing; }
 .participant-preference-handle > span { width: 42px; height: 5px; border-radius: 999px; background: #c7cbd0; }
+.participant-preference-header { cursor: grab; touch-action: none; user-select: none; }
+.participant-preference-header:active { cursor: grabbing; }
+.participant-preference-header button { cursor: pointer; }
 .participant-preference-header > span { margin-left: auto; color: var(--color-primary); font-size: 12px; font-weight: 700; }
 
 /* ===== 개인 조건 본문 ===== */

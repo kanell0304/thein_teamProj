@@ -23,3 +23,8 @@ export async function postJoinChatRoomByCode(code, { signal } = {}) {
   const response = await axiosInstance.post('/chatrooms/join', { code }, { signal })
   return response.data
 }
+
+// ===== 현재 로그인 사용자를 채팅방 참가자에서 제거 =====
+export async function deleteMyChatRoomMembership(chatRoomId, { signal } = {}) {
+  await axiosInstance.delete(`/chatrooms/${chatRoomId}/members/me`, { signal })
+}

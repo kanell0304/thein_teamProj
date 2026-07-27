@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 
 public interface ChatRoomMemberRepository extends JpaRepository<ChatRoomMember, Long> {
 
@@ -17,4 +18,6 @@ public interface ChatRoomMemberRepository extends JpaRepository<ChatRoomMember, 
     long countByChatRoomIdAndUserIdIn(Long chatRoomId, Collection<Long> userIds);
 
     List<ChatRoomMember> findByChatRoomId(Long chatRoomId);
+
+    Optional<ChatRoomMember> findByChatRoomIdAndUserId(Long chatRoomId, Long userId);
 }
