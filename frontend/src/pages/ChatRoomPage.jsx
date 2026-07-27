@@ -585,6 +585,10 @@ function ChatRoomPage({ room: providedRoom, currentUser = DEMO_CURRENT_USER }) {
         participantPreferenceDeadlineAt,
       }
 
+      // 새 모임이 서버에 생성된 뒤에만 이전 결과를 정리해 설정 취소 시 복귀할 수 있게 합니다.
+      voteSessionRef.current = null
+      setVoteSession(null)
+      setMomeokjiResult(null)
       pendingMeetingSettingsRef.current = savedSettings
       setPendingMeetingSettings(savedSettings)
       setPreferenceSession({
@@ -717,6 +721,19 @@ function ChatRoomPage({ room: providedRoom, currentUser = DEMO_CURRENT_USER }) {
 
   // ===== 공지 영역은 최신 진행 상태 하나만 표시하고 상태 변경 시 새 공지로 교체 =====
   const renderCurrentNotice = () => {
+    if (isCreatingMeetup) {
+      return <ChatNotice key="meetup-loading" text="모임을 만들고 있어요." />
+    }
+
+    if (meetupCreationError) {
+      return (
+        <ChatNotice
+          key={`meetup-error-${meetupCreationError}`}
+          text={meetupCreationError}
+        />
+      )
+    }
+
     if (voteSession && canViewVote) {
       return (
         <ChatNotice
@@ -765,19 +782,6 @@ function ChatRoomPage({ room: providedRoom, currentUser = DEMO_CURRENT_USER }) {
       return <ChatNotice key="recommendation-loading" text="AI가 추천 식당을 찾고 있어요." />
     }
 
-    if (meetupCreationError) {
-      return (
-        <ChatNotice
-          key={`meetup-error-${meetupCreationError}`}
-          text={meetupCreationError}
-        />
-      )
-    }
-
-    if (isCreatingMeetup) {
-      return <ChatNotice key="meetup-loading" text="모임을 만들고 있어요." />
-    }
-
     return null
   }
 
@@ -801,20 +805,25 @@ function ChatRoomPage({ room: providedRoom, currentUser = DEMO_CURRENT_USER }) {
     startMomeokjiSession()
   }
 
-  // ===== 종료된 투표를 정리하고 새 모먹지 공통 설정을 1단계부터 시작 =====
+  // ===== 기존 결과는 보존한 채 새 모먹지 공통 설정을 1단계부터 시작 =====
   const restartMomeokji = () => {
     pendingMeetingSettingsRef.current = null
-    voteSessionRef.current = null
     voteSubmissionLockRef.current = false
     setPendingMeetingSettings(null)
     setPreferenceSession(null)
-    setVoteSession(null)
-    setMomeokjiResult(null)
     setMeetupCreationError('')
     setRecommendationError('')
     setIsParticipantPreferenceOpen(false)
     setIsVotePageOpen(false)
     startMomeokjiSession()
+  }
+
+  // ===== 새 설정을 취소하면 보존한 이전 투표 결과 화면으로 복귀 =====
+  const closeMomeokjiSetup = (reason = 'cancel') => {
+    setIsMomeokjiOpen(false)
+    if (reason === 'cancel' && voteSession?.status === 'CLOSED') {
+      setIsVotePageOpen(true)
+    }
   }
 
   // ===== 최다 득표 가게 또는 가게 공동 1등 중 무작위 결과로 투표 마감 =====
@@ -1011,7 +1020,7 @@ function ChatRoomPage({ room: providedRoom, currentUser = DEMO_CURRENT_USER }) {
       <MomeokjiPage
         key={momeokjiFeatureStartedAt ?? 'momeokji-idle'}
         open={isMomeokjiOpen}
-        onClose={() => setIsMomeokjiOpen(false)}
+        onClose={closeMomeokjiSetup}
         onComplete={requestParticipantPreference}
         chatRoomId={room.id}
         featureStartedAt={momeokjiFeatureStartedAt}

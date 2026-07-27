@@ -286,7 +286,7 @@ function MomeokjiPage({
   useEffect(() => {
     if (!open) return undefined
     const closeOnEscape = (event) => {
-      if (event.key === 'Escape') onClose()
+      if (event.key === 'Escape') onClose('cancel')
     }
     window.addEventListener('keydown', closeOnEscape)
     return () => window.removeEventListener('keydown', closeOnEscape)
@@ -544,7 +544,7 @@ function MomeokjiPage({
       moods: [],
     })
     setStep(0)
-    onClose()
+    onClose('complete')
   }
 
   const renderStep = () => {
@@ -669,7 +669,12 @@ function MomeokjiPage({
 
   return (
     <div className="ui-layer momeokji-layer" role="presentation">
-      <button className="ui-backdrop" type="button" aria-label="모먹지 닫기" onClick={onClose} />
+      <button
+        className="ui-backdrop"
+        type="button"
+        aria-label="모먹지 닫기"
+        onClick={() => onClose('cancel')}
+      />
       <section className="ui-sheet momeokji-sheet" role="dialog" aria-modal="true" aria-labelledby="momeokji-title">
         <header className="ui-sheet__header momeokji-sheet__header">
           {step > 0 && (
