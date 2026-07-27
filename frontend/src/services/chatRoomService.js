@@ -1,4 +1,4 @@
-import { fetchChatRooms, postChatRoom } from '../api/chatRoomApi'
+import { fetchChatRooms, postChatRoom, postJoinChatRoomByCode } from '../api/chatRoomApi'
 
 const USE_MOCK_API = String(import.meta.env.VITE_USE_MOCK ?? 'false').toLowerCase() === 'true'
 
@@ -31,5 +31,14 @@ export async function createNewChatRoom({ name, participantIds }) {
     return await postChatRoom({ name, participantIds })
   } catch (error) {
     throw new Error(error.userMessage || '채팅방을 만들지 못했습니다.', { cause: error })
+  }
+}
+
+// ===== 공유 코드를 입력해 채팅방에 중간 합류 =====
+export async function joinChatRoomByCode(code) {
+  try {
+    return await postJoinChatRoomByCode(code)
+  } catch (error) {
+    throw new Error(error.userMessage || '코드로 채팅방에 참여하지 못했습니다.', { cause: error })
   }
 }

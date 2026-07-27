@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import MainScreen from '../components/layout/MainScreen'
-import { ChatAddIcon } from '../components/layout/HeaderActionIcons'
+import { ChatAddIcon, ChatJoinIcon } from '../components/layout/HeaderActionIcons'
 import { getChatRooms } from '../services/chatRoomService'
 import './ChatListPage.css'
 
@@ -78,6 +78,14 @@ function ChatListPage() {
             onClick={() => searchInputRef.current?.focus()}
           >
             <span className="material-symbols-outlined" aria-hidden="true">search</span>
+          </button>
+          <button
+            className="main-screen-action"
+            type="button"
+            aria-label="코드로 채팅방 참여"
+            onClick={() => navigate('/chats/join')}
+          >
+            <ChatJoinIcon />
           </button>
           <button
             className="main-screen-action"

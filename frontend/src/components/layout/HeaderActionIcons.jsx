@@ -18,3 +18,13 @@ export function ChatAddIcon() {
     </svg>
   )
 }
+
+// ===== 코드로 채팅방 입장 진입점 아이콘(열쇠 모양) =====
+export function ChatJoinIcon() {
+  return (
+    <svg className="main-screen-action-icon" viewBox="0 0 24 24" aria-hidden="true">
+      <circle cx="8" cy="15" r="3.25" />
+      <path d="M10.25 12.75 18 5M15.5 7.5l2 2M18 5l2 2" />
+    </svg>
+  )
+}

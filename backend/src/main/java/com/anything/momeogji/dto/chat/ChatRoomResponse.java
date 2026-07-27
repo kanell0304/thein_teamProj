@@ -1,4 +1,4 @@
 package com.anything.momeogji.dto.chat;
 
-public record ChatRoomResponse(Long id, String name) {
+public record ChatRoomResponse(Long id, String name, String joinCode) {
 }

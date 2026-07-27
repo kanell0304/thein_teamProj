@@ -14,6 +14,9 @@ public interface ChatRoomService {
     /** 이미 참여 중이면 아무 일도 하지 않는다(중복 참여 방지). */
     void joinRoom(Long chatRoomId, Long memberId);
 
+    /** 공유 코드로 채팅방을 찾아 참여자로 등록한다. 코드가 유효하지 않으면 예외를 던진다. */
+    ChatRoomResponse joinRoomByCode(String joinCode, Long memberId);
+
     /** 로그인 회원이 참여한 채팅방을 최근 메시지 순으로 조회한다. */
     List<ChatRoomListItemResponse> getMyRooms(Long memberId);
 

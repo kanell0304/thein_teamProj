@@ -3,6 +3,7 @@ import PrivateRoute from './components/auth/PrivateRoute'
 import useAuth from './hooks/useAuth'
 import ChatRoomPage from './pages/ChatRoomPage'
 import ChatListPage from './pages/ChatListPage'
+import ChatRoomJoinPage from './pages/ChatRoomJoinPage'
 import FriendListPage from './pages/FriendListPage'
 import KakaoCallbackPage from './pages/KakaoCallbackPage'
 import LoginPage from './pages/LoginPage'
@@ -28,6 +29,7 @@ function App() {
         <Route path="/friends" element={<FriendListPage />} />
         <Route path="/chats" element={<ChatListPage />} />
         <Route path="/chats/new" element={<NewChatRoomPage />} />
+        <Route path="/chats/join" element={<ChatRoomJoinPage />} />
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="/chat/:roomId" element={<AuthenticatedChatRoom />} />
       </Route>

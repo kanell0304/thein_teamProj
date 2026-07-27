@@ -990,6 +990,7 @@ function ChatRoomPage({ room: providedRoom, currentUser = DEMO_CURRENT_USER }) {
       <ChatHeader
         roomName={roomInfo?.name ?? '채팅방'}
         memberCount={roomParticipants.length}
+        joinCode={roomInfo?.joinCode}
         onBack={() => navigate('/chats')}
       />
 

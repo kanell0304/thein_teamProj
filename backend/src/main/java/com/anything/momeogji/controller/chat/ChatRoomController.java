@@ -3,6 +3,7 @@ package com.anything.momeogji.controller.chat;
 import com.anything.momeogji.dto.MemberDTO;
 import com.anything.momeogji.dto.chat.ChatRoomCreateRequest;
 import com.anything.momeogji.dto.chat.ChatRoomInviteRequest;
+import com.anything.momeogji.dto.chat.ChatRoomJoinByCodeRequest;
 import com.anything.momeogji.dto.chat.ChatRoomResponse;
 import com.anything.momeogji.dto.chat.ChatRoomListItemResponse;
 import com.anything.momeogji.service.chat.ChatRoomService;
@@ -63,6 +64,12 @@ public class ChatRoomController {
             // 나면 flush 시점이 아니라 여기서 곧바로 unique 제약 위반이 터진다 - 마찬가지로 이미 다른 요청이
             // 참여를 성공시켰다는 뜻이므로 무시한다.
         }
+    }
+
+    @Operation(summary = "코드로 채팅방 참여", description = "채팅방 공유 코드로 참여자로 등록됩니다.")
+    @PostMapping("/join")
+    public ChatRoomResponse joinRoomByCode(@Valid @RequestBody ChatRoomJoinByCodeRequest request, Authentication authentication) {
+        return chatRoomService.joinRoomByCode(request.code(), memberId(authentication));
     }
 
     @GetMapping("/{chatRoomId}/members")

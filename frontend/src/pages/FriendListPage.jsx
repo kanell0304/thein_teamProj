@@ -2,10 +2,16 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import MainScreen from '../components/layout/MainScreen'
 import { FriendAddIcon } from '../components/layout/HeaderActionIcons'
 import useAuth from '../hooks/useAuth'
-import { getMembers } from '../services/memberService'
+import {
+  acceptFriendRequest,
+  getFriends,
+  getReceivedFriendRequests,
+  rejectFriendRequest,
+  sendFriendRequest,
+} from '../services/friendService'
 import './FriendListPage.css'
 
-function FriendProfile({ nickname, statusMessage, profileImageUrl, isMe = false }) {
+function FriendProfile({ nickname, statusMessage, profileImageUrl, isMe = false, actions = null }) {
   return (
     <article className={`friend-profile${isMe ? ' friend-profile--me' : ''}`}>
       {profileImageUrl ? (
@@ -17,6 +23,7 @@ function FriendProfile({ nickname, statusMessage, profileImageUrl, isMe = false 
         <strong>{nickname}</strong>
         {statusMessage && <small>{statusMessage}</small>}
       </span>
+      {actions}
     </article>
   )
 }
@@ -28,12 +35,22 @@ function FriendListPage() {
   const [friends, setFriends] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState('')
+  const [receivedRequests, setReceivedRequests] = useState([])
+  const [isAddFormVisible, setIsAddFormVisible] = useState(false)
+  const [targetUid, setTargetUid] = useState('')
+  const [isSendingRequest, setIsSendingRequest] = useState(false)
+  const [addRequestMessage, setAddRequestMessage] = useState('')
   const currentNickname = user?.nickname || user?.name || '사용자'
 
-  // ===== 친구 목록을 조회하고 실패 시 재시도 가능한 상태로 전환 =====
+  // ===== 친구 목록과 받은 요청을 함께 조회하고 실패 시 재시도 가능한 상태로 전환 =====
   const requestFriends = useCallback(async (signal) => {
     try {
-      setFriends(await getMembers({ signal }))
+      const [friendList, requests] = await Promise.all([
+        getFriends({ signal }),
+        getReceivedFriendRequests({ signal }),
+      ])
+      setFriends(friendList)
+      setReceivedRequests(requests)
     } catch (error) {
       if (signal?.aborted) return
       setErrorMessage(error.message)
@@ -42,7 +59,6 @@ function FriendListPage() {
     }
   }, [])
 
-  // ===== 사용자가 오류 안내에서 친구 목록 조회를 다시 요청 =====
   const retryFriends = () => {
     setIsLoading(true)
     setErrorMessage('')
@@ -51,8 +67,14 @@ function FriendListPage() {
 
   useEffect(() => {
     const controller = new AbortController()
-    getMembers({ signal: controller.signal })
-      .then(setFriends)
+    Promise.all([
+      getFriends({ signal: controller.signal }),
+      getReceivedFriendRequests({ signal: controller.signal }),
+    ])
+      .then(([friendList, requests]) => {
+        setFriends(friendList)
+        setReceivedRequests(requests)
+      })
       .catch((error) => {
         if (!controller.signal.aborted) setErrorMessage(error.message)
       })
@@ -62,14 +84,54 @@ function FriendListPage() {
     return () => controller.abort()
   }, [])
 
-  // ===== 닉네임과 상태 메시지를 기준으로 사용자 검색 =====
+  // ===== 닉네임을 기준으로 친구 검색 =====
   const visibleFriends = useMemo(() => {
     const keyword = searchText.trim().toLowerCase()
     if (!keyword) return friends
-    return friends.filter((friend) => (
-      `${friend.nickname} ${friend.statusMessage}`.toLowerCase().includes(keyword)
-    ))
+    return friends.filter((friend) => friend.nickname.toLowerCase().includes(keyword))
   }, [friends, searchText])
+
+  const handleToggleAddForm = () => {
+    setIsAddFormVisible((visible) => !visible)
+    setAddRequestMessage('')
+  }
+
+  // ===== UID로 친구 요청 전송 =====
+  const handleSendRequest = async () => {
+    const trimmedUid = targetUid.trim()
+    if (!trimmedUid || isSendingRequest) return
+
+    setIsSendingRequest(true)
+    setAddRequestMessage('')
+    try {
+      await sendFriendRequest(Number(trimmedUid))
+      setTargetUid('')
+      setAddRequestMessage('친구 요청을 보냈어요.')
+    } catch (error) {
+      setAddRequestMessage(error.message)
+    } finally {
+      setIsSendingRequest(false)
+    }
+  }
+
+  // ===== 받은 요청 수락: 목록을 다시 불러와 친구/요청 상태를 함께 반영 =====
+  const handleAccept = async (requestId) => {
+    try {
+      await acceptFriendRequest(requestId)
+      requestFriends()
+    } catch (error) {
+      setErrorMessage(error.message)
+    }
+  }
+
+  const handleReject = async (requestId) => {
+    try {
+      await rejectFriendRequest(requestId)
+      setReceivedRequests((previous) => previous.filter((request) => request.requestId !== requestId))
+    } catch (error) {
+      setErrorMessage(error.message)
+    }
+  }
 
   return (
     <MainScreen
@@ -84,12 +146,11 @@ function FriendListPage() {
           >
             <span className="material-symbols-outlined" aria-hidden="true">search</span>
           </button>
-          {/* ===== 친구 추가 아이콘은 현재 회원 검색창으로 연결 ===== */}
           <button
             className="main-screen-action"
             type="button"
             aria-label="친구 추가"
-            onClick={() => searchInputRef.current?.focus()}
+            onClick={handleToggleAddForm}
           >
             <FriendAddIcon />
           </button>
@@ -109,6 +170,30 @@ function FriendListPage() {
         />
       </label>
 
+      {/* ===== UID로 친구 요청 보내기 ===== */}
+      {isAddFormVisible && (
+        <section className="friend-add-form" aria-label="UID로 친구 추가">
+          <label>
+            <span>상대방 UID</span>
+            <input
+              type="number"
+              value={targetUid}
+              onChange={(event) => setTargetUid(event.target.value)}
+              placeholder="설정 화면에서 확인한 UID를 입력해주세요"
+            />
+          </label>
+          <button
+            type="button"
+            className="friend-add-form__submit"
+            disabled={!targetUid.trim() || isSendingRequest}
+            onClick={handleSendRequest}
+          >
+            {isSendingRequest ? '요청 보내는 중...' : '요청 보내기'}
+          </button>
+          {addRequestMessage && <p className="friend-add-form__message">{addRequestMessage}</p>}
+        </section>
+      )}
+
       {/* ===== 로그인한 사용자의 프로필 ===== */}
       <section className="friend-section" aria-labelledby="my-profile-title">
         <h2 id="my-profile-title">내 프로필</h2>
@@ -120,7 +205,29 @@ function FriendListPage() {
         />
       </section>
 
-      {/* ===== 실제 회원 API의 로딩·오류·목록 상태 표시 ===== */}
+      {/* ===== 아직 수락/거절하지 않은 받은 친구 요청 ===== */}
+      {receivedRequests.length > 0 && (
+        <section className="friend-section friend-section--list" aria-labelledby="friend-request-title">
+          <h2 id="friend-request-title">받은 친구 요청 {receivedRequests.length}</h2>
+          <div className="friend-list">
+            {receivedRequests.map((request) => (
+              <FriendProfile
+                key={request.requestId}
+                nickname={request.requesterNickname}
+                profileImageUrl={request.requesterProfileImageUrl}
+                actions={(
+                  <span className="friend-request-actions">
+                    <button type="button" onClick={() => handleAccept(request.requestId)}>수락</button>
+                    <button type="button" onClick={() => handleReject(request.requestId)}>거절</button>
+                  </span>
+                )}
+              />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* ===== 실제 친구 API의 로딩·오류·목록 상태 표시 ===== */}
       <section className="friend-section friend-section--list" aria-labelledby="friend-list-title">
         <h2 id="friend-list-title">친구 {visibleFriends.length}</h2>
         {isLoading ? (
@@ -136,13 +243,12 @@ function FriendListPage() {
               <FriendProfile
                 key={friend.id}
                 nickname={friend.nickname}
-                statusMessage={friend.statusMessage}
                 profileImageUrl={friend.profileImageUrl}
               />
             ))}
           </div>
         ) : (
-          <p className="main-empty friend-empty">검색 결과가 없어요.</p>
+          <p className="main-empty friend-empty">친구를 UID로 추가해보세요.</p>
         )}
       </section>
     </MainScreen>

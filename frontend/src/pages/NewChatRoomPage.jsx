@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import MainScreen from '../components/layout/MainScreen'
-import { getMembers } from '../services/memberService'
+import { getFriends } from '../services/friendService'
 import { createNewChatRoom } from '../services/chatRoomService'
 import './FriendListPage.css'
 import './NewChatRoomPage.css'
@@ -18,7 +18,7 @@ function NewChatRoomPage() {
 
   // ===== 친구 목록을 조회하고 실패 시 재시도 가능한 상태로 전환 =====
   const requestFriends = (signal) => {
-    getMembers({ signal })
+    getFriends({ signal })
       .then(setFriends)
       .catch((error) => {
         if (!signal?.aborted) setLoadErrorMessage(error.message)
