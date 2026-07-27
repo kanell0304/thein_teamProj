@@ -15,6 +15,8 @@ function createKakaoAuthorizeUrl() {
     client_id: clientId,
     redirect_uri: redirectUri,
     response_type: 'code',
+    // ===== 앱 로그아웃 후 남아 있는 카카오 웹 세션으로 자동 로그인되지 않도록 재인증 요청 =====
+    prompt: 'login',
     // 콘솔에서 "선택 동의"로 설정한 항목은 scope로 명시해야 동의 화면에 노출됩니다.
     scope: 'profile_nickname,profile_image',
   })
