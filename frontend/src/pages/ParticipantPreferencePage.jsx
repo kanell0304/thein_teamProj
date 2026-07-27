@@ -20,6 +20,8 @@ const BUDGET_OPTIONS = [
   { value: 'UNRESTRICTED', label: '상관없어요' },
 ]
 
+const COLLAPSED_HANDLE_HEIGHT = 40
+
 // ===== 저장값은 숫자만 유지하고 입력창에는 천 단위 쉼표로 표시 =====
 function formatBudgetInput(value) {
   if (!value) return ''
@@ -154,7 +156,7 @@ function ParticipantPreferencePage({
   // ===== 상단 손잡이의 포인터 이동량으로 시트를 위·아래 스냅 =====
   const prepareSheetDrag = (clientY, pointerId) => {
     const sheetHeight = sheetRef.current?.offsetHeight ?? 0
-    const maxOffset = Math.max(0, sheetHeight - 36)
+    const maxOffset = Math.max(0, sheetHeight - COLLAPSED_HANDLE_HEIGHT)
     dragStateRef.current = {
       pointerId,
       startY: clientY,
@@ -205,41 +207,23 @@ function ParticipantPreferencePage({
     setIsCollapsed((previous) => !previous)
   }
 
-  // ===== 터치·펜은 포인터 캡처로 시트 바깥 이동까지 계속 추적 =====
+  // ===== 마우스·터치·펜을 포인터 캡처 하나로 처리해 시트 밖에서도 드래그 유지 =====
   const startSheetPointerDrag = (event) => {
-    if (event.pointerType === 'mouse') return
+    if (event.pointerType === 'mouse' && event.button !== 0) return
+    event.preventDefault()
     prepareSheetDrag(event.clientY, event.pointerId)
     event.currentTarget.setPointerCapture?.(event.pointerId)
   }
 
   const moveSheetPointerDrag = (event) => {
-    if (event.pointerType === 'mouse') return
     updateSheetDrag(event.clientY, event.pointerId)
   }
 
   const finishSheetPointerDrag = (event) => {
-    if (event.pointerType === 'mouse') return
     completeSheetDrag(event.clientY, event.pointerId)
-    event.currentTarget.releasePointerCapture?.(event.pointerId)
-  }
-
-  // ===== 데스크톱 마우스는 창 단위 이동·놓기 이벤트로 안정적으로 추적 =====
-  const startSheetMouseDrag = (event) => {
-    event.preventDefault()
-    const mousePointerId = 'mouse'
-    prepareSheetDrag(event.clientY, mousePointerId)
-
-    const moveWithMouse = (moveEvent) => {
-      updateSheetDrag(moveEvent.clientY, mousePointerId)
+    if (event.currentTarget.hasPointerCapture?.(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId)
     }
-    const finishWithMouse = (upEvent) => {
-      completeSheetDrag(upEvent.clientY, mousePointerId)
-      window.removeEventListener('mousemove', moveWithMouse)
-      window.removeEventListener('mouseup', finishWithMouse)
-    }
-
-    window.addEventListener('mousemove', moveWithMouse)
-    window.addEventListener('mouseup', finishWithMouse)
   }
 
   // ===== 검증 실패 시 첫 번째 미입력 항목을 화면 중앙으로 이동하고 입력 위치를 안내 =====
@@ -404,7 +388,6 @@ function ParticipantPreferencePage({
           aria-label={isCollapsed ? '내 조건 입력 펼치기' : '내 조건 입력 접기'}
           aria-expanded={!isCollapsed}
           onClick={toggleCollapsed}
-          onMouseDown={startSheetMouseDrag}
           onPointerDown={startSheetPointerDrag}
           onPointerMove={moveSheetPointerDrag}
           onPointerUp={finishSheetPointerDrag}

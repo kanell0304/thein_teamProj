@@ -12,7 +12,7 @@
   transition: transform 220ms ease, box-shadow 220ms ease;
 }
 .participant-preference-layer.is-collapsed .participant-preference-sheet { pointer-events: auto; }
-.participant-preference-sheet.is-collapsed { transform: translateY(calc(100% - 36px)); box-shadow: 0 -3px 12px rgba(24, 25, 27, 0.12); }
+.participant-preference-sheet.is-collapsed { transform: translateY(calc(100% - 40px)); box-shadow: 0 -3px 12px rgba(24, 25, 27, 0.12); }
 .participant-preference-sheet.is-dragging { animation: none; transition: none; }
 .participant-preference-sheet.is-collapsed .participant-preference-header,
 .participant-preference-sheet.is-collapsed .participant-preference-body,
@@ -20,13 +20,16 @@
 
 /* ===== 바텀시트 위·아래 드래그 손잡이 ===== */
 .participant-preference-handle {
-  flex: 0 0 36px;
+  position: relative;
+  z-index: 1;
+  flex: 0 0 40px;
   width: 100%;
-  height: 36px;
+  height: 40px;
   display: grid;
   place-items: center;
   cursor: grab;
   touch-action: none;
+  user-select: none;
   background: #fff !important;
 }
 .participant-preference-handle:active { cursor: grabbing; }
