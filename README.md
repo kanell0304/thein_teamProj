@@ -107,5 +107,5 @@ momeogji/
 
 ## 📄 관련 문서
 
-- 개발 문서(Notion): [핀테크 프로젝트 - 모먹지](https://app.notion.com/p/39cdb803401e80439ff5ebceceaffdc9)
+- 개발 문서(Notion): [핀테크 프로젝트 - 모먹지](https://app.notion.com/p/momeokji/1c72e073c0e3837997f5017a13efd3c7)
 - 전체 흐름 정리: [v3. 전체 흐름 정리](https://app.notion.com/p/39ddb803401e809d8102eb06f64834cd)
