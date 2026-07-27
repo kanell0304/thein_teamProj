@@ -4,6 +4,15 @@
 
 > **주의**: 본 문서는 초안(draft)이며, Notion의 [`v3. 전체 흐름 정리`](https://app.notion.com/p/39ddb803401e809d8102eb06f64834cd) 기준으로 작성되었습니다. 기획 및 개발 진행 상황에 따라 지속적으로 수정됩니다.
 
+## 🌐 배포
+
+| 구분 | 주소 |
+|---|---|
+| 프론트엔드 | [https://d3syj51ll6yq4a.cloudfront.net](https://d3syj51ll6yq4a.cloudfront.net) |
+| 백엔드 API 문서(Swagger) | [https://d1llv9lskrx5vw.cloudfront.net/swagger-ui.html](https://d1llv9lskrx5vw.cloudfront.net/swagger-ui.html) |
+
+`main` 브랜치에 push되면 GitHub Actions가 백엔드(EC2)·프론트엔드(S3+CloudFront)를 자동으로 재배포합니다. 배포 아키텍처와 인프라 구성은 Notion의 [Infra Structure](https://app.notion.com/p/3a4db803401e804ca652fc2c5e2ad557) 문서에 정리되어 있습니다.
+
 ## 📌 프로젝트 소개
 
 `모먹지`는 채팅방 안에서 모임 장소를 정할 때 반복되는 번거로운 과정 — 참여자 파악, 각자의 조건(장소·예산·분위기) 취합, 음식점 후보 검색, 투표, 공지 — 을 채팅방을 벗어나지 않고 하나의 흐름으로 압축하는 서비스입니다.
@@ -57,14 +66,17 @@
 
 | 영역 | 기술 |
 |---|---|
-| Backend | Java 21, Spring Boot 3.5.16 (Spring Web, Spring Data JPA, Validation, Security, WebSocket) |
-| Database | PostgreSQL |
+| Backend | Java 21, Spring Boot 3.5.16 (Spring Web, Spring Data JPA, MyBatis, Validation, Security, WebSocket) |
+| Database | PostgreSQL — 배포 환경은 Supabase(Session Pooler), 로컬 개발은 로컬 PostgreSQL |
 | Frontend | React 19.2.7, Vite |
 | 빌드 도구 | Gradle 8 |
 | AI 추천 | OpenAI API |
 | 지도/위치 | 카카오맵 API |
+| 인증 | 카카오 소셜 로그인(OAuth 2.0) + 자체 발급 JWT |
+| 배포/인프라 | AWS EC2(백엔드, systemd) · S3+CloudFront(프론트엔드) · CloudFront(백엔드 HTTPS 프록시) |
+| CI/CD | GitHub Actions — `main` push 시 자동 빌드·배포 |
 
-REST API는 모임/참여자/투표/공지 등의 생성·조회·수정을 담당하고, WebSocket은 참여 상태 변화·추천 회차 시작·투표 마감·최종 공지 등의 실시간 알림을 담당합니다.
+REST API는 모임/참여자/투표/공지/친구 등의 생성·조회·수정을 담당하고, WebSocket은 참여 상태 변화·추천 회차 시작·투표 마감·최종 공지 등의 실시간 알림을 담당합니다.
 
 ## 📂 프로젝트 구조
 
@@ -76,17 +88,14 @@ momeogji/
 
 ## 🌿 브랜치 용도
 
-| 브랜치 | 담당 영역 및 용도 | 작업 원칙 |
-|---|---|---|
-| `main` | 팀 검토가 끝난 안정 버전 및 배포 기준 | 직접 작업하지 않고 PR 검토 후 병합 |
-| `feature/momeokji` | 박진원의 모먹지 React 화면·사용자 흐름 작업 | 프론트 기능 단위 개발 및 검증 |
-| `features/myData` | 이서준의 목업 마이데이터 수집·정제·카카오 장소 매칭 작업 | 데이터 파이프라인 개발 및 테스트 |
-| `websocket` | 이경준의 채팅 WebSocket 및 추천·투표 백엔드 작업 | 원본 기능 브랜치로 유지 |
-| `integration/momeokji` | 프론트·마이데이터·WebSocket을 합쳐 API 연동과 통합 테스트를 수행하는 브랜치 | 기능 개발 결과를 모아 검증하며, 확인 전 `main`에 병합하지 않음 |
+| 브랜치 | 용도 |
+|---|---|
+| `main` | 배포 기준 브랜치. push 시 GitHub Actions가 자동으로 프로덕션에 배포됨 |
+| `feature/*`, `기타 작업 브랜치` | 담당자별 기능 단위 개발 브랜치. 작업 완료 후 `main`에 병합 |
 
 > `review/*` 브랜치는 팀원의 원격 브랜치를 수정하지 않고 확인하기 위해 각 개발자 PC에서만 사용하는 로컬 전용 브랜치입니다. GitHub 공유 및 병합 대상이 아닙니다.
 
-권장 흐름은 `개인 기능 브랜치 → integration/momeokji → main`입니다.
+권장 흐름은 `개인 기능 브랜치 → main`이며, `main`에 반영되는 즉시 배포되므로 병합 전 로컬 검증을 거칩니다.
 
 ## 👥 팀 소개
 
