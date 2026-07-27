@@ -2,7 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import momeokjiIcon from '../assets/icons/momeokji-icon.png'
 import AddableMenuInput from '../components/momeokji/AddableMenuInput'
 import CountdownTimer from '../components/momeokji/CountdownTimer'
-import { AVOID_OPTIONS, MOOD_OPTIONS } from '../constants/momeokjiOptions'
+import { AVOID_ANY_OPTION, AVOID_OPTIONS, MOOD_OPTIONS } from '../constants/momeokjiOptions'
+import { MOMEOKJI_TEXT } from '../locales/ko/momeokji'
 import './ParticipantPreferencePage.css'
 
 const PARKING_OPTIONS = [
@@ -82,7 +83,7 @@ function ParticipantPreferencePage({
   deadlineAt,
 }) {
   const [customAvoidOptions, setCustomAvoidOptions] = useState([])
-  const [avoidFoods, setAvoidFoods] = useState([])
+  const [avoidFoods, setAvoidFoods] = useState([AVOID_ANY_OPTION])
   const [avoidInput, setAvoidInput] = useState('')
   const [budgetInput, setBudgetInput] = useState('20000')
   const [budgetUnrestricted, setBudgetUnrestricted] = useState(false)
@@ -258,12 +259,12 @@ function ParticipantPreferencePage({
     setValidationMessage('')
   }
 
-  // ===== '없어요'와 실제 제외 음식이 동시에 선택되지 않도록 정리 =====
+  // ===== '아무거나'와 실제 제외 음식이 동시에 선택되지 않도록 정리 =====
   const toggleAvoidFood = (value) => {
     clearFieldError('avoidFoods')
     setAvoidFoods((previous) => {
-      if (value === '없어요') return previous.includes(value) ? [] : ['없어요']
-      const withoutNone = previous.filter((item) => item !== '없어요')
+      if (value === AVOID_ANY_OPTION) return previous.includes(value) ? [] : [AVOID_ANY_OPTION]
+      const withoutNone = previous.filter((item) => item !== AVOID_ANY_OPTION)
       return withoutNone.includes(value)
         ? withoutNone.filter((item) => item !== value)
         : [...withoutNone, value]
@@ -281,7 +282,7 @@ function ParticipantPreferencePage({
         : [...previous, value]
     ))
     setAvoidFoods((previous) => [
-      ...previous.filter((item) => item !== '없어요' && item !== value),
+      ...previous.filter((item) => item !== AVOID_ANY_OPTION && item !== value),
       value,
     ])
     setAvoidInput('')
@@ -305,13 +306,15 @@ function ParticipantPreferencePage({
   } = {}) => {
     const hasBudget = !budgetUnrestricted && budgetInput.trim() !== ''
     const hasAvoidAnswer = avoidFoods.length > 0
+    const avoidFoodsUnrestricted = avoidFoods.includes(AVOID_ANY_OPTION)
+      || (useUnrestrictedDefaults && !hasAvoidAnswer)
 
     return {
       participantId: participant.id,
       excludedFoods: hasAvoidAnswer
-        ? avoidFoods.filter((item) => item !== '없어요')
+        ? avoidFoods.filter((item) => item !== AVOID_ANY_OPTION)
         : [],
-      excludedFoodsUnrestricted: useUnrestrictedDefaults && !hasAvoidAnswer,
+      excludedFoodsUnrestricted: avoidFoodsUnrestricted,
       budgetLimit: hasBudget ? Number(budgetInput) : null,
       budgetUnrestricted: budgetUnrestricted || (useUnrestrictedDefaults && !hasBudget),
       myDataConsent: myDataConsent === 'AGREED',
@@ -330,7 +333,7 @@ function ParticipantPreferencePage({
       return
     }
     if (!myDataConsent) {
-      showFieldError('myDataConsent', '마이데이터 활용 동의 여부를 선택해주세요.')
+      showFieldError('myDataConsent', MOMEOKJI_TEXT.preference.myDataValidation)
       return
     }
 
@@ -360,11 +363,11 @@ function ParticipantPreferencePage({
   const handleChooseMissingAgain = () => {
     setShowMissingChoice(false)
     if (avoidFoods.length === 0) {
-      showFieldError('avoidFoods', '피하고 싶은 음식 또는 없어요를 선택해주세요.')
+      showFieldError('avoidFoods', MOMEOKJI_TEXT.preference.avoidValidation)
       return
     }
     if (!budgetUnrestricted && budgetInput.trim() === '') {
-      showFieldError('budget', '1인당 예산 상한을 입력하거나 상관없어요를 선택해주세요.')
+      showFieldError('budget', MOMEOKJI_TEXT.preference.budgetValidation)
     }
   }
 
@@ -428,20 +431,20 @@ function ParticipantPreferencePage({
             ref={(element) => { sectionRefs.current.avoidFoods = element }}
           >
             <div className="participant-preference-label">
-              <strong>피하고 싶은 음식</strong>
+              <strong>{MOMEOKJI_TEXT.preference.avoidTitle}</strong>
               <span>필수</span>
             </div>
-            <p>알레르기나 못 먹는 음식은 후보에서 제외돼요.</p>
+            <p>{MOMEOKJI_TEXT.preference.avoidDescription}</p>
             <PreferenceChips
-              label="피하고 싶은 음식"
+              label={MOMEOKJI_TEXT.preference.avoidTitle}
               options={selectableAvoidOptions}
               selected={avoidFoods}
               onToggle={toggleAvoidFood}
             />
             <AddableMenuInput
               value={avoidInput}
-              placeholder="알레르기나 못 먹는 음식 입력"
-              ariaLabel="피하고 싶은 음식 직접 입력"
+              placeholder={MOMEOKJI_TEXT.preference.avoidInputPlaceholder}
+              ariaLabel={`${MOMEOKJI_TEXT.preference.avoidTitle} 직접 입력`}
               onChange={setAvoidInput}
               onAdd={addCustomAvoidFood}
             />
@@ -455,10 +458,10 @@ function ParticipantPreferencePage({
             ref={(element) => { sectionRefs.current.budget = element }}
           >
             <div className="participant-preference-label">
-              <strong>1인당 예산 상한</strong>
+              <strong>{MOMEOKJI_TEXT.preference.budgetTitle}</strong>
               <span>필수</span>
             </div>
-            <p>추천에 사용할 최대 금액을 선택하거나 직접 입력해주세요.</p>
+            <p>{MOMEOKJI_TEXT.preference.budgetDescription}</p>
             {/* ===== 자주 쓰는 예산은 한 번에 선택하고 상관없음도 명시적으로 전송 ===== */}
             <PreferenceChips
               label="예산 빠른 선택"
@@ -478,7 +481,7 @@ function ParticipantPreferencePage({
                 type="text"
                 inputMode="numeric"
                 placeholder="예: 20,000"
-                aria-label="1인당 예산 상한"
+                aria-label={MOMEOKJI_TEXT.preference.budgetTitle}
                 aria-invalid={validationField === 'budget'}
                 disabled={budgetUnrestricted}
                 value={formatBudgetInput(budgetInput)}
@@ -497,11 +500,11 @@ function ParticipantPreferencePage({
 
           <section className="participant-preference-section participant-preference-section--optional">
             <div className="participant-preference-label">
-              <strong>주차 여부</strong>
+              <strong>{MOMEOKJI_TEXT.preference.parkingTitle}</strong>
               <em>선택</em>
             </div>
             <PreferenceChips
-              label="주차 여부"
+              label={MOMEOKJI_TEXT.preference.parkingTitle}
               options={PARKING_OPTIONS}
               selected={parkingPreference}
               onToggle={setParkingPreference}
@@ -511,11 +514,11 @@ function ParticipantPreferencePage({
 
           <section className="participant-preference-section participant-preference-section--optional">
             <div className="participant-preference-label">
-              <strong>원하는 분위기</strong>
+              <strong>{MOMEOKJI_TEXT.preference.additionalTitle}</strong>
               <em>선택</em>
             </div>
             <PreferenceChips
-              label="원하는 분위기"
+              label={MOMEOKJI_TEXT.preference.additionalTitle}
               options={MOOD_OPTIONS}
               selected={moods}
               onToggle={toggleMood}
@@ -528,10 +531,10 @@ function ParticipantPreferencePage({
             ref={(element) => { sectionRefs.current.myDataConsent = element }}
           >
             <div className="participant-preference-label">
-              <strong>마이데이터 활용</strong>
+              <strong>{MOMEOKJI_TEXT.preference.myDataTitle}</strong>
               <span>필수</span>
             </div>
-            <p>동의 여부를 선택해주세요. 동의하지 않아도 모임에는 참여할 수 있어요.</p>
+            <p>{MOMEOKJI_TEXT.preference.myDataDescription}</p>
 
             {/* ===== 마이데이터 활용 범위를 선택 전에 바로 확인하는 핵심 요약 ===== */}
             <div className="participant-preference-data-summary">

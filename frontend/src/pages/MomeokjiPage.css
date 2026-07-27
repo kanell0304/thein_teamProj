@@ -64,6 +64,7 @@
 .momeokji-duration-field small { color: var(--color-muted); font-size: 11px; line-height: 16px; }
 .momeokji-duration-field input { width: 100%; accent-color: var(--color-primary); cursor: pointer; }
 .momeokji-duration-field em { display: flex; justify-content: space-between; color: var(--color-subtle); font-size: 10px; font-style: normal; }
+.momeokji-duration-field .momeokji-duration-max { color: var(--color-text); font-size: 10px; font-weight: 700; }
 
 @media (max-height: 620px) {
   .momeokji-sheet { --ui-header-height: 54px; --ui-header-padding: 12px 16px 8px; }

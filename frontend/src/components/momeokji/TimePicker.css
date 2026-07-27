@@ -18,6 +18,7 @@
   overflow-y: auto;
   overscroll-behavior: contain;
   scroll-snap-type: y mandatory;
+  touch-action: pan-y;
   scrollbar-width: none;
 }
 
@@ -40,6 +41,7 @@
   font-size: 15px;
   font-weight: 500;
   line-height: 20px;
+  cursor: pointer;
 }
 
 .time-picker__option.is-selected {

@@ -15,6 +15,7 @@ import {
   VOTE_DURATION,
 } from '../constants/momeokjiOptions'
 import { analyzeConversationKeywords } from '../services/momeokjiService'
+import { MOMEOKJI_TEXT } from '../locales/ko/momeokji'
 import './MomeokjiPage.css'
 
 const KEYWORD_TYPES = ['MENU', 'CATEGORY', 'RESTAURANT']
@@ -29,6 +30,7 @@ const MAX_CUSTOM_MENU_LENGTH = 30
 const MAX_CUSTOM_MENU_COUNT = 7
 const MAX_SELECTED_KEYWORDS = 3
 const CUSTOM_MENU_ALLOWED_PATTERN = /^[\p{L}\p{N}\s&+·'()\u002F-]+$/u
+const MENU_ANY_KEY = `MENU:${MENU_ANY_OPTION}`
 
 function createKeywordOption(type, name) {
   return {
@@ -215,7 +217,7 @@ function KeywordRow({ label, options, selected, onToggle }) {
 }
 
 // ===== 개인 옵션과 식당 투표 제한시간을 동일한 분 단위 입력으로 관리 =====
-function DurationField({ label, description, value, min, max, onChange }) {
+function DurationField({ label, description, value, min, max, onChange, emphasizeMax = false }) {
   return (
     <label className="momeokji-duration-field">
       <span>
@@ -232,7 +234,10 @@ function DurationField({ label, description, value, min, max, onChange }) {
         aria-label={label}
         onChange={(event) => onChange(Number(event.target.value))}
       />
-      <em><span>최소 {min}분</span><span>최대 {max}분</span></em>
+      <em>
+        <span>최소 {min}분</span>
+        <span className={emphasizeMax ? 'momeokji-duration-max' : undefined}>최대 {max}분</span>
+      </em>
     </label>
   )
 }
@@ -258,7 +263,7 @@ function MomeokjiPage({
   const [themeCode, setThemeCode] = useState('MEAL')
   const [keywordScores, setKeywordScores] = useState([])
   const [customMenuOptions, setCustomMenuOptions] = useState([])
-  const [selectedKeywordKeys, setSelectedKeywordKeys] = useState([])
+  const [selectedKeywordKeys, setSelectedKeywordKeys] = useState([MENU_ANY_KEY])
   const [keywordSelectionError, setKeywordSelectionError] = useState('')
   const [menuInput, setMenuInput] = useState('')
   const [isAnalyzing, setIsAnalyzing] = useState(false)
@@ -307,7 +312,7 @@ function MomeokjiPage({
     setIsAnalyzing(true)
     setAnalysisMessage('')
     setKeywordScores([])
-    setSelectedKeywordKeys([])
+    setSelectedKeywordKeys([MENU_ANY_KEY])
     setKeywordSelectionError('')
 
     analyzeConversationKeywords(chatRoomId, featureStartedAt, analysisParticipantIds)
@@ -555,8 +560,8 @@ function MomeokjiPage({
       case 1:
         return (
           <div className="momeokji-step">
-            <h3>몇 시에 만날까요?</h3>
-            <p className="momeokji-description">원하는 시간대를 선택해주세요.</p>
+            <h3>{MOMEOKJI_TEXT.common.timeTitle}</h3>
+            <p className="momeokji-description">{MOMEOKJI_TEXT.common.timeDescription}</p>
             {/* ===== 24시간 내부 스크롤 선택 ===== */}
             <TimePicker options={TIME_OPTIONS} value={time} onChange={setTime} />
           </div>
@@ -572,8 +577,8 @@ function MomeokjiPage({
       case 3:
         return (
           <div className="momeokji-step">
-            <h3>누가 참가하나요?</h3>
-            <p className="momeokji-description">선택한 참가자에게만 최종 공지가 보여요.</p>
+            <h3>{MOMEOKJI_TEXT.common.participantsTitle}</h3>
+            <p className="momeokji-description">{MOMEOKJI_TEXT.common.participantsDescription}</p>
             <ParticipantPicker
               people={participants}
               selectedIds={effectiveParticipantIds}
@@ -585,8 +590,8 @@ function MomeokjiPage({
       case 4:
         return (
           <div className="momeokji-step">
-            <h3>참여 시간을 정해주세요</h3>
-            <p className="momeokji-description">개인 조건 입력과 식당 투표의 제한 시간을 각각 설정해요.</p>
+            <h3>{MOMEOKJI_TEXT.common.deadlineTitle}</h3>
+            <p className="momeokji-description">{MOMEOKJI_TEXT.common.deadlineDescription}</p>
             <div className="momeokji-duration-list">
               <DurationField
                 label="개인 조건 입력 시간"
@@ -603,6 +608,7 @@ function MomeokjiPage({
                 min={VOTE_DURATION.min}
                 max={VOTE_DURATION.max}
                 onChange={setVoteDurationMinutes}
+                emphasizeMax
               />
             </div>
           </div>
@@ -610,7 +616,7 @@ function MomeokjiPage({
       case 5:
         return (
           <div className="momeokji-step">
-            <h3>모임의 주제가 무엇인가요?</h3>
+            <h3>{MOMEOKJI_TEXT.common.purposeTitle}</h3>
             <p className="momeokji-description">선택한 테마 코드는 AI 메뉴 추천 조건으로 전달돼요.</p>
             <ChipGroup label="모임 테마" options={THEMES} selected={themeCode} onToggle={setThemeCode} single />
           </div>
@@ -619,7 +625,7 @@ function MomeokjiPage({
         return (
           <div className="momeokji-step momeokji-keyword-step">
             <div className="momeokji-step-title">
-              <h3>오늘 대화엔 이런 메뉴가 나왔어요</h3>
+              <h3>{MOMEOKJI_TEXT.common.conversationTitle}</h3>
               <span>필수</span>
             </div>
             <p className="momeokji-description" aria-live="polite">

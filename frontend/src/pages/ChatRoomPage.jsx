@@ -426,6 +426,10 @@ function ChatRoomPage({ room: providedRoom, currentUser = DEMO_CURRENT_USER }) {
           onRecommendationProgress: (event) => {
             if (event.status === 'STARTED') {
               setIsCreatingVote(true)
+              setPreferenceSession((previous) => previous ? {
+                ...previous,
+                status: 'GENERATING',
+              } : previous)
               return
             }
             if (event.status === 'FAILED') {
@@ -711,6 +715,72 @@ function ChatRoomPage({ room: providedRoom, currentUser = DEMO_CURRENT_USER }) {
     setRecommendationError('참여 안 하기를 선택했어요. 모임 설정을 다시 시작해주세요.')
   }
 
+  // ===== 공지 영역은 최신 진행 상태 하나만 표시하고 상태 변경 시 새 공지로 교체 =====
+  const renderCurrentNotice = () => {
+    if (voteSession && canViewVote) {
+      return (
+        <ChatNotice
+          key={`vote-${voteSession.id ?? voteSession.roundId}-${voteSession.status}`}
+          text={getVoteNoticeText(voteSession.status)}
+        >
+          <MomeokjiVoteNotice
+            status={voteSession.status}
+            onOpenVote={() => setIsVotePageOpen(true)}
+          />
+        </ChatNotice>
+      )
+    }
+
+    if (recommendationError) {
+      return (
+        <ChatNotice
+          key={`recommendation-error-${recommendationError}`}
+          text={recommendationError}
+        />
+      )
+    }
+
+    if (preferenceSession && canViewPreference) {
+      return (
+        <ChatNotice
+          key={`preference-${preferenceSession.meetupId}-${preferenceSession.status}`}
+          text={getPreferenceNoticeText(preferenceSession.status)}
+        >
+          <MomeokjiPreferenceNotice
+            status={preferenceSession.status}
+            participantCount={preferenceSession.participantIds.length}
+            submittedCount={preferenceSession.submittedParticipantIds.length}
+            deadlineAt={preferenceSession.deadlineAt}
+            hasSubmitted={includesMemberId(
+              preferenceSession.submittedParticipantIds,
+              currentUser.id,
+            )}
+            onOpen={() => setIsParticipantPreferenceOpen(true)}
+          />
+        </ChatNotice>
+      )
+    }
+
+    if (isCreatingVote) {
+      return <ChatNotice key="recommendation-loading" text="AI가 추천 식당을 찾고 있어요." />
+    }
+
+    if (meetupCreationError) {
+      return (
+        <ChatNotice
+          key={`meetup-error-${meetupCreationError}`}
+          text={meetupCreationError}
+        />
+      )
+    }
+
+    if (isCreatingMeetup) {
+      return <ChatNotice key="meetup-loading" text="모임을 만들고 있어요." />
+    }
+
+    return null
+  }
+
   // ===== 새 기능 시작 시각을 만들고 공통 설정·키워드 분석 상태를 새 세션으로 초기화 =====
   const startMomeokjiSession = () => {
     setMomeokjiFeatureStartedAt(new Date().toISOString())
@@ -915,45 +985,8 @@ function ChatRoomPage({ room: providedRoom, currentUser = DEMO_CURRENT_USER }) {
       />
 
       <div className="chat-body">
-        {/* ===== 모임 생성 REST 요청 상태를 채팅 공지로 표시 ===== */}
-        {isCreatingMeetup && <ChatNotice text="모임을 만들고 있어요." />}
-        {meetupCreationError && <ChatNotice text={meetupCreationError} />}
-
-        {/* ===== 참가자 전용 공지: 개인 조건 입력 현황과 현재 단계 연결 ===== */}
-        {preferenceSession && canViewPreference && (
-          <ChatNotice
-            text={getPreferenceNoticeText(preferenceSession.status)}
-          >
-            <MomeokjiPreferenceNotice
-              status={preferenceSession.status}
-              participantCount={preferenceSession.participantIds.length}
-              submittedCount={preferenceSession.submittedParticipantIds.length}
-              deadlineAt={preferenceSession.deadlineAt}
-              hasSubmitted={includesMemberId(
-                preferenceSession.submittedParticipantIds,
-                currentUser.id,
-              )}
-              onOpen={() => setIsParticipantPreferenceOpen(true)}
-            />
-          </ChatNotice>
-        )}
-
-        {/* 개인 조건 단계 없이 추천을 다시 요청하는 예외 흐름의 생성 상태. */}
-        {isCreatingVote && !preferenceSession && (
-          <ChatNotice text="AI가 추천 식당을 찾고 있어요." />
-        )}
-        {/* 성공한 투표 회차가 존재하면 이전 추천 실패 공지는 표시하지 않습니다. */}
-        {recommendationError && !voteSession && <ChatNotice text={recommendationError} />}
-
-        {/* ===== 참가자 전용 공지: 생성·진행·결과 상태와 연결 버튼만 표시 ===== */}
-        {voteSession && canViewVote && (
-          <ChatNotice text={getVoteNoticeText(voteSession.status)}>
-            <MomeokjiVoteNotice
-              status={voteSession.status}
-              onOpenVote={() => setIsVotePageOpen(true)}
-            />
-          </ChatNotice>
-        )}
+        {/* ===== 새 상태가 생기면 이전 내용을 교체하는 단일 공지 영역 ===== */}
+        {renderCurrentNotice()}
         <ChatMessageList
           messages={messages}
           voteSession={voteSession}
