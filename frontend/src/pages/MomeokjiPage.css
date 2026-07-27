@@ -2,7 +2,42 @@
 
 /* ===== 공통 바텀시트 변수만 화면 크기에 맞게 재정의 ===== */
 .momeokji-layer { --ui-layer-z: 20; --ui-backdrop-bg: rgba(24, 25, 27, 0.08); }
-.momeokji-sheet { --ui-sheet-height: 532px; --ui-header-height: 68px; --ui-header-padding: 20px 16px 12px; }
+.momeokji-layer.is-collapsed { pointer-events: none; }
+.momeokji-layer.is-collapsed .ui-backdrop { opacity: 0; pointer-events: none; }
+.momeokji-sheet {
+  --ui-sheet-height: 532px;
+  --ui-header-height: 68px;
+  --ui-header-padding: 20px 16px 12px;
+  transition: transform 220ms ease, box-shadow 220ms ease;
+}
+.momeokji-layer.is-collapsed .momeokji-sheet { pointer-events: auto; }
+.momeokji-sheet.is-collapsed { transform: translateY(calc(100% - 32px)); box-shadow: 0 -3px 12px rgba(24, 25, 27, 0.12); }
+.momeokji-sheet.is-dragging { animation: none; transition: none; }
+.momeokji-sheet.is-collapsed .momeokji-sheet__header,
+.momeokji-sheet.is-collapsed .ui-sheet__body,
+.momeokji-sheet.is-collapsed .momeokji-menu-input-footer,
+.momeokji-sheet.is-collapsed .next-progress-button { visibility: hidden; pointer-events: none; }
+.momeokji-sheet__header { cursor: grab; touch-action: none; user-select: none; }
+.momeokji-sheet__header:active { cursor: grabbing; }
+.momeokji-sheet__header button { cursor: pointer; }
+.momeokji-sheet__handle {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 3;
+  width: 100%;
+  height: 32px;
+  padding: 5px 0 19px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  background: transparent !important;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+.momeokji-sheet__handle:active { cursor: grabbing; }
+.momeokji-sheet__handle > span { width: 38px; height: 4px; border-radius: 999px; background: #c7cbd0; }
 .momeokji-step-count { margin-left: auto; color: var(--color-subtle); font-size: 13px; font-weight: 600; }
 
 /* ===== 단계별 내용만 모먹지 화면에서 관리 ===== */

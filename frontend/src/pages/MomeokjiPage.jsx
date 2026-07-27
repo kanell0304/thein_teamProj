@@ -25,6 +25,7 @@ const KEYWORD_ROW_CONFIG = [
   { type: 'RESTAURANT', label: '음식점명' },
 ]
 const DRAG_SCROLL_THRESHOLD_PX = 5
+const MOMEOKJI_COLLAPSED_HANDLE_HEIGHT = 32
 const MAX_EXTRACTED_KEYWORDS_PER_TYPE = 7
 const MAX_CUSTOM_MENU_LENGTH = 30
 const MAX_CUSTOM_MENU_COUNT = 7
@@ -268,7 +269,14 @@ function MomeokjiPage({
   const [menuInput, setMenuInput] = useState('')
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [analysisMessage, setAnalysisMessage] = useState('')
+  const [isCollapsed, setIsCollapsed] = useState(false)
+  const [isDragging, setIsDragging] = useState(false)
+  const [dragOffset, setDragOffset] = useState(null)
   const analyzedRequestKeyRef = useRef(null)
+  const sheetRef = useRef(null)
+  const dragStateRef = useRef(null)
+  const dragCleanupRef = useRef(null)
+  const didDragRef = useRef(false)
 
   // ===== 주최자 ID는 UI 상태와 무관하게 최종 참가자 값에 항상 포함 =====
   const effectiveParticipantIds = useMemo(
@@ -283,14 +291,174 @@ function MomeokjiPage({
     ? `${featureStartedAt}|${analysisParticipantIds.join(',')}`
     : null
 
+  // ===== 전역 포인터 추적을 해제해 시트 밖에서 끝난 드래그도 안전하게 정리 =====
+  const cleanupSheetDragListeners = () => {
+    dragCleanupRef.current?.()
+    dragCleanupRef.current = null
+  }
+
+  const cancelSheetDrag = () => {
+    cleanupSheetDragListeners()
+    dragStateRef.current = null
+    didDragRef.current = false
+    setDragOffset(null)
+    setIsDragging(false)
+  }
+
+  // ===== 모먹지 설정 시트를 손가락·마우스로 위아래 이동하고 끝 위치에 스냅 =====
+  const startSheetDrag = (event) => {
+    if (event.pointerType === 'mouse' && event.button !== 0) return
+    const interactiveControl = event.target.closest?.('button, a, input, select, textarea')
+    if (interactiveControl && !interactiveControl.classList.contains('momeokji-sheet__handle')) return
+
+    if (event.pointerType !== 'mouse') event.preventDefault()
+    cleanupSheetDragListeners()
+
+    const pointerId = event.pointerId
+    const sheetHeight = sheetRef.current?.offsetHeight ?? 0
+    const maxOffset = Math.max(0, sheetHeight - MOMEOKJI_COLLAPSED_HANDLE_HEIGHT)
+    dragStateRef.current = {
+      pointerId,
+      startY: event.clientY,
+      baseOffset: isCollapsed ? maxOffset : 0,
+      maxOffset,
+    }
+    didDragRef.current = false
+    setIsDragging(true)
+
+    const moveSheet = (moveEvent) => {
+      const dragState = dragStateRef.current
+      if (!dragState || moveEvent.pointerId !== dragState.pointerId) return
+      moveEvent.preventDefault()
+      const deltaY = moveEvent.clientY - dragState.startY
+      if (Math.abs(deltaY) > 4) didDragRef.current = true
+      setDragOffset(Math.min(
+        dragState.maxOffset,
+        Math.max(0, dragState.baseOffset + deltaY),
+      ))
+    }
+
+    const finishSheet = (finishEvent) => {
+      const dragState = dragStateRef.current
+      if (!dragState || finishEvent.pointerId !== dragState.pointerId) return
+      const deltaY = finishEvent.clientY - dragState.startY
+      const nextOffset = Math.min(
+        dragState.maxOffset,
+        Math.max(0, dragState.baseOffset + deltaY),
+      )
+      const collapseBoundary = Math.min(96, dragState.maxOffset * 0.2)
+      setIsCollapsed(nextOffset > collapseBoundary)
+      cleanupSheetDragListeners()
+      dragStateRef.current = null
+      setDragOffset(null)
+      setIsDragging(false)
+    }
+
+    const cancelPointerDrag = (cancelEvent) => {
+      if (cancelEvent.pointerId === pointerId) cancelSheetDrag()
+    }
+
+    window.addEventListener('pointermove', moveSheet, { passive: false })
+    window.addEventListener('pointerup', finishSheet)
+    window.addEventListener('pointercancel', cancelPointerDrag)
+    dragCleanupRef.current = () => {
+      window.removeEventListener('pointermove', moveSheet)
+      window.removeEventListener('pointerup', finishSheet)
+      window.removeEventListener('pointercancel', cancelPointerDrag)
+    }
+    event.currentTarget.setPointerCapture?.(pointerId)
+  }
+
+  // ===== 데스크톱 브라우저에서 마우스 이동·해제를 창 전체에서 직접 추적 =====
+  const startSheetMouseDrag = (event) => {
+    if (event.button !== 0) return
+    const interactiveControl = event.target.closest?.('button, a, input, select, textarea')
+    if (interactiveControl && !interactiveControl.classList.contains('momeokji-sheet__handle')) return
+
+    event.preventDefault()
+    cleanupSheetDragListeners()
+
+    const sheetHeight = sheetRef.current?.offsetHeight ?? 0
+    const maxOffset = Math.max(0, sheetHeight - MOMEOKJI_COLLAPSED_HANDLE_HEIGHT)
+    dragStateRef.current = {
+      pointerId: 'mouse',
+      startY: event.clientY,
+      baseOffset: isCollapsed ? maxOffset : 0,
+      maxOffset,
+    }
+    didDragRef.current = false
+    setIsDragging(true)
+
+    const moveSheet = (moveEvent) => {
+      const dragState = dragStateRef.current
+      if (!dragState || dragState.pointerId !== 'mouse') return
+      moveEvent.preventDefault()
+      const deltaY = moveEvent.clientY - dragState.startY
+      if (Math.abs(deltaY) > 4) didDragRef.current = true
+      setDragOffset(Math.min(
+        dragState.maxOffset,
+        Math.max(0, dragState.baseOffset + deltaY),
+      ))
+    }
+
+    const finishSheet = (finishEvent) => {
+      const dragState = dragStateRef.current
+      if (!dragState || dragState.pointerId !== 'mouse') return
+      const deltaY = finishEvent.clientY - dragState.startY
+      const nextOffset = Math.min(
+        dragState.maxOffset,
+        Math.max(0, dragState.baseOffset + deltaY),
+      )
+      const collapseBoundary = Math.min(96, dragState.maxOffset * 0.2)
+      setIsCollapsed(nextOffset > collapseBoundary)
+      cleanupSheetDragListeners()
+      dragStateRef.current = null
+      setDragOffset(null)
+      setIsDragging(false)
+    }
+
+    window.addEventListener('mousemove', moveSheet, { passive: false })
+    window.addEventListener('mouseup', finishSheet)
+    dragCleanupRef.current = () => {
+      window.removeEventListener('mousemove', moveSheet)
+      window.removeEventListener('mouseup', finishSheet)
+    }
+  }
+
+  const toggleSheet = () => {
+    if (didDragRef.current) {
+      didDragRef.current = false
+      return
+    }
+    setIsCollapsed((previous) => !previous)
+  }
+
+  const closeMomeokji = (reason) => {
+    cancelSheetDrag()
+    setIsCollapsed(false)
+    onClose(reason)
+  }
+
   useEffect(() => {
     if (!open) return undefined
     const closeOnEscape = (event) => {
-      if (event.key === 'Escape') onClose('cancel')
+      if (event.key !== 'Escape') return
+      dragCleanupRef.current?.()
+      dragCleanupRef.current = null
+      dragStateRef.current = null
+      didDragRef.current = false
+      setDragOffset(null)
+      setIsDragging(false)
+      setIsCollapsed(false)
+      onClose('cancel')
     }
     window.addEventListener('keydown', closeOnEscape)
     return () => window.removeEventListener('keydown', closeOnEscape)
   }, [open, onClose])
+
+  useEffect(() => () => {
+    dragCleanupRef.current?.()
+  }, [])
 
   useEffect(() => {
     if (
@@ -544,7 +712,7 @@ function MomeokjiPage({
       moods: [],
     })
     setStep(0)
-    onClose('complete')
+    closeMomeokji('complete')
   }
 
   const renderStep = () => {
@@ -668,15 +836,40 @@ function MomeokjiPage({
   if (!open) return null
 
   return (
-    <div className="ui-layer momeokji-layer" role="presentation">
+    <div className={`ui-layer momeokji-layer${isCollapsed ? ' is-collapsed' : ''}`} role="presentation">
       <button
         className="ui-backdrop"
         type="button"
         aria-label="모먹지 닫기"
-        onClick={() => onClose('cancel')}
+        onClick={() => closeMomeokji('cancel')}
       />
-      <section className="ui-sheet momeokji-sheet" role="dialog" aria-modal="true" aria-labelledby="momeokji-title">
-        <header className="ui-sheet__header momeokji-sheet__header">
+      <section
+        ref={sheetRef}
+        className={`ui-sheet momeokji-sheet${isCollapsed ? ' is-collapsed' : ''}${isDragging ? ' is-dragging' : ''}`}
+        style={dragOffset == null ? undefined : { transform: `translateY(${dragOffset}px)` }}
+        role="dialog"
+        aria-modal={!isCollapsed}
+        aria-labelledby="momeokji-title"
+      >
+        {/* ===== 설정 시트를 위아래로 접고 펼치는 드래그 손잡이 ===== */}
+        <button
+          className="momeokji-sheet__handle"
+          type="button"
+          aria-label={isCollapsed ? '모먹지 설정 펼치기' : '모먹지 설정 접기'}
+          aria-expanded={!isCollapsed}
+          onClick={toggleSheet}
+          onPointerDown={startSheetDrag}
+          onMouseDown={startSheetMouseDrag}
+        >
+          <span />
+        </button>
+
+        <header
+          className="ui-sheet__header momeokji-sheet__header"
+          aria-hidden={isCollapsed}
+          onPointerDown={startSheetDrag}
+          onMouseDown={startSheetMouseDrag}
+        >
           {step > 0 && (
             <button className="ui-sheet__back" type="button" aria-label="이전 단계" onClick={() => setStep((previous) => previous - 1)}>‹</button>
           )}
@@ -684,7 +877,7 @@ function MomeokjiPage({
           <h2 id="momeokji-title">오늘 모 먹지?</h2>
           <span className="momeokji-step-count">{step + 1}/{TOTAL_STEPS}</span>
         </header>
-        <div className="ui-sheet__body">{renderStep()}</div>
+        <div className="ui-sheet__body" aria-hidden={isCollapsed}>{renderStep()}</div>
         {step === TOTAL_STEPS - 1 && (
           <div className="momeokji-menu-input-footer">
             <AddableMenuInput
