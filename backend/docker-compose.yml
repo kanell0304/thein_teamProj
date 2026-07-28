@@ -1,6 +1,6 @@
 services:
   backend:
-    image: kanell0304/momeogji-backend:latest
+    image: leegj/momeogji-backend:latest
     ports:
       - "8081:8081"
     volumes:

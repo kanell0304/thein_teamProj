@@ -25,8 +25,8 @@ jobs:
           context: backend
           push: true
           tags: |
-            kanell0304/momeogji-backend:latest
-            kanell0304/momeogji-backend:${{ github.sha }}
+            leegj/momeogji-backend:latest
+            leegj/momeogji-backend:${{ github.sha }}
 
       - name: Copy docker-compose.yml to EC2
         uses: appleboy/scp-action@v0.1.7
