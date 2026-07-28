@@ -1,6 +1,6 @@
-# 모먹지 DB 설계 (초안)
+# 모먹지 DB 설계
 
-> 실제 구현·테스트된 AI 추천 기능(`backend/src/main/java/com/anything/momeogji/service/recommendation`)의 API 스펙을 기준으로 작성했습니다. 채팅/모임 흐름은 아직 구현 전이라 v3 기획서 기준으로 잡아둔 스켈레톤입니다.
+> 현재 백엔드 엔티티와 채팅·모임·추천·투표 구현을 기준으로 작성했습니다.
 >
 > ERD 이미지: [db-erd.svg](db-erd.svg)
 
@@ -10,7 +10,6 @@
 USERS(Member) ─┬─ CHAT_ROOM_MEMBERS ─ CHAT_ROOMS ─┬─ CHAT_MESSAGES
                 ├─ MEETUPS(주최) ──────────────────┘
                 ├─ MEETUP_PARTICIPANTS ─┬─ PARTICIPANT_PREFERENCES
-                │                       ├─ MYDATA_CONSENTS
                 │                       └─ VOTES ── ROUND_CANDIDATES ── RESTAURANTS
                 └─ FINAL_NOTICE_CHANGE_LOGS
 
@@ -83,7 +82,7 @@ MEETUPS ─┬─ RECOMMENDATION_ROUNDS ─ ROUND_CANDIDATES
 | submission_status | VARCHAR | 개인 옵션 제출 상태 (제출완료/미응답/참여안함) |
 | confirmed_for_ai | BOOLEAN | AI 추천 요청 시 실제로 포함할 참여자로 확정됐는지 |
 
-### PARTICIPANT_PREFERENCES — 개인 옵션 (`PersonalOptionRequest`와 1:1 매칭, 실제 구현됨)
+### PARTICIPANT_PREFERENCES — 개인 옵션 (`PreferenceSubmitRequest`로 최초 1회 제출)
 
 | 컬럼 | 타입 | 설명 |
 |---|---|---|
@@ -95,16 +94,7 @@ MEETUPS ─┬─ RECOMMENDATION_ROUNDS ─ ROUND_CANDIDATES
 | parking_needed | BOOLEAN | 주차 필요 여부 — `parkingNeeded` |
 | excluded_foods | JSONB | 제외 음식 배열 — `excludedFoods`. 한 명이라도 넣으면 후보에서 제외 |
 | atmosphere | VARCHAR (nullable) | 선호 분위기 — `atmosphere`. NULL이면 상관없음 |
-
-### MYDATA_CONSENTS — 마이데이터 동의 (아직 미구현, v3 기획 반영용 스켈레톤)
-
-| 컬럼 | 타입 | 설명 |
-|---|---|---|
-| id | BIGINT PK | |
-| meetup_participant_id | BIGINT FK | 어느 참여자의 동의인지 (1:1) |
-| consent_status | VARCHAR | 동의 여부 (AGREED/DECLINED) |
-| processing_status | VARCHAR | 목업 데이터 비동기 가공 상태 (대기/처리중/완료/실패) |
-| processed_result | TEXT | 가공된 결과. 개인 원본은 노출 안 하고 그룹 조건으로만 사용 |
+| mydata_consent | BOOLEAN NOT NULL | 해당 모임에서 본인이 카드 마이데이터 활용에 동의했는지 여부. 기본값 `false` |
 
 ### RESTAURANTS — 음식점 마스터 (카카오 검색 결과 캐시, `RestaurantCandidate`와 매칭)
 
@@ -173,9 +163,8 @@ MEETUPS ─┬─ RECOMMENDATION_ROUNDS ─ ROUND_CANDIDATES
 ## 알려진 참고 사항
 
 - `votes`는 설계대로 `round_candidate_id` 기준으로 영속화되어 있습니다(`POST/DELETE /api/meetups/{meetupId}/rounds/{roundId}/candidates/{roundCandidateId}/votes`). 참여자별로 idempotent하게 처리되며, 득표수는 매 투표마다 웹소켓으로 실시간 브로드캐스트됩니다.
-- `participant_preferences`도 실제로 저장됩니다. `personalOptions[].participantId`는 자유 문자열이 아니라 **실제 회원 ID(Long)**여야 하며, 채팅방 멤버십까지는 요구하지 않고 실존하는 회원인지만 확인합니다(투표는 기존처럼 채팅방 멤버십을 요구함). 재추천 시 같은 참여자가 다시 제출하면 최신값으로 갱신됩니다.
+- `participant_preferences`는 초대된 참여자가 모임마다 최초 한 번만 제출합니다. 중복 제출은 거부되며, 재추천 시에는 새로 제출받거나 덮어쓰지 않고 저장된 선호를 읽어 다음 추천 회차에 재사용합니다.
 - 재추천 시 "이전에 추천된 곳 제외" 목록은 별도 컬럼 없이, 같은 `meetup_id`의 이전 `round_candidates`를 조회해서 파생합니다.
 - `final_notice_change_logs`도 실제로 쓰입니다(`PATCH /api/meetups/{meetupId}/final-notice`로 약속시간 수정 시 호스트/변경필드/시각을 기록). 지금은 약속시간(`meeting_datetime`)만 수정 가능합니다.
 - `meetups.vote_deadline_at`도 실제로 적용됩니다. 모임 생성 시 선택적으로 지정하며, 지나면 투표/투표취소 모두 400으로 막힙니다.
-- `mydata_consents`는 아직 기능 자체가 구현되지 않아 v3 기획서 기준 스켈레톤 그대로입니다(v3 범위 외).
 - 로그인은 카카오 전용으로 확정되어 실제로 구현되어 있습니다(카카오 OAuth + 자체 JWT 발급). `SecurityConfig`가 `/api/**`를 기본적으로 인증 필요로 막고 있고, `/api/dev/**`(dev-login 우회)는 `dev` 스프링 프로필에서만 노출됩니다.
