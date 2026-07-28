@@ -12,31 +12,39 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-java@v4
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
         with:
-          distribution: temurin
-          java-version: '21'
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Build jar
-        working-directory: backend
-        run: ./gradlew bootJar
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: backend
+          push: true
+          tags: |
+            kanell0304/momeogji-backend:latest
+            kanell0304/momeogji-backend:${{ github.sha }}
 
-      - name: Copy jar to EC2
+      - name: Copy docker-compose.yml to EC2
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ubuntu
           key: ${{ secrets.EC2_SSH_KEY }}
-          source: "backend/build/libs/*.jar"
+          source: "backend/docker-compose.yml"
           target: "/opt/momeogji"
-          strip_components: 3
+          strip_components: 1
 
-      - name: Restart backend service
+      - name: Pull and restart container
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ubuntu
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
-            mv /opt/momeogji/momeogji-*.jar /opt/momeogji/app.jar
-            sudo systemctl restart momeogji-backend
+            cd /opt/momeogji
+            sudo docker compose pull
+            sudo docker compose up -d
