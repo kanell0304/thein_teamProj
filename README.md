@@ -2,6 +2,8 @@
 
 > 채팅방의 대화와 참여자별 조건을 실제 음식점 3곳으로 구체화하고, 투표와 최종 공지까지 한 흐름으로 연결하는 그룹 의사결정 서비스
 
+![MainImage](docs/readme_img/main.png)
+
 ## 바로가기
 
 | 구분          | 링크                                                                                                                                    |
@@ -11,8 +13,6 @@
 | 프로젝트 문서 | [Notion 프로젝트 홈](https://app.notion.com/p/momeokji/1c72e073c0e3837997f5017a13efd3c7)                                                |
 | 기술 문서     | [기술 보고서](https://app.notion.com/p/d0c2e073c0e3821a9aaf019efb07b479)                                                                |
 | 화면 설계     | [Figma](https://www.figma.com/design/9RbAxoRILDrcQTgY634Dkd/%EC%A0%9C%EB%AA%A9-%EC%97%86%EC%9D%8C?node-id=16-2947&t=gSVer82mZtyRsdFu-1) |
-
-![MainImage](docs/readme_img/main.jpg)
 
 ## 프로젝트 소개
 
@@ -37,6 +37,8 @@ AI는 카카오에서 검색한 실제 후보 안에서만 서로 다른 식당 
 | 투표·최종 확정   | 구현   | 1~4개 복수 선택, 재추천, 동률·무투표 판정, 최종 공지 저장과 실시간 전송              | [투표·재추천·최종 확정 프로세스](https://app.notion.com/p/3aa2e073c0e381cab625f0e7159e711f)   |
 
 ## 서비스 흐름
+
+![FlowImage](docs/readme_img/flow.jpg)
 
 ```mermaid
 flowchart LR
