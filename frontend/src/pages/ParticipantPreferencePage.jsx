@@ -8,7 +8,6 @@ import './ParticipantPreferencePage.css'
 
 const PARKING_OPTIONS = [
   { value: 'REQUIRED', label: '주차 필요' },
-  { value: 'NOT_REQUIRED', label: '주차 불필요' },
   { value: 'ANY', label: '상관없어요' },
 ]
 
@@ -86,7 +85,7 @@ function ParticipantPreferencePage({
   const [customAvoidOptions, setCustomAvoidOptions] = useState([])
   const [avoidFoods, setAvoidFoods] = useState([AVOID_ANY_OPTION])
   const [avoidInput, setAvoidInput] = useState('')
-  const [budgetInput, setBudgetInput] = useState('20000')
+  const [budgetInput, setBudgetInput] = useState('15000')
   const [budgetUnrestricted, setBudgetUnrestricted] = useState(false)
   const [myDataConsent, setMyDataConsent] = useState(null)
   const [parkingPreference, setParkingPreference] = useState('ANY')
@@ -471,7 +470,7 @@ function ParticipantPreferencePage({
                 className="ui-input"
                 type="text"
                 inputMode="numeric"
-                placeholder="예: 20,000"
+                placeholder="예: 15,000"
                 aria-label={MOMEOKJI_TEXT.preference.budgetTitle}
                 aria-invalid={validationField === 'budget'}
                 disabled={budgetUnrestricted}
