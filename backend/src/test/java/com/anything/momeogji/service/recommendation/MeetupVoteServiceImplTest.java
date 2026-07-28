@@ -1,12 +1,14 @@
 package com.anything.momeogji.service.recommendation;
 
 import com.anything.momeogji.dto.recommendation.RoundResponse;
+import com.anything.momeogji.dto.recommendation.PersonalOptionRequest;
 import com.anything.momeogji.dto.recommendation.VoteSelectionRequest;
 import com.anything.momeogji.entity.ChatRoom;
 import com.anything.momeogji.entity.Member;
 import com.anything.momeogji.entity.recommendation.Meetup;
 import com.anything.momeogji.entity.recommendation.MeetupParticipant;
 import com.anything.momeogji.entity.recommendation.MeetupStatus;
+import com.anything.momeogji.entity.recommendation.ParticipantPreference;
 import com.anything.momeogji.entity.recommendation.RecommendationRound;
 import com.anything.momeogji.entity.recommendation.Restaurant;
 import com.anything.momeogji.entity.recommendation.RoundCandidate;
@@ -197,6 +199,23 @@ class MeetupVoteServiceImplTest {
                         .name("재투표").build())
                 .rankNo(4).build();
         MeetupParticipant participant = MeetupParticipant.builder().id(50L).meetup(meetup).build();
+        MeetupParticipant submittedParticipant = MeetupParticipant.builder()
+                .id(51L)
+                .meetup(meetup)
+                .user(meetup.getHostUser())
+                .build();
+        ParticipantPreference savedPreference = ParticipantPreference.builder()
+                .meetupParticipant(submittedParticipant)
+                .walkMinutes(10)
+                .preferredCategories(List.of("한식", "분식"))
+                .budgetLimit(20_000)
+                .parkingNeeded(true)
+                .excludedFoods(List.of("고수"))
+                .atmosphere("조용한")
+                .myDataConsent(true)
+                .build();
+        PersonalOptionRequest reusedPreference = new PersonalOptionRequest(
+                1L, 10, List.of("한식", "분식"), 20_000, true, List.of("고수"), "조용한");
         RoundResponse nextRound = new RoundResponse(100L, 3L, 2, 1, 0, "VOTING", null, List.of());
         given(roundCandidateRepository.findByRoundId(2L)).willReturn(List.of(candidate, recommendAgain));
         given(meetupParticipantRepository.findByMeetupIdAndUserId(100L, 1L)).willReturn(Optional.of(participant));
@@ -205,14 +224,16 @@ class MeetupVoteServiceImplTest {
         given(voteRepository.countDistinctVotersByRoundId(2L)).willReturn(1L);
         given(voteRepository.countByRoundCandidateId(14L)).willReturn(1L);
         given(voteRepository.countByRoundCandidateId(11L)).willReturn(0L);
-        given(participantPreferenceRepository.findByMeetupParticipant_Meetup_Id(100L)).willReturn(List.of());
-        given(recommendationRoundService.triggerAutoRecommendation(meetup, List.of())).willReturn(nextRound);
+        given(participantPreferenceRepository.findByMeetupParticipant_Meetup_Id(100L))
+                .willReturn(List.of(savedPreference));
+        given(recommendationRoundService.triggerAutoRecommendation(meetup, List.of(reusedPreference)))
+                .willReturn(nextRound);
 
         RoundResponse response = service.replaceVotes(
                 100L, 2L, new VoteSelectionRequest(List.of(14L)), 1L);
 
         assertThat(response).isEqualTo(nextRound);
-        verify(recommendationRoundService).triggerAutoRecommendation(meetup, List.of());
+        verify(recommendationRoundService).triggerAutoRecommendation(meetup, List.of(reusedPreference));
         verify(meetupFinalizeService, never()).finalizeInternal(any());
     }
 
