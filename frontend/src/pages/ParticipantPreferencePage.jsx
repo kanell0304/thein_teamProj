@@ -79,7 +79,6 @@ function ParticipantPreferencePage({
   open,
   onClose,
   onSubmit,
-  onDecline,
   participant,
   meetingSummary,
   deadlineAt,
@@ -615,9 +614,6 @@ function ParticipantPreferencePage({
               </button>
               <button className="app-button app-button--large" type="button" onClick={handleChooseMissingAgain}>
                 다시 고르기
-              </button>
-              <button className="participant-preference-decline" type="button" onClick={onDecline}>
-                참여 안 하기
               </button>
             </section>
           </div>

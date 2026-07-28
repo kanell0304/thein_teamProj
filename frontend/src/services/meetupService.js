@@ -1,11 +1,5 @@
 import { fetchMeetup, postMeetup } from '../api/meetupApi'
 
-export const USE_MOCK_API = String(
-  import.meta.env.VITE_USE_MOCK ?? 'false',
-).toLowerCase() === 'true'
-
-const mockMeetups = new Map()
-
 // ===== 숫자 ID와 좌표가 백엔드 DTO 조건을 만족하는지 확인 =====
 function requirePositiveNumber(value, fieldName) {
   const numberValue = Number(value)
@@ -75,28 +69,9 @@ export function createMeetupRequest({
   }
 }
 
-// ===== 백엔드 없이도 이후 화면 연결을 시험할 수 있는 모임 생성 응답 =====
-function createMockMeetup(request) {
-  const id = `mock-meetup-${crypto.randomUUID()}`
-  const meetup = {
-    id,
-    meetupId: id,
-    chatRoomId: request.chatRoomId,
-    status: 'RECOMMENDING',
-    commonOption: request.commonOption,
-    personalOptionDeadlineAt: request.personalOptionDeadlineAt,
-    latestRound: null,
-    voteDeadlineAt: request.voteDeadlineAt,
-    voteDurationMinutes: request.voteDurationMinutes,
-  }
-  mockMeetups.set(id, meetup)
-  return meetup
-}
-
 // ===== 화면 입력값을 변환한 뒤 모임 생성 API를 호출 =====
 export async function createMeetup(input, { signal } = {}) {
   const request = createMeetupRequest(input)
-  if (USE_MOCK_API) return createMockMeetup(request)
 
   try {
     return await postMeetup(request, { signal })
@@ -107,12 +82,6 @@ export async function createMeetup(input, { signal } = {}) {
 
 // ===== 재접속 시 현재 추천 회차와 투표 상태를 복구 =====
 export async function getMeetup(meetupId, { signal } = {}) {
-  if (USE_MOCK_API) {
-    const meetup = mockMeetups.get(String(meetupId))
-    if (!meetup) throw new Error('목업 모임 정보를 찾을 수 없습니다.')
-    return meetup
-  }
-
   try {
     return await fetchMeetup(meetupId, { signal })
   } catch (error) {

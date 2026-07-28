@@ -6,19 +6,8 @@ import {
   postFriendRequest,
 } from '../api/friendApi'
 
-const USE_MOCK_API = String(import.meta.env.VITE_USE_MOCK ?? 'false').toLowerCase() === 'true'
-
-// ===== 백엔드 연결 전에도 친구 화면을 확인할 수 있는 목업 =====
-const MOCK_FRIENDS = [
-  { id: 'member-seojun', nickname: '서준', profileImageUrl: null },
-  { id: 'member-gyeongjun', nickname: '경준', profileImageUrl: null },
-]
-const MOCK_RECEIVED_REQUESTS = []
-
-// ===== 실행 환경에 따라 목업 또는 실제 친구 API를 사용 =====
+// ===== 실제 친구 API를 사용 =====
 export async function getFriends({ signal } = {}) {
-  if (USE_MOCK_API) return MOCK_FRIENDS
-
   try {
     return await fetchFriends({ signal })
   } catch (error) {
@@ -27,8 +16,6 @@ export async function getFriends({ signal } = {}) {
 }
 
 export async function getReceivedFriendRequests({ signal } = {}) {
-  if (USE_MOCK_API) return MOCK_RECEIVED_REQUESTS
-
   try {
     return await fetchReceivedFriendRequests({ signal })
   } catch (error) {

@@ -50,9 +50,11 @@ function PlacePicker({ value, onChange }) {
       if (searchResults.length === 0) {
         setSearchError('검색 결과가 없어요. 주소 순서를 바꾸거나 지도에서 직접 선택해주세요.')
       }
-    } catch {
+    } catch (error) {
       setResults([])
-      setSearchError('장소를 불러오지 못했어요. 잠시 후 다시 시도해주세요.')
+      setSearchError(error instanceof Error
+        ? error.message
+        : '장소를 불러오지 못했어요. 잠시 후 다시 시도해주세요.')
     } finally {
       setIsSearching(false)
     }
@@ -93,8 +95,8 @@ function PlacePicker({ value, onChange }) {
         {!isRealMapReady && (
           <div className="place-picker__placeholder">
             <span className="place-picker__pin" aria-hidden="true">●</span>
-            <span>{value ? value.name : '장소를 선택하면 지도에 표시돼요'}</span>
-            <small>카카오맵 키 설정 전 데모 영역</small>
+            <span>카카오 지도를 불러오지 못했어요</span>
+            <small>JavaScript 키와 등록 도메인을 확인해주세요</small>
           </div>
         )}
         {isRealMapReady && !value && (

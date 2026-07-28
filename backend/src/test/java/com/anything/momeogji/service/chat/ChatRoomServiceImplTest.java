@@ -61,6 +61,26 @@ class ChatRoomServiceImplTest {
     }
 
     @Test
+    void 방을_만들면_호스트와_요청한_참가자만_중복없이_등록한다() {
+        given(chatRoomRepository.existsByJoinCode(anyString())).willReturn(false);
+        given(memberRepository.findById(1L)).willReturn(Optional.of(member(1L)));
+        given(memberRepository.findById(2L)).willReturn(Optional.of(member(2L)));
+        given(memberRepository.findById(3L)).willReturn(Optional.of(member(3L)));
+        given(chatRoomRepository.save(any())).willAnswer(invocation -> {
+            ChatRoom chatRoom = invocation.getArgument(0);
+            return ChatRoom.builder().id(100L).name(chatRoom.getName()).joinCode(chatRoom.getJoinCode()).build();
+        });
+
+        service.createRoom("방 이름", 1L, List.of(2L, 3L, 2L, 1L));
+
+        ArgumentCaptor<ChatRoomMember> captor = ArgumentCaptor.forClass(ChatRoomMember.class);
+        verify(chatRoomMemberRepository, times(3)).save(captor.capture());
+        assertThat(captor.getAllValues())
+                .extracting(membership -> membership.getUser().getId())
+                .containsExactly(2L, 3L, 1L);
+    }
+
+    @Test
     void 코드가_계속_충돌하면_예외를_던진다() {
         given(chatRoomRepository.existsByJoinCode(anyString())).willReturn(true);
         given(memberRepository.findById(1L)).willReturn(Optional.of(member(1L)));

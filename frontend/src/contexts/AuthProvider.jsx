@@ -57,18 +57,11 @@ function AuthProvider({ children }) {
     setUser(null)
   }, [])
 
-  // ===== 개발용 로그인: 목업에서는 로컬 사용자, 실제 모드에서는 Spring JWT 사용 =====
+  // ===== 개발용 로그인도 백엔드에서 실제 Spring JWT를 발급받아 사용 =====
   const loginForDevelopment = useCallback(async ({ kakaoId, nickname }) => {
     setIsAuthenticating(true)
     try {
-      const response = String(import.meta.env.VITE_USE_MOCK ?? 'false').toLowerCase() === 'true'
-        ? {
-          accessToken: 'mock-access-token',
-          memberId: 'member-me',
-          nickname: nickname || '테스트유저',
-        }
-        : await postDevLogin({ kakaoId, nickname })
-      return completeLogin(response)
+      return completeLogin(await postDevLogin({ kakaoId, nickname }))
     } catch (error) {
       throw new Error(error.userMessage || '개발용 로그인에 실패했습니다.', { cause: error })
     } finally {

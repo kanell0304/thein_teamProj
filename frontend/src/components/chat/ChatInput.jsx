@@ -11,9 +11,8 @@ function ChatInput({ onSend, onOpenMomeokji }) {
     event.preventDefault()
     const value = text.trim()
     if (!value) return
-    // 부모가 전달한 함수만 호출하므로, 이후 REST/WebSocket 전송 함수로 교체
-    onSend(value)
-    setText('')
+    const wasSent = onSend(value)
+    if (wasSent !== false) setText('')
   }
 
   return (

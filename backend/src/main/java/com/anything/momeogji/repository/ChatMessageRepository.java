@@ -29,6 +29,4 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> 
             @Param("toExclusive") LocalDateTime toExclusive
     );
 
-    /** 개발용 기본 대화가 이미 들어 있는지 확인해 중복 생성을 막습니다. */
-    long countByChatRoomId(Long chatRoomId);
 }
