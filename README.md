@@ -2,9 +2,7 @@
 
 > 채팅방의 대화와 참여자별 조건을 실제 음식점 3곳으로 구체화하고, 투표와 최종 공지까지 한 흐름으로 연결하는 그룹 의사결정 서비스
 
-![모먹지 서비스 주요 화면](docs/readme_img/main.png)
-
-_채팅에서 조건 수집, 추천, 투표와 최종 확정까지 이어지는 모먹지의 주요 화면입니다._
+![모먹지 소개 화면](docs/readme_img/main.png)
 
 ## 🔗 바로가기
 
@@ -140,4 +138,4 @@ thein_teamProj/
 | E-mail | kanell0304@gmail.com | wkadlf999@naver.com | 1007ckddjs12@gmail.com |
 | Github | [kanell0304](https://github.com/kanell0304) | [Paengnyeon](https://github.com/Paengnyeon) | [lsj1206](https://github.com/lsj1206) |
 | 역할   | 팀장, Backend | 팀원, Frontend | 팀원, Backend |
-| 상세   | • WebSocket 채팅방<br>• OpenAI API<br>• 음식점 추첨<br>• 친구 추가/방 코드 참여<br>• Kakao Map, Login API<br>• 배포, (CI/CD, AWS, Supabase) | • 디자인 및 UI/UX<br>• 카카오맵 API 연동<br>• React-SpringBoot 데이터 연결<br>• DB 설계 | • 기획<br>• Notion 작성<br>• 마이데이터<br>• Kakao Local API<br>• 채팅 키워드 추출 |
+| 상세   | • WebSocket 채팅<br>• 친구 추가/ 방 코드<br>• OpenAI API 음식점 추첨<br>• 카카오 맵, 로그인 API<br>• 배포 (CI/CD, AWS, Supabase) | • 디자인 및 UI/UX<br>• 카카오 맵 API 연동<br>• React-SpringBoot 데이터 연결<br>• DB 설계 | • 기획<br>• 문서 작성<br>• 마이데이터<br>• 카카오 로컬 API<br>• 채팅 키워드 추출 |
