@@ -12,6 +12,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Service;
 
 import java.util.Comparator;
@@ -28,7 +29,11 @@ import java.util.stream.Collectors;
  // 그 실검색 데이터에서 채워 넣는다(AI가 직접 만든 값은 신뢰하지 않음).
  // DB 테이블이 아직 확정되지 않았으므로 결과는 영속화하지 않고 요청-응답으로만 다룬다.
 
+// RestaurantRecommendationService 구현체가 2개(이 클래스, MockRestaurantRecommendationServiceImpl) 존재한다.
+// 둘 다 항상 빈으로 등록되며, @Primary가 없으면 주입 지점에서 어느 쪽을 써야 할지 몰라 스프링이
+// NoUniqueBeanDefinitionException을 던진다. @Primary는 "특별히 지정 안 하면 이걸 기본으로 써라"는 표시일 뿐이다.
 @Service
+@Primary
 @RequiredArgsConstructor
 public class RestaurantRecommendationServiceImpl implements RestaurantRecommendationService {
 
